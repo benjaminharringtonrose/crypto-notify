@@ -7,9 +7,9 @@ import { TEXTBELT_BASE_URL } from "./constants";
 
 dotenv.config();
 
-const TARGET_PRICE = 0.8;
+const ABOVE_TARGET_PRICES = [0.8, 0.9, 1.0];
 const CHECK_INTERVAL = "1";
-const NOTIFICATION_COOLDOWN = 60 * 60 * 1000; // 1 HR
+const NOTIFICATION_COOLDOWN = 30 * 60 * 1000; // 30 MINS
 
 const db = firestore();
 const configDocRef = db.collection("config").doc("priceAlert");
@@ -18,46 +18,58 @@ export const checkCardanoPrice = onSchedule(
   `*/${CHECK_INTERVAL} * * * *`,
   async (_event) => {
     try {
-      console.log("Running scheduled Cardano price check");
+      logger.info("Running scheduled Cardano price check");
 
       const currentPrice = await getCardanoPrice();
-      console.log(`Current Cardano price: $${currentPrice}`);
+      logger.info(`Current Cardano price: $${currentPrice}`);
 
       const configDoc = await configDocRef.get();
+      const config = configDoc.exists ? configDoc.data() : {};
 
-      const lastNotified = configDoc.exists
-        ? configDoc.data()?.lastNotified?.toDate() || new Date(0)
-        : new Date(0);
+      // Get last notified time and the last notified price threshold
+      const lastNotified = config?.lastNotified?.toDate() || new Date(0);
+      const lastNotifiedThreshold = config?.lastNotifiedThreshold || 0;
 
       const now = new Date();
       const timeSinceLastNotification = now.getTime() - lastNotified.getTime();
+      const cooldownActive = timeSinceLastNotification <= NOTIFICATION_COOLDOWN;
 
-      // Check if price is below target and we haven't notified recently
+      // Find the first price threshold that has been exceeded
+      const exceededThreshold = ABOVE_TARGET_PRICES.find(
+        (threshold) => currentPrice >= threshold
+      );
+
+      // Only notify if we found an exceeded threshold, it's higher than the last one we notified about,
+      // and the cooldown is not active
       if (
-        currentPrice <= TARGET_PRICE &&
-        timeSinceLastNotification > NOTIFICATION_COOLDOWN
+        exceededThreshold &&
+        exceededThreshold > lastNotifiedThreshold &&
+        !cooldownActive
       ) {
-        await sendSmsNotification(currentPrice);
+        await sendSmsNotification(currentPrice, exceededThreshold);
 
         await configDocRef.set(
           {
             lastNotified: firestore.FieldValue.serverTimestamp(),
+            lastNotifiedThreshold: exceededThreshold,
           },
           { merge: true }
         );
-      } else if (currentPrice <= TARGET_PRICE) {
-        console.log(
-          `Price is below target but notification cooldown active. ${Math.floor(
+
+        logger.info(
+          `Notification sent for price $${currentPrice} exceeding threshold $${exceededThreshold}`
+        );
+      } else if (exceededThreshold && cooldownActive) {
+        logger.info(
+          `Price threshold $${exceededThreshold} exceeded but notification cooldown active. ${Math.floor(
             (NOTIFICATION_COOLDOWN - timeSinceLastNotification) / 60000
           )} minutes remaining.`
         );
       } else {
-        console.log(
-          `Price above target. Current: $${currentPrice}, Target: $${TARGET_PRICE}`
-        );
+        logger.info(`No price thresholds exceeded. Current: $${currentPrice}`);
       }
     } catch (error) {
-      console.error("Error in checkCardanoPrice function:", error);
+      logger.error("Error in checkCardanoPrice function:", error);
     }
   }
 );
@@ -76,19 +88,25 @@ async function getCardanoPrice(): Promise<number> {
 
     return response.data.cardano.usd;
   } catch (error) {
-    console.error("Error fetching Cardano price:", error);
+    logger.error("Error fetching Cardano price:", error);
     throw error;
   }
 }
 
-async function sendSmsNotification(currentPrice: number): Promise<void> {
+async function sendSmsNotification(
+  currentPrice: number,
+  threshold: number
+): Promise<void> {
   try {
-    console.log(`Sending sms message to ${process.env.PHONE_NUMBER}`);
-    const message = `CARDANO ALERT: ADA is now at $${currentPrice} (Target: $${TARGET_PRICE})`;
+    logger.info(`Sending SMS message to ${process.env.PHONE_NUMBER}`);
+    const message = `CARDANO ALERT: ADA has risen above $${threshold} and is now at $${currentPrice}`;
+
     await axios.post(`${TEXTBELT_BASE_URL}/text`, {
-      phone: process.env.PHONE_NUMBER,
-      message: message,
-      key: process.env.TEXTBELT_API_KEY,
+      phone: process.env.PHONE_NUMBER || "9102289283",
+      message,
+      key:
+        process.env.TEXTBELT_API_KEY ||
+        "37cc7e109746163ca34a9cdaf2ab78a9024b0574vnvhnU6EN4wc7zrG6eJnJgaEK",
     });
   } catch (error) {
     logger.error("Error sending SMS notification:", error);

@@ -1,6 +1,6 @@
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import * as functions from "firebase-functions";
-import * as admin from "firebase-admin";
+import { logger } from "firebase-functions";
+import { firestore } from "firebase-admin";
 import dotenv from "dotenv";
 import axios from "axios";
 import { TEXTBELT_BASE_URL } from "./constants";
@@ -11,10 +11,10 @@ const TARGET_PRICE = 0.8;
 const CHECK_INTERVAL = "1";
 const NOTIFICATION_COOLDOWN = 60 * 60 * 1000; // 1 HR
 
-const db = admin.firestore();
+const db = firestore();
 const configDocRef = db.collection("config").doc("priceAlert");
 
-export const checkCryptoPrice = onSchedule(
+export const checkCardanoPrice = onSchedule(
   `*/${CHECK_INTERVAL} * * * *`,
   async (_event) => {
     try {
@@ -41,7 +41,7 @@ export const checkCryptoPrice = onSchedule(
 
         await configDocRef.set(
           {
-            lastNotified: admin.firestore.FieldValue.serverTimestamp(),
+            lastNotified: firestore.FieldValue.serverTimestamp(),
           },
           { merge: true }
         );
@@ -83,6 +83,7 @@ async function getCardanoPrice(): Promise<number> {
 
 async function sendSmsNotification(currentPrice: number): Promise<void> {
   try {
+    console.log(`Sending sms message to ${process.env.PHONE_NUMBER}`);
     const message = `CARDANO ALERT: ADA is now at $${currentPrice} (Target: $${TARGET_PRICE})`;
     await axios.post(`${TEXTBELT_BASE_URL}/text`, {
       phone: process.env.PHONE_NUMBER,
@@ -90,7 +91,7 @@ async function sendSmsNotification(currentPrice: number): Promise<void> {
       key: process.env.TEXTBELT_API_KEY,
     });
   } catch (error) {
-    functions.logger.error("Error sending SMS notification:", error);
+    logger.error("Error sending SMS notification:", error);
     throw error;
   }
 }

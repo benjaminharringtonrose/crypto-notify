@@ -3,8 +3,25 @@ import { logger } from "firebase-functions";
 import { firestore } from "firebase-admin";
 import dotenv from "dotenv";
 import axios from "axios";
-import { COIN_GEKO_BASE_URL, MERGE, TEXTBELT_BASE_URL } from "./constants";
-import { isAboveThreshold } from "./utils";
+import {
+  COIN_GEKO_BASE_URL,
+  CryptoIds,
+  Currencies,
+  MERGE,
+  RUNNING_SCHEDULE_CHECK_MESSAGE,
+  TEXTBELT_BASE_URL,
+} from "./constants";
+import {
+  checkCardanoPriceErrorMessage,
+  cooldownMessage,
+  currentCardanoPriceMessage,
+  fetchCardanoPriceErrorMessage,
+  isAboveThreshold,
+  notExceededMessage,
+  notificationSentMessage,
+  sendSmsErrorMessage,
+  textMessage,
+} from "./utils";
 
 dotenv.config();
 
@@ -17,10 +34,10 @@ const configDocRef = db.collection("config").doc("priceAlert");
 
 export const checkCardanoPrice = onSchedule(SCHEDULE, async () => {
   try {
-    logger.info("Running scheduled Cardano price check");
+    logger.info(RUNNING_SCHEDULE_CHECK_MESSAGE);
 
     const currentPrice = await getCardanoPrice();
-    logger.info(`Current Cardano price: $${currentPrice}`);
+    logger.info(currentCardanoPriceMessage(currentPrice));
 
     const configDoc = await configDocRef.get();
     const config = configDoc.exists ? configDoc.data() : {};
@@ -51,28 +68,28 @@ export const checkCardanoPrice = onSchedule(SCHEDULE, async () => {
 
       await configDocRef.set(lastNotifiedPayload, MERGE);
 
-      logger.info(
-        `Notification sent for price $${currentPrice} exceeding threshold $${exceededThreshold}`
-      );
+      logger.info(notificationSentMessage(currentPrice, exceededThreshold));
     } else if (exceededThreshold && cooldownActive) {
       logger.info(
-        `Price threshold $${exceededThreshold} exceeded but notification cooldown active. ${Math.floor(
-          (NOTIFICATION_COOLDOWN - timeSinceLastNotification) / 60000
-        )} minutes remaining.`
+        cooldownMessage({
+          exceededThreshold,
+          notificationCooldown: NOTIFICATION_COOLDOWN,
+          timeSinceLastNotification,
+        })
       );
     } else {
-      logger.info(`No price thresholds exceeded. Current: $${currentPrice}`);
+      logger.info(notExceededMessage(currentPrice));
     }
   } catch (error) {
-    logger.error("Error in checkCardanoPrice function:", error);
+    logger.error(checkCardanoPriceErrorMessage(error));
   }
 });
 
 async function getCardanoPrice(): Promise<number> {
   try {
     const params = {
-      ids: "cardano",
-      vs_currencies: "usd",
+      ids: CryptoIds.Cardano,
+      vs_currencies: Currencies.USD,
     };
 
     const response = await axios.get(`${COIN_GEKO_BASE_URL}/price`, {
@@ -81,7 +98,7 @@ async function getCardanoPrice(): Promise<number> {
 
     return response.data.cardano.usd;
   } catch (error) {
-    logger.error("Error fetching Cardano price:", error);
+    logger.error(fetchCardanoPriceErrorMessage(error));
     throw error;
   }
 }
@@ -91,16 +108,13 @@ async function sendSmsNotification(
   threshold: number
 ): Promise<void> {
   try {
-    logger.info(`Sending SMS message to ${process.env.PHONE_NUMBER}`);
-    const message = `CARDANO ALERT: ADA has risen above $${threshold} and is now at $${currentPrice}`;
-
     await axios.post(`${TEXTBELT_BASE_URL}/text`, {
       phone: process.env.PHONE_NUMBER,
-      message,
+      message: textMessage(threshold, currentPrice),
       key: process.env.TEXTBELT_API_KEY,
     });
   } catch (error) {
-    logger.error("Error sending SMS notification:", error);
+    logger.error(sendSmsErrorMessage(error));
     throw error;
   }
 }

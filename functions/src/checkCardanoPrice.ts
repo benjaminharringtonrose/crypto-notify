@@ -5,8 +5,10 @@ import dotenv from "dotenv";
 import axios from "axios";
 import {
   COIN_GEKO_BASE_URL,
+  Collections,
   CryptoIds,
   Currencies,
+  Docs,
   MERGE,
   RUNNING_SCHEDULE_CHECK_MESSAGE,
   TEXTBELT_BASE_URL,
@@ -30,7 +32,7 @@ const SCHEDULE = `*/1 * * * *`; // every 1 min
 const NOTIFICATION_COOLDOWN = 30 * 60 * 1000; // 30 mins
 
 const db = firestore();
-const configDocRef = db.collection("config").doc("priceAlert");
+const configDocRef = db.collection(Collections.Config).doc(Docs.PriceAlert);
 
 export const checkCardanoPrice = onSchedule(SCHEDULE, async () => {
   try {

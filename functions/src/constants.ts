@@ -18,3 +18,11 @@ export enum CryptoIds {
 export enum Currencies {
   USD = "usd",
 }
+
+export enum Collections {
+  Config = "config",
+}
+
+export enum Docs {
+  PriceAlert = "priceAlert",
+}

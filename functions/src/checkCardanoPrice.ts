@@ -4,14 +4,13 @@ import { firestore } from "firebase-admin";
 import dotenv from "dotenv";
 import axios from "axios";
 import {
-  COIN_GEKO_BASE_URL,
+  COINGECKO_API_URL,
   Collections,
   CryptoIds,
   Currencies,
   Docs,
   MERGE,
   RUNNING_SCHEDULE_CHECK_MESSAGE,
-  TEXTBELT_BASE_URL,
 } from "./constants";
 import {
   checkCardanoPriceErrorMessage,
@@ -21,27 +20,25 @@ import {
   isAboveThreshold,
   notExceededMessage,
   notificationSentMessage,
-  sendSmsErrorMessage,
-  textMessage,
 } from "./utils";
+import { sendSmsNotification } from "./notifications/sendSmsNotification";
 
 dotenv.config();
 
 const PRICES = [0.8, 0.9, 1.0, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
-const SCHEDULE = `*/1 * * * *`; // every 1 min
+const PRICE_CHECK_SCHEDULE = `*/1 * * * *`; // every 1 min
 const NOTIFICATION_COOLDOWN = 30 * 60 * 1000; // 30 mins
 
 const db = firestore();
 const configDocRef = db.collection(Collections.Config).doc(Docs.PriceAlert);
 
-export const checkCardanoPrice = onSchedule(SCHEDULE, async () => {
-  console.log("Checking Cardano price...");
-
+export const checkCardanoPrice = onSchedule(PRICE_CHECK_SCHEDULE, async () => {
   try {
-    logger.info(RUNNING_SCHEDULE_CHECK_MESSAGE);
+    console.log(RUNNING_SCHEDULE_CHECK_MESSAGE);
 
     const currentPrice = await getCardanoPrice();
-    logger.info(currentCardanoPriceMessage(currentPrice));
+
+    console.log(currentCardanoPriceMessage(currentPrice));
 
     const configDoc = await configDocRef.get();
     const config = configDoc.exists ? configDoc.data() : {};
@@ -72,9 +69,9 @@ export const checkCardanoPrice = onSchedule(SCHEDULE, async () => {
 
       await configDocRef.set(lastNotifiedPayload, MERGE);
 
-      logger.info(notificationSentMessage(currentPrice, exceededThreshold));
+      console.log(notificationSentMessage(currentPrice, exceededThreshold));
     } else if (exceededThreshold && cooldownActive) {
-      logger.info(
+      console.log(
         cooldownMessage({
           exceededThreshold,
           notificationCooldown: NOTIFICATION_COOLDOWN,
@@ -82,10 +79,10 @@ export const checkCardanoPrice = onSchedule(SCHEDULE, async () => {
         })
       );
     } else {
-      logger.info(notExceededMessage(currentPrice));
+      console.log(notExceededMessage(currentPrice));
     }
   } catch (error) {
-    logger.error(checkCardanoPriceErrorMessage(error));
+    console.log(checkCardanoPriceErrorMessage(error));
   }
 });
 
@@ -96,29 +93,13 @@ async function getCardanoPrice(): Promise<number> {
       vs_currencies: Currencies.USD,
     };
 
-    const response = await axios.get(`${COIN_GEKO_BASE_URL}/price`, {
+    const response = await axios.get(`${COINGECKO_API_URL}/simple/price`, {
       params,
     });
 
     return response.data.cardano.usd;
   } catch (error) {
     logger.error(fetchCardanoPriceErrorMessage(error));
-    throw error;
-  }
-}
-
-async function sendSmsNotification(
-  currentPrice: number,
-  threshold: number
-): Promise<void> {
-  try {
-    await axios.post(`${TEXTBELT_BASE_URL}/text`, {
-      phone: process.env.PHONE_NUMBER,
-      message: textMessage(threshold, currentPrice),
-      key: process.env.TEXTBELT_API_KEY,
-    });
-  } catch (error) {
-    logger.error(sendSmsErrorMessage(error));
     throw error;
   }
 }

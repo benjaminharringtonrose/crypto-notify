@@ -1,8 +1,8 @@
 import { firestore } from "firebase-admin";
 
-export const TEXTBELT_BASE_URL = "https://textbelt.com";
+export const TEXTBELT_API_URL = "https://textbelt.com";
 
-export const COIN_GEKO_BASE_URL = "https://api.coingecko.com/api/v3/simple";
+export const COINGECKO_API_URL = "https://api.coingecko.com/api/v3";
 
 export const RUNNING_SCHEDULE_CHECK_MESSAGE =
   "Running scheduled Cardano price check";

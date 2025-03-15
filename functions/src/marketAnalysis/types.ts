@@ -17,6 +17,14 @@ export interface SellDecision {
   sma20: string;
   upperBand: string;
   lowerBand: string;
+  obv: string;
+  atr: string;
+  zScore: string;
+  vwap: string;
+  stochRsi: string;
+  stochRsiSignal: string;
+  fib61_8: string;
+  conditionsMet: string[];
   recommendation: "sell" | "hold";
   timestamp: FieldValue;
 }

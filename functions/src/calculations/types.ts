@@ -25,7 +25,7 @@ export interface SellDecision {
   stochRsiSignal: string;
   fib61_8: string;
   volumeOscillator: string;
-  conditionsMet: string[];
+  metConditions: string[];
   score: string;
   recommendation: "sell" | "hold";
   timestamp: FieldValue;

@@ -5,7 +5,7 @@ import { labelData } from "./labelData";
 import { getHistoricalData } from "../api/getHistoricalData";
 
 export const trainSellModel = async () => {
-  const { prices, volumes } = await getHistoricalData("bitcoin", 365);
+  const { prices, volumes } = await getHistoricalData("cardano", 365);
   const X: number[][] = [];
   const y: number[] = [];
 

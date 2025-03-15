@@ -15,7 +15,6 @@ export const trainSellModel = async () => {
   const X: number[][] = [];
   const y: number[] = [];
 
-  // Compute features and labels for each day
   for (let i = 34; i < prices.length; i++) {
     const features = computeFeatures(prices, volumes, i, prices[i]);
     if (features.length !== 26) {
@@ -29,26 +28,22 @@ export const trainSellModel = async () => {
     y.push(label);
   }
 
-  // Log label distribution
   const sellCount = y.filter((label) => label === 1).length;
   const holdCount = y.filter((label) => label === 0).length;
   console.log(
     `Training data: ${sellCount} sell, ${holdCount} hold, total: ${y.length}`
   );
 
-  // Convert to tensors
-  const X_tensor = tf.tensor2d(X); // Shape: [n_samples, 26]
-  const y_tensor = tf.tensor1d(y); // Shape: [n_samples]
+  const X_tensor = tf.tensor2d(X);
+  const y_tensor = tf.tensor1d(y);
 
   console.log("X_tensor shape:", X_tensor.shape);
   console.log("y_tensor shape:", y_tensor.shape);
 
-  // Normalize features (min-max scaling)
   const X_min = X_tensor.min(0);
   const X_max = X_tensor.max(0);
   const X_normalized = X_tensor.sub(X_min).div(X_max.sub(X_min).add(1e-6));
 
-  // Define and train model
   const model = tf.sequential();
   model.add(
     tf.layers.dense({ units: 1, activation: "sigmoid", inputShape: [26] })
@@ -60,7 +55,7 @@ export const trainSellModel = async () => {
   });
 
   await model.fit(X_normalized, y_tensor, {
-    epochs: 100,
+    epochs: 20, // Reduced from 50
     batchSize: 32,
     validationSplit: 0.2,
     callbacks: {
@@ -72,7 +67,6 @@ export const trainSellModel = async () => {
     },
   });
 
-  // Save weights to Firestore
   const [weights, bias] = model.getWeights();
   const weightsArray = await weights.data();
   const biasValue = (await bias.data())[0];
@@ -93,7 +87,6 @@ export const trainSellModel = async () => {
     .set(weightsJson);
   console.log("Model weights saved to Firestore");
 
-  // Clean up
   X_tensor.dispose();
   y_tensor.dispose();
   X_normalized.dispose();

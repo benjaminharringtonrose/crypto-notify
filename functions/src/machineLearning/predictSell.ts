@@ -7,9 +7,6 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount as any),
 });
 
-/**
- * Predicts a sell probability using a pre-trained logistic regression model loaded from Firestore.
- */
 export async function predictSell(indicators: {
   rsi?: number;
   prevRsi?: number;
@@ -82,7 +79,7 @@ export async function predictSell(indicators: {
   const featureMins = tf.tensor1d(modelData.featureMins);
   const featureMaxs = tf.tensor1d(modelData.featureMaxs);
 
-  // Features (26 total, matching computeFeatures.ts)
+  // Features (26 total)
   const featuresRaw = tf.tensor1d([
     rsi || 0,
     prevRsi || 0,
@@ -112,10 +109,11 @@ export async function predictSell(indicators: {
     isVolumeSpike ? 1 : 0,
   ]);
 
-  // Normalize using training min/max
-  const features = featuresRaw
+  // Normalize and clamp to [0, 1]
+  const featuresNormalized = featuresRaw
     .sub(featureMins)
     .div(featureMaxs.sub(featureMins).add(1e-6));
+  const features = featuresNormalized.clipByValue(0, 1); // Clamp to 0-1 range
 
   // Predict
   const logits = features.dot(weights).add(bias);
@@ -123,7 +121,11 @@ export async function predictSell(indicators: {
   const probability = (await probabilityTensor.data())[0];
 
   console.log("Raw Features:", await featuresRaw.array());
-  console.log("Normalized Features:", await features.array());
+  console.log(
+    "Normalized Features (pre-clamp):",
+    await featuresNormalized.array()
+  );
+  console.log("Normalized Features (post-clamp):", await features.array());
   console.log("Weights:", await weights.array());
   console.log("Bias:", (await bias.data())[0]);
   console.log("Logits:", (await logits.data())[0]);

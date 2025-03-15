@@ -1,12 +1,6 @@
 import * as tf from "@tensorflow/tfjs-node";
 import * as admin from "firebase-admin";
-import serviceAccount from "../../serviceAccountKey.json";
 import { Condition } from "../types";
-
-// Initialize Firebase Admin
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount as any),
-});
 
 export async function predictSell(indicators: {
   rsi?: number;

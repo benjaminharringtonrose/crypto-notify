@@ -8,6 +8,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 export const runAnalysisModel = onSchedule(ANALYSIS_SCHEDULE, async () => {
+  console.log("Running analytics model...");
   const value = await calculateSellDecision("cardano");
   await sendSmsNotification(JSON.stringify(value));
   console.log(value);

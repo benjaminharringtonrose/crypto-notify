@@ -11,12 +11,12 @@ import { calculateStochRSI } from "./calculateStochRSI";
 import { calculateFibonacciLevels } from "./calculateFibonacciLevels";
 import { detectDoubleTop } from "../detections/detectDoubleTop";
 import { detectHeadAndShoulders } from "../detections/detectHeadAndShoulders";
-import { detectTripleTop } from "../detections/detectTripleTop"; // New import
+import { detectTripleTop } from "../detections/detectTripleTop";
 import { evaluateSellConditions } from "./evaluateSellConditions";
 import { CoinGeckoMarketChartResponse, SellDecision } from "./types";
 
 /**
- * Calculates a sell decision for a cryptocurrency using weighted indicators: RSI, SMA, MACD, Bollinger Bands, OBV, RSI divergence, ATR, Z-Score, VWAP, StochRSI, Fibonacci levels, MACD divergence, Volume Oscillator, Double Top, Head and Shoulders, and Triple Top patterns.
+ * Calculates a sell decision for a cryptocurrency using weighted indicators: RSI, SMA, MACD, Bollinger Bands, OBV, RSI divergence, ATR, Z-Score, VWAP, StochRSI, Fibonacci levels, MACD divergence, Volume Oscillator, Double Top, Head and Shoulders, Triple Top patterns, and Volume Spike.
  *
  * Computes indicators and delegates decision logic to evaluateSellConditions.
  *
@@ -117,6 +117,11 @@ export const calculateSellDecision = async (
     const prevVolumeOscillator =
       ((prevVolSmaShort - prevVolSmaLong) / prevVolSmaLong) * 100;
 
+    // Volume Spike
+    const currentVolume = volumes[volumes.length - 1];
+    const volSma5 = calculateSMA(volumes.slice(-5));
+    const isVolumeSpike = currentVolume > volSma5 * 2;
+
     // Pattern Detections
     const isDoubleTop = detectDoubleTop(prices, volumes, currentPrice);
     const isHeadAndShoulders = detectHeadAndShoulders(
@@ -124,7 +129,7 @@ export const calculateSellDecision = async (
       volumes,
       currentPrice
     );
-    const isTripleTop = detectTripleTop(prices, volumes, currentPrice); // New pattern detection
+    const isTripleTop = detectTripleTop(prices, volumes, currentPrice);
 
     // Evaluate Sell Conditions
     const { metConditions, score, recommendation } = evaluateSellConditions({
@@ -152,7 +157,8 @@ export const calculateSellDecision = async (
       isDoubleTop,
       isHeadAndShoulders,
       prevMacdLine,
-      isTripleTop, // Add isTripleTop to the indicators object
+      isTripleTop,
+      isVolumeSpike,
     });
 
     return {

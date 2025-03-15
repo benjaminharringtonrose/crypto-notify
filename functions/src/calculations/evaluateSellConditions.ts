@@ -28,7 +28,8 @@ export const evaluateSellConditions = (indicators: {
   isDoubleTop: boolean;
   isHeadAndShoulders: boolean;
   prevMacdLine: number;
-  isTripleTop: boolean; // New parameter
+  isTripleTop: boolean;
+  isVolumeSpike: boolean; // New parameter
 }): {
   metConditions: string[];
   score: string;
@@ -60,10 +61,11 @@ export const evaluateSellConditions = (indicators: {
     isHeadAndShoulders,
     prevMacdLine,
     isTripleTop,
+    isVolumeSpike,
   } = indicators;
 
   const conditions: { name: string; met: boolean; weight: number }[] = [
-    { name: "RSI Overbought", met: !!rsi && rsi > 70, weight: 0.1 }, // Adjusted weights (sum = 1.0)
+    { name: "RSI Overbought", met: !!rsi && rsi > 70, weight: 0.1 },
     {
       name: "SMA Death Cross",
       met: sma7 < sma21 && prevSma7 >= prevSma21,
@@ -118,7 +120,8 @@ export const evaluateSellConditions = (indicators: {
       met: isHeadAndShoulders,
       weight: 0.08,
     },
-    { name: "Triple Top Pattern", met: isTripleTop, weight: 0.08 }, // New condition
+    { name: "Triple Top Pattern", met: isTripleTop, weight: 0.08 },
+    { name: "Volume Spike", met: isVolumeSpike, weight: 0.06 }, // New condition
   ];
 
   const metConditions = conditions

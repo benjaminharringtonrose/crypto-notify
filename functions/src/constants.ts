@@ -5,7 +5,7 @@ export const COINGECKO_API_URL = "https://api.coingecko.com/api/v3";
 
 export const PRICES = [0.8, 0.9, 1.0, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
 export const PRICE_CHECK_SCHEDULE = `*/1 * * * *`; // every 1 min
-export const ANALYSIS_SCHEDULE = `40 15 * * *`; // every day at 3:40 PM ET
+export const ANALYSIS_SCHEDULE = `05 16 * * *`; // every day at 4:05 PM ET
 export const NOTIFICATION_COOLDOWN = 30 * 60 * 1000; // 30 mins
 
 export const RUNNING_SCHEDULE_CHECK_MESSAGE =

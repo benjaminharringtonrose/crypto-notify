@@ -21,7 +21,7 @@ import {
   notificationSentMessage,
 } from "./utils";
 import { sendSmsNotification } from "./notifications/sendSmsNotification";
-import { getCryptoPrice } from "./api/getCryptoPrice";
+import { getCurrentPrice } from "./api/getCurrentPrice";
 
 dotenv.config();
 
@@ -29,7 +29,7 @@ export const checkCardanoPrice = onSchedule(PRICE_CHECK_SCHEDULE, async () => {
   try {
     console.log(RUNNING_SCHEDULE_CHECK_MESSAGE);
 
-    const currentPrice = await getCryptoPrice({
+    const currentPrice = await getCurrentPrice({
       id: CryptoIds.Cardano,
       currency: Currencies.USD,
     });

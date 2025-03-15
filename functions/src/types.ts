@@ -30,3 +30,9 @@ export interface SellDecision {
   recommendation: "sell" | "hold";
   timestamp: FieldValue;
 }
+
+export interface Condition {
+  name: string;
+  met: boolean;
+  weight: number;
+}

@@ -13,7 +13,7 @@ import { detectDoubleTop } from "../detections/detectDoubleTop";
 import { detectHeadAndShoulders } from "../detections/detectHeadAndShoulders";
 import { detectTripleTop } from "../detections/detectTripleTop";
 import { predictSell } from "../machineLearning/predictSell";
-import { CoinGeckoMarketChartResponse, SellDecision } from "./types";
+import { CoinGeckoMarketChartResponse, SellDecision } from "../types";
 
 /**
  * Calculates a sell decision for a cryptocurrency using machine learning prediction based on indicators: RSI, SMA, MACD, Bollinger Bands, OBV, RSI divergence, ATR, Z-Score, VWAP, StochRSI, Fibonacci levels, MACD divergence, Volume Oscillator, Double Top, Head and Shoulders, Triple Top patterns, and Volume Spike.

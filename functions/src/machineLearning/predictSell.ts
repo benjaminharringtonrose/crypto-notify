@@ -1,6 +1,7 @@
 import * as tf from "@tensorflow/tfjs-node";
 import * as admin from "firebase-admin";
 import serviceAccount from "../../serviceAccountKey.json";
+import { Condition } from "../types";
 
 // Initialize Firebase Admin
 admin.initializeApp({
@@ -132,7 +133,7 @@ export async function predictSell(indicators: {
   console.log("Probability:", probability);
 
   // Conditions for metConditions
-  const conditions: { name: string; met: boolean; weight: number }[] = [
+  const conditions: Condition[] = [
     { name: "RSI Overbought", met: !!rsi && rsi > 70, weight: 0.1 },
     {
       name: "SMA Death Cross",

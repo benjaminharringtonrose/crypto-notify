@@ -1,4 +1,4 @@
-import { onSchedule } from "firebase-functions/scheduler";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import { ANALYSIS_SCHEDULE } from "./constants";
 import { calculateSellDecision } from "./calculations/calculateSellDecision";
 import { sendSmsNotification } from "./notifications/sendSmsNotification";

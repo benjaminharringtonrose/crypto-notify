@@ -35,6 +35,8 @@ const db = firestore();
 const configDocRef = db.collection(Collections.Config).doc(Docs.PriceAlert);
 
 export const checkCardanoPrice = onSchedule(SCHEDULE, async () => {
+  console.log("Checking Cardano price...");
+
   try {
     logger.info(RUNNING_SCHEDULE_CHECK_MESSAGE);
 

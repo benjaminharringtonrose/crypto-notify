@@ -12,12 +12,12 @@ import { calculateFibonacciLevels } from "./calculateFibonacciLevels";
 import { CoinGeckoMarketChartResponse, SellDecision } from "./types";
 
 /**
- * Determines whether to sell a cryptocurrency using RSI, SMA, MACD, Bollinger Bands, OBV, divergence, ATR, Z-Score, VWAP, StochRSI, and Fibonacci levels.
+ * Calculates a sell decision for a cryptocurrency using weighted indicators: RSI, SMA, MACD, Bollinger Bands, OBV, RSI divergence, ATR, Z-Score, VWAP, StochRSI, Fibonacci levels, MACD divergence, and Volume Oscillator.
  *
- * Combines multiple indicators for a robust sell decision and returns which conditions were met.
+ * Combines 13 indicators with weights, selling if the total score exceeds 0.5, and returns met conditions.
  *
  * @param {string} cryptoSymbol - The CoinGecko ID of the cryptocurrency (e.g., "bitcoin").
- * @returns {Promise<SellDecision | Error>} Trading decision details, including met conditions, or an error.
+ * @returns {Promise<SellDecision | Error>} Trading decision details, including met conditions and score, or an error.
  */
 export const calculateSellDecision = async (
   cryptoSymbol: string
@@ -58,6 +58,9 @@ export const calculateSellDecision = async (
       }),
       9
     );
+    const prevEma12 = calculateEMA(prices.slice(-13, -1), 12);
+    const prevEma26 = calculateEMA(prices.slice(-27, -1), 26);
+    const prevMacdLine = prevEma12 - prevEma26;
 
     // Bollinger Bands (and Z-Score prep)
     const sma20 = calculateSMA(prices.slice(-20));
@@ -101,15 +104,33 @@ export const calculateSellDecision = async (
     const { levels: fibLevels } = calculateFibonacciLevels(prices, 30);
     const fib61_8 = fibLevels[3]; // 61.8% level
 
-    // Decision logic with named conditions
-    const conditions: { name: string; met: boolean }[] = [
-      { name: "RSI Overbought", met: !!rsi && rsi > 70 },
-      { name: "SMA Death Cross", met: sma7 < sma21 && prevSma7 >= prevSma21 },
-      { name: "MACD Bearish", met: macdLine < signalLine },
-      { name: "Above Bollinger Upper", met: currentPrice > upperBand },
+    // Volume Oscillator
+    const volSmaShort = calculateSMA(volumes.slice(-5)); // 5-day SMA
+    const volSmaLong = calculateSMA(volumes.slice(-14)); // 14-day SMA
+    const volumeOscillator = ((volSmaShort - volSmaLong) / volSmaLong) * 100;
+    const prevVolSmaShort = calculateSMA(volumes.slice(-6, -1));
+    const prevVolSmaLong = calculateSMA(volumes.slice(-15, -1));
+    const prevVolumeOscillator =
+      ((prevVolSmaShort - prevVolSmaLong) / prevVolSmaLong) * 100;
+
+    // Decision logic with weights
+    const conditions: { name: string; met: boolean; weight: number }[] = [
+      { name: "RSI Overbought", met: !!rsi && rsi > 70, weight: 0.13 }, // Adjusted weights (sum = 1.0)
+      {
+        name: "SMA Death Cross",
+        met: sma7 < sma21 && prevSma7 >= prevSma21,
+        weight: 0.1,
+      },
+      { name: "MACD Bearish", met: macdLine < signalLine, weight: 0.13 },
+      {
+        name: "Above Bollinger Upper",
+        met: currentPrice > upperBand,
+        weight: 0.08,
+      },
       {
         name: "OBV Dropping",
         met: obvValues[obvValues.length - 1] < obvValues[obvValues.length - 2],
+        weight: 0.07,
       },
       {
         name: "Bearish RSI Divergence",
@@ -118,24 +139,42 @@ export const calculateSellDecision = async (
           !!rsi &&
           !!prevRsi &&
           rsi < prevRsi,
+        weight: 0.08,
       },
-      { name: "High ATR Volatility", met: atr > atrBaseline * 2 },
-      { name: "Z-Score High", met: zScore > 2 },
-      { name: "Above VWAP", met: currentPrice > vwap * 1.05 },
+      { name: "High ATR Volatility", met: atr > atrBaseline * 2, weight: 0.06 },
+      { name: "Z-Score High", met: zScore > 2, weight: 0.08 },
+      { name: "Above VWAP", met: currentPrice > vwap * 1.05, weight: 0.07 },
       {
         name: "StochRSI Overbought",
         met: stochRsi > 80 && stochRsi < prevStochRsi,
+        weight: 0.08,
       },
       {
         name: "Near Fibonacci 61.8%",
         met: currentPrice >= fib61_8 * 0.99 && currentPrice <= fib61_8 * 1.01,
+        weight: 0.07,
+      },
+      {
+        name: "Bearish MACD Divergence",
+        met:
+          currentPrice > prices[prices.length - 2] && macdLine < prevMacdLine,
+        weight: 0.08,
+      },
+      {
+        name: "Volume Oscillator Declining",
+        met: volumeOscillator < 0 && volumeOscillator < prevVolumeOscillator,
+        weight: 0.07,
       },
     ];
 
     const metConditions = conditions
       .filter((cond) => cond.met)
       .map((cond) => cond.name);
-    const recommendation = metConditions.length >= 6 ? "sell" : "hold";
+    const score = conditions.reduce(
+      (sum, cond) => sum + (cond.met ? cond.weight : 0),
+      0
+    );
+    const recommendation = score >= 0.5 ? "sell" : "hold";
 
     return {
       cryptoSymbol,
@@ -155,12 +194,14 @@ export const calculateSellDecision = async (
       stochRsi: stochRsi.toFixed(2),
       stochRsiSignal: stochRsiSignal.toFixed(2),
       fib61_8: fib61_8.toFixed(2),
-      conditionsMet: metConditions, // New: Array of met condition names
+      volumeOscillator: volumeOscillator.toFixed(2),
+      conditionsMet: metConditions,
+      score: score.toFixed(3),
       recommendation,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     };
   } catch (error: any) {
-    console.error("Error in shouldSell:", error.message);
+    console.error("Error in calculateSellDecision:", error.message);
     return error;
   }
 };

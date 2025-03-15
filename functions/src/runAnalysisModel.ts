@@ -1,21 +1,31 @@
 import "firebase-admin";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { ANALYSIS_SCHEDULE } from "./constants";
+import { ANALYSIS_SCHEDULE, TIME_ZONE } from "./constants";
 import { calculateSellDecision } from "./calculations/calculateSellDecision";
 import { sendSmsNotification } from "./notifications/sendSmsNotification";
 import dotenv from "dotenv";
 
 dotenv.config();
-
 export const runAnalysisModel = onSchedule(
   {
     schedule: ANALYSIS_SCHEDULE,
-    timeZone: "America/New_York",
+    timeZone: TIME_ZONE,
   },
   async () => {
     console.log("Running analytics model...");
     const value = await calculateSellDecision("cardano");
-    await sendSmsNotification(JSON.stringify(value));
-    console.log(value);
+
+    const symbol = value.cryptoSymbol.toUpperCase();
+    const price = `$${value.currentPrice}`;
+    const prob = `${Math.round(parseFloat(value.probability) * 100)}%`;
+    const rec =
+      value.recommendation.charAt(0).toUpperCase() +
+      value.recommendation.slice(1);
+    const conditions = value.metConditions.join(", ");
+    const smsMessage = `${symbol}: ${price}, Prob: ${prob}, Rec: ${rec} (${conditions})`;
+
+    await sendSmsNotification(smsMessage);
+    console.log("SMS Message:", smsMessage);
+    console.log("Full Result:", value);
   }
 );

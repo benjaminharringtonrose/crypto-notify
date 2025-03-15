@@ -25,7 +25,7 @@ import { CoinGeckoMarketChartResponse, SellDecision } from "../types";
  */
 export const calculateSellDecision = async (
   cryptoSymbol: string
-): Promise<SellDecision | Error> => {
+): Promise<SellDecision> => {
   try {
     const priceResponse = await axios.get(
       `${COINGECKO_API_URL}/simple/price?ids=${cryptoSymbol.toLowerCase()}&vs_currencies=usd`

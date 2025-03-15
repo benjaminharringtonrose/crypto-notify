@@ -19,6 +19,7 @@ import {
   isAboveThreshold,
   notExceededMessage,
   notificationSentMessage,
+  textMessage,
 } from "./utils";
 import { sendSmsNotification } from "./notifications/sendSmsNotification";
 import { getCurrentPrice } from "./api/getCurrentPrice";
@@ -59,7 +60,7 @@ export const checkCardanoPrice = onSchedule(PRICE_CHECK_SCHEDULE, async () => {
       exceededThreshold > lastNotifiedThreshold &&
       !cooldownActive
     ) {
-      await sendSmsNotification(currentPrice, exceededThreshold);
+      await sendSmsNotification(textMessage(exceededThreshold, currentPrice));
 
       const lastNotifiedPayload = {
         lastNotified: firestore.FieldValue.serverTimestamp(),

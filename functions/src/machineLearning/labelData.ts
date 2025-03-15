@@ -4,5 +4,5 @@ export const labelData = (prices: number[], dayIndex: number): number => {
   const futureAvg =
     (prices[dayIndex + 1] + prices[dayIndex + 2] + prices[dayIndex + 3]) / 3;
   const dropPercent = (prices[dayIndex] - futureAvg) / prices[dayIndex];
-  return dropPercent > 0.015 ? 1 : 0;
+  return dropPercent > 0.01 ? 1 : 0; // Sell if drop >1%
 };

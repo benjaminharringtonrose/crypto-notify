@@ -55,7 +55,7 @@ export const trainSellModel = async () => {
   });
 
   await model.fit(X_normalized, y_tensor, {
-    epochs: 20, // Reduced from 50
+    epochs: 50,
     batchSize: 32,
     validationSplit: 0.2,
     callbacks: {

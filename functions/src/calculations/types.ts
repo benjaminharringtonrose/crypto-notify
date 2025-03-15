@@ -26,7 +26,7 @@ export interface SellDecision {
   fib61_8: string;
   volumeOscillator: string;
   metConditions: string[];
-  score: string;
+  probability: string;
   recommendation: "sell" | "hold";
   timestamp: FieldValue;
 }

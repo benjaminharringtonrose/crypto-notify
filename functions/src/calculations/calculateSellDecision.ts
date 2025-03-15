@@ -12,16 +12,16 @@ import { calculateFibonacciLevels } from "./calculateFibonacciLevels";
 import { detectDoubleTop } from "../detections/detectDoubleTop";
 import { detectHeadAndShoulders } from "../detections/detectHeadAndShoulders";
 import { detectTripleTop } from "../detections/detectTripleTop";
-import { evaluateSellConditions } from "./evaluateSellConditions";
+import { predictSell } from "../machineLearning/predictSell";
 import { CoinGeckoMarketChartResponse, SellDecision } from "./types";
 
 /**
- * Calculates a sell decision for a cryptocurrency using weighted indicators: RSI, SMA, MACD, Bollinger Bands, OBV, RSI divergence, ATR, Z-Score, VWAP, StochRSI, Fibonacci levels, MACD divergence, Volume Oscillator, Double Top, Head and Shoulders, Triple Top patterns, and Volume Spike.
+ * Calculates a sell decision for a cryptocurrency using machine learning prediction based on indicators: RSI, SMA, MACD, Bollinger Bands, OBV, RSI divergence, ATR, Z-Score, VWAP, StochRSI, Fibonacci levels, MACD divergence, Volume Oscillator, Double Top, Head and Shoulders, Triple Top patterns, and Volume Spike.
  *
- * Computes indicators and delegates decision logic to evaluateSellConditions.
+ * Computes indicators and delegates prediction to predictSell.
  *
  * @param {string} cryptoSymbol - The CoinGecko ID of the cryptocurrency (e.g., "bitcoin").
- * @returns {Promise<SellDecision | Error>} Trading decision details, including met conditions and score, or an error.
+ * @returns {Promise<SellDecision | Error>} Trading decision details, including met conditions and probability, or an error.
  */
 export const calculateSellDecision = async (
   cryptoSymbol: string
@@ -131,8 +131,8 @@ export const calculateSellDecision = async (
     );
     const isTripleTop = detectTripleTop(prices, volumes, currentPrice);
 
-    // Evaluate Sell Conditions
-    const { metConditions, score, recommendation } = evaluateSellConditions({
+    // Predict Sell using ML
+    const { metConditions, probability, recommendation } = await predictSell({
       rsi,
       prevRsi,
       sma7,
@@ -181,7 +181,7 @@ export const calculateSellDecision = async (
       fib61_8: fib61_8.toFixed(2),
       volumeOscillator: volumeOscillator.toFixed(2),
       metConditions,
-      score,
+      probability: probability.toFixed(3), // Replace score with probability
       recommendation,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     };

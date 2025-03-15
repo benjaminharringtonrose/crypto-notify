@@ -1,9 +1,16 @@
+import * as tf from "@tensorflow/tfjs-node";
+import * as admin from "firebase-admin";
+import serviceAccount from "../../serviceAccountKey.json";
+
+// Initialize Firebase Admin
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount as any),
+});
+
 /**
- * Evaluates sell conditions based on a set of weighted indicators.
- * @param {Object} indicators - Object containing all computed indicator values.
- * @returns {{ metConditions: string[], score: string, recommendation: "sell" | "hold" }} Decision details.
+ * Predicts a sell probability using a pre-trained logistic regression model loaded from Firestore.
  */
-export const evaluateSellConditions = (indicators: {
+export async function predictSell(indicators: {
   rsi?: number;
   prevRsi?: number;
   sma7: number;
@@ -29,12 +36,12 @@ export const evaluateSellConditions = (indicators: {
   isHeadAndShoulders: boolean;
   prevMacdLine: number;
   isTripleTop: boolean;
-  isVolumeSpike: boolean; // New parameter
-}): {
+  isVolumeSpike: boolean;
+}): Promise<{
   metConditions: string[];
-  score: string;
+  probability: number;
   recommendation: "sell" | "hold";
-} => {
+}> {
   const {
     rsi,
     prevRsi,
@@ -64,6 +71,65 @@ export const evaluateSellConditions = (indicators: {
     isVolumeSpike,
   } = indicators;
 
+  // Load trained weights from Firestore
+  const modelRef = admin.firestore().collection("models").doc("sellPredictor");
+  const modelDoc = await modelRef.get();
+  const modelData = modelDoc.data();
+  if (!modelData) throw new Error("Model weights not found in Firestore");
+
+  const weights = tf.tensor1d(modelData.weights);
+  const bias = tf.scalar(modelData.bias);
+  const featureMins = tf.tensor1d(modelData.featureMins);
+  const featureMaxs = tf.tensor1d(modelData.featureMaxs);
+
+  // Features (26 total, matching computeFeatures.ts)
+  const featuresRaw = tf.tensor1d([
+    rsi || 0,
+    prevRsi || 0,
+    sma7,
+    sma21,
+    prevSma7,
+    prevSma21,
+    macdLine,
+    signalLine,
+    currentPrice,
+    upperBand,
+    obvValues[obvValues.length - 1],
+    atr,
+    atrBaseline,
+    zScore,
+    vwap,
+    stochRsi,
+    prevStochRsi,
+    fib61_8,
+    prices[prices.length - 2],
+    volumeOscillator,
+    prevVolumeOscillator,
+    isDoubleTop ? 1 : 0,
+    isHeadAndShoulders ? 1 : 0,
+    prevMacdLine,
+    isTripleTop ? 1 : 0,
+    isVolumeSpike ? 1 : 0,
+  ]);
+
+  // Normalize using training min/max
+  const features = featuresRaw
+    .sub(featureMins)
+    .div(featureMaxs.sub(featureMins).add(1e-6));
+
+  // Predict
+  const logits = features.dot(weights).add(bias);
+  const probabilityTensor = logits.sigmoid();
+  const probability = (await probabilityTensor.data())[0];
+
+  console.log("Raw Features:", await featuresRaw.array());
+  console.log("Normalized Features:", await features.array());
+  console.log("Weights:", await weights.array());
+  console.log("Bias:", (await bias.data())[0]);
+  console.log("Logits:", (await logits.data())[0]);
+  console.log("Probability:", probability);
+
+  // Conditions for metConditions
   const conditions: { name: string; met: boolean; weight: number }[] = [
     { name: "RSI Overbought", met: !!rsi && rsi > 70, weight: 0.1 },
     {
@@ -121,21 +187,27 @@ export const evaluateSellConditions = (indicators: {
       weight: 0.08,
     },
     { name: "Triple Top Pattern", met: isTripleTop, weight: 0.08 },
-    { name: "Volume Spike", met: isVolumeSpike, weight: 0.06 }, // New condition
+    { name: "Volume Spike", met: isVolumeSpike, weight: 0.06 },
   ];
 
   const metConditions = conditions
     .filter((cond) => cond.met)
     .map((cond) => cond.name);
-  const score = conditions.reduce(
-    (sum, cond) => sum + (cond.met ? cond.weight : 0),
-    0
-  );
-  const recommendation = score >= 0.5 ? "sell" : "hold";
+  const recommendation = probability >= 0.5 ? "sell" : "hold";
+
+  // Clean up tensors
+  weights.dispose();
+  bias.dispose();
+  featureMins.dispose();
+  featureMaxs.dispose();
+  featuresRaw.dispose();
+  features.dispose();
+  logits.dispose();
+  probabilityTensor.dispose();
 
   return {
     metConditions,
-    score: score.toFixed(3),
+    probability,
     recommendation,
   };
-};
+}

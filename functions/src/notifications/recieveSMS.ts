@@ -5,7 +5,7 @@ import { sendSMS } from "./sendSMS";
 export const receiveSMS = https.onRequest(async (req, res) => {
   const replyText = req.body.text || "No message";
 
-  const value = await calculateSellDecision(replyText);
+  const value = await calculateSellDecision(replyText.toLowerCase());
 
   const symbol = value.cryptoSymbol.toUpperCase();
   const price = `$${value.currentPrice}`;

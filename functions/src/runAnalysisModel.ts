@@ -22,7 +22,7 @@ export const runAnalysisModel = onSchedule(
       value.recommendation.charAt(0).toUpperCase() +
       value.recommendation.slice(1);
     const conditions = value.metConditions.join(", ");
-    const smsMessage = `${symbol}: ${price}\nProb: ${prob}\nRec: ${rec}\nConditions: ${conditions}\nReply with a crypto to check again.`;
+    const smsMessage = `${symbol}: ${price}\nProb: ${prob}\nRec: ${rec}\nSell conditions met: ${conditions}\nReply with a crypto to check again.`;
 
     await sendSMS(smsMessage);
     console.log("SMS Message:", smsMessage);

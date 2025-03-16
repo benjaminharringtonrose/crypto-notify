@@ -37,13 +37,34 @@ export const predictSell = async ({
   const modelData = modelDoc.data();
   if (!modelData) throw new Error("Model weights not found in Firestore");
 
-  const weights1 = tf.tensor2d(modelData.weights1, [28, 16]);
-  const bias1 = tf.tensor1d(modelData.bias1);
-  const weights2 = tf.tensor2d(modelData.weights2, [16, 1]);
-  const bias2 = tf.scalar(modelData.bias2);
-  const featureMins = tf.tensor1d(modelData.featureMins);
-  const featureMaxs = tf.tensor1d(modelData.featureMaxs);
+  const weights = JSON.parse(modelDoc.data()?.weights);
+  console.log("lstmWeights length:", weights.lstmWeights.length); // Should be 7168
+  console.log(
+    "lstmRecurrentWeights length:",
+    weights.lstmRecurrentWeights.length
+  ); // Should be 16384
 
+  // Load weights from Version 24's LSTM model with debugging
+  const lstmWeightsData = JSON.parse(modelData.weights).lstmWeights;
+  console.log("lstmWeights length:", lstmWeightsData.length);
+  const lstmWeights = tf.tensor2d(lstmWeightsData, [28, 256]); // [inputDim, 4 * units]
+
+  const lstmRecurrentWeightsData = JSON.parse(
+    modelData.weights
+  ).lstmRecurrentWeights;
+  console.log("lstmRecurrentWeights length:", lstmRecurrentWeightsData.length);
+  const lstmRecurrentWeights = tf.tensor2d(lstmRecurrentWeightsData, [64, 256]); // [units, 4 * units]
+
+  const lstmBias = tf.tensor1d(JSON.parse(modelData.weights).lstmBias); // [4 * units]
+  const denseWeights = tf.tensor2d(
+    JSON.parse(modelData.weights).denseWeights,
+    [64, 1]
+  ); // [units, output]
+  const denseBias = tf.scalar(JSON.parse(modelData.weights).denseBias); // scalar
+  const featureMins = tf.tensor1d(JSON.parse(modelData.weights).featureMins);
+  const featureMaxs = tf.tensor1d(JSON.parse(modelData.weights).featureMaxs);
+
+  // Compute normalized OBV
   const obvWindow = obvValues.slice(-30);
   const obvMin = Math.min(...obvWindow);
   const obvMax = Math.max(...obvWindow);
@@ -52,6 +73,7 @@ export const predictSell = async ({
       ? (obvValues[obvValues.length - 1] - obvMin) / (obvMax - obvMin)
       : 0;
 
+  // Prepare single-timestep input features (matching computeFeatures.ts)
   const featuresRaw = tf.tensor1d([
     rsi || 0,
     prevRsi || 0,
@@ -71,7 +93,7 @@ export const predictSell = async ({
     stochRsi,
     prevStochRsi,
     fib61_8,
-    prices[prices.length - 2],
+    prices[prices.length - 2], // Previous price
     volumeOscillator,
     prevVolumeOscillator,
     isDoubleTop ? 1 : 0,
@@ -83,14 +105,38 @@ export const predictSell = async ({
     priceChangePct || 0,
   ]);
 
+  // Normalize features as done during training
   const featuresNormalized = featuresRaw
     .sub(featureMins)
     .div(featureMaxs.sub(featureMins).add(1e-6));
-  const features = featuresNormalized.clipByValue(0, 1);
+  const features = featuresNormalized.clipByValue(0, 1).reshape([1, 1, 28]); // [batch, timesteps, features]
 
-  // Two-layer prediction
-  const hidden = features.dot(weights1).add(bias1).relu();
-  const logits = hidden.dot(weights2).add(bias2);
+  // Simplified LSTM prediction for a single timestep (no sequence history)
+  const [Wi, Wf, Wc, Wo] = tf.split(lstmWeights, 4, 1); // Input, Forget, Cell, Output weights
+  const [Ri, Rf, Rc, Ro] = tf.split(lstmRecurrentWeights, 4, 1); // Recurrent weights
+  const [bi, bf, bc, bo] = tf.split(lstmBias, 4); // Biases
+
+  const hPrev = tf.zeros([1, 64]);
+  const cPrev = tf.zeros([1, 64]);
+
+  const inputGate = tf.sigmoid(
+    features.matMul(Wi).add(hPrev.matMul(Ri)).add(bi)
+  );
+  const forgetGate = tf.sigmoid(
+    features.matMul(Wf).add(hPrev.matMul(Rf)).add(bf)
+  );
+  const cellGate = tf.tanh(features.matMul(Wc).add(hPrev.matMul(Rc)).add(bc));
+  const outputGate = tf.sigmoid(
+    features.matMul(Wo).add(hPrev.matMul(Ro)).add(bo)
+  );
+
+  const cNext = forgetGate.mul(cPrev).add(inputGate.mul(cellGate));
+  const hNext = outputGate.mul(tf.tanh(cNext));
+
+  const dropoutMask = tf.randomUniform([1, 64]).greater(0.35).cast("float32");
+  const hDropped = hNext.mul(dropoutMask).div(0.65);
+
+  const logits = hDropped.matMul(denseWeights).add(denseBias);
   const probabilityTensor = logits.sigmoid();
   const probability = (await probabilityTensor.data())[0];
 
@@ -159,17 +205,39 @@ export const predictSell = async ({
     .filter((cond) => cond.met)
     .map((cond) => cond.name);
   const recommendation =
-    probability >= 0.5 ? Recommendation.Sell : Recommendation.Hold;
+    probability >= 0.45 ? Recommendation.Sell : Recommendation.Hold;
 
-  weights1.dispose();
-  bias1.dispose();
-  weights2.dispose();
-  bias2.dispose();
+  lstmWeights.dispose();
+  lstmRecurrentWeights.dispose();
+  lstmBias.dispose();
+  denseWeights.dispose();
+  denseBias.dispose();
   featureMins.dispose();
   featureMaxs.dispose();
   featuresRaw.dispose();
   features.dispose();
-  hidden.dispose();
+  Wi.dispose();
+  Wf.dispose();
+  Wc.dispose();
+  Wo.dispose();
+  Ri.dispose();
+  Rf.dispose();
+  Rc.dispose();
+  Ro.dispose();
+  bi.dispose();
+  bf.dispose();
+  bc.dispose();
+  bo.dispose();
+  hPrev.dispose();
+  cPrev.dispose();
+  inputGate.dispose();
+  forgetGate.dispose();
+  cellGate.dispose();
+  outputGate.dispose();
+  cNext.dispose();
+  hNext.dispose();
+  dropoutMask.dispose();
+  hDropped.dispose();
   logits.dispose();
   probabilityTensor.dispose();
 

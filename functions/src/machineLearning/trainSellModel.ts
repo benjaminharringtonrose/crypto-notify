@@ -3,9 +3,14 @@ import * as admin from "firebase-admin";
 import { computeFeatures } from "./computeFeatures";
 import { labelData } from "./labelData";
 import { getHistoricalData } from "../api/getHistoricalData";
+import serviceAccount from "../../serviceAccount.json";
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount as any),
+});
 
 export const trainSellModel = async () => {
-  const { prices, volumes } = await getHistoricalData("cardano", 365);
+  const { prices, volumes } = await getHistoricalData("bitcoin", 365);
   const X: number[][] = [];
   const y: number[] = [];
 
@@ -89,3 +94,5 @@ export const trainSellModel = async () => {
   X_min.dispose();
   X_max.dispose();
 };
+
+trainSellModel();

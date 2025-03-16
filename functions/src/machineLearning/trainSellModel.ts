@@ -3,7 +3,7 @@ import * as admin from "firebase-admin";
 import { computeFeatures } from "./computeFeatures";
 import { labelData } from "./labelData";
 import { getHistoricalData } from "../api/getHistoricalData";
-import serviceAccount from "../../serviceAccount.json";
+import serviceAccount from "../../../serviceAccount.json";
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount as any),

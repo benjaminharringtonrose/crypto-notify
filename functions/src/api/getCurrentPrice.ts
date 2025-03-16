@@ -1,5 +1,6 @@
 import axios from "axios";
-import { COINGECKO_API_URL, CryptoIds, Currencies } from "../constants";
+import { COINGECKO_API_URL } from "../constants";
+import { CryptoIds, Currencies } from "../types";
 import { fetchCardanoPriceErrorMessage } from "../utils";
 
 export const getCurrentPrice = async ({

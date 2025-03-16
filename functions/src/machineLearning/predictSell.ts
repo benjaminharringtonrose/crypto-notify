@@ -1,6 +1,6 @@
 import * as tf from "@tensorflow/tfjs-node";
 import * as admin from "firebase-admin";
-import { Condition } from "../types";
+import { Condition, Recommendation } from "../types";
 
 export async function predictSell(indicators: {
   rsi?: number;
@@ -32,7 +32,7 @@ export async function predictSell(indicators: {
 }): Promise<{
   metConditions: string[];
   probability: number;
-  recommendation: "sell" | "hold";
+  recommendation: Recommendation;
 }> {
   const {
     rsi,
@@ -190,7 +190,8 @@ export async function predictSell(indicators: {
   const metConditions = conditions
     .filter((cond) => cond.met)
     .map((cond) => cond.name);
-  const recommendation = probability >= 0.5 ? "sell" : "hold";
+  const recommendation =
+    probability >= 0.5 ? Recommendation.Sell : Recommendation.Hold;
 
   // Clean up tensors
   weights.dispose();

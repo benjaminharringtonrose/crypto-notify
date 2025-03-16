@@ -2,10 +2,6 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { firestore } from "firebase-admin";
 import dotenv from "dotenv";
 import {
-  Collections,
-  CryptoIds,
-  Currencies,
-  Docs,
   MERGE_PAYLOAD,
   NOTIFICATION_COOLDOWN,
   EVERY_MIN,
@@ -19,10 +15,11 @@ import {
   isAboveThreshold,
   notExceededMessage,
   notificationSentMessage,
-  textMessage,
+  priceAlertTextMessage,
 } from "./utils";
 import { sendSMS } from "./notifications/sendSMS";
 import { getCurrentPrice } from "./api/getCurrentPrice";
+import { Collections, CryptoIds, Currencies, Docs } from "./types";
 
 dotenv.config();
 
@@ -60,7 +57,7 @@ export const checkCardanoPrice = onSchedule(EVERY_MIN, async () => {
       exceededThreshold > lastNotifiedThreshold &&
       !cooldownActive
     ) {
-      await sendSMS(textMessage(exceededThreshold, currentPrice));
+      await sendSMS(priceAlertTextMessage(exceededThreshold, currentPrice));
 
       const lastNotifiedPayload = {
         lastNotified: firestore.FieldValue.serverTimestamp(),

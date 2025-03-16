@@ -1,15 +1,15 @@
-import "firebase-admin";
+import dotenv from "dotenv";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { EVERY_MIN } from "./constants";
 import { calculateSellDecision } from "./calculations/calculateSellDecision";
 import { sendSMS } from "./notifications/sendSMS";
-import dotenv from "dotenv";
-import { formatCurrency } from "./utils";
+import { EVERY_MIN, RUNNING_ANALYTICS_MODEL_MESSAGE } from "./constants";
+import { CryptoIds, Recommendation } from "./types";
+import { formatAnalysisResults } from "./utils";
 
 dotenv.config();
 
 export const runAnalysisModel = onSchedule(EVERY_MIN, async () => {
-  console.log("Running analytics model...");
+  console.log(RUNNING_ANALYTICS_MODEL_MESSAGE);
 
   const {
     cryptoSymbol,
@@ -17,16 +17,19 @@ export const runAnalysisModel = onSchedule(EVERY_MIN, async () => {
     probability,
     recommendation,
     metConditions,
-  } = await calculateSellDecision("cardano");
+  } = await calculateSellDecision(CryptoIds.Cardano);
 
-  const symbol = cryptoSymbol.toUpperCase();
-  const price = formatCurrency(currentPrice);
-  const prob = `${(Number(probability) * 100).toFixed(3)}%`;
-  const rec = recommendation.charAt(0).toUpperCase() + recommendation.slice(1);
-  const conditions = metConditions.join(", ");
-  const smsMessage = `${symbol}: ${price}\n\nProbability: ${prob}\n\nRecommendation: ${rec}\n\nSell conditions met: ${conditions}\n\nReply with a cryptocurrency to run the analysis again`;
+  const smsMessage = formatAnalysisResults({
+    cryptoSymbol,
+    currentPrice,
+    probability,
+    recommendation,
+    metConditions,
+  });
 
-  if (rec === "Sell") {
+  await sendSMS(smsMessage);
+
+  if (recommendation === Recommendation.Sell) {
     await sendSMS(smsMessage);
   }
 });

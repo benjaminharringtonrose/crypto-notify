@@ -1,3 +1,5 @@
+import { Recommendation } from "./types";
+
 export const isAboveThreshold = ({
   prices,
   currentPrice,
@@ -37,8 +39,33 @@ export const checkCardanoPriceErrorMessage = (error: any) => {
   return `Error: ${JSON.stringify(error)}`;
 };
 
-export const textMessage = (threshold: number, currentPrice: number) => {
+export const priceAlertTextMessage = (
+  threshold: number,
+  currentPrice: number
+) => {
   return `CARDANO ALERT: ADA has risen above $${threshold} and is now at $${currentPrice}`;
+};
+
+export const formatAnalysisResults = ({
+  cryptoSymbol,
+  currentPrice,
+  probability,
+  recommendation,
+  metConditions,
+}: {
+  cryptoSymbol: string;
+  currentPrice: number;
+  probability: string;
+  recommendation: Recommendation;
+  metConditions: string[];
+}) => {
+  const symbol = cryptoSymbol.toUpperCase();
+  const price = formatCurrency(currentPrice);
+  const prob = `${(Number(probability) * 100).toFixed(3)}%`;
+  const rec = recommendation.charAt(0).toUpperCase() + recommendation.slice(1);
+  const conditions = metConditions.join(", ");
+
+  return `${symbol}: ${price}\n\nProbability: ${prob}\n\nRecommendation: ${rec}\n\nSell conditions met: ${conditions}\n\nReply with a cryptocurrency to run the analysis again`;
 };
 
 export const currentCardanoPriceMessage = (currentPrice: number) => {

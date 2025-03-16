@@ -6,6 +6,27 @@ export interface CoinGeckoMarketChartResponse {
   total_volumes: [number, number][];
 }
 
+export enum Recommendation {
+  Hold = "hold",
+  Sell = "sell",
+}
+
+export enum CryptoIds {
+  Cardano = "cardano",
+}
+
+export enum Currencies {
+  USD = "usd",
+}
+
+export enum Collections {
+  Config = "config",
+}
+
+export enum Docs {
+  PriceAlert = "priceAlert",
+}
+
 export interface SellDecision {
   cryptoSymbol: string;
   currentPrice: number;
@@ -27,7 +48,7 @@ export interface SellDecision {
   volumeOscillator: string;
   metConditions: string[];
   probability: string;
-  recommendation: "sell" | "hold";
+  recommendation: Recommendation;
   timestamp: FieldValue;
 }
 

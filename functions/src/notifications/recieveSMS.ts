@@ -2,6 +2,11 @@ import { https } from "firebase-functions";
 import { calculateSellDecision } from "../calculations/calculateSellDecision";
 import { sendSMS } from "./sendSMS";
 
+const formatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+});
+
 export const receiveSMS = https.onRequest(async (req, res) => {
   // Log the reply to Firebase Realtime Database or Firestore
   try {
@@ -10,13 +15,13 @@ export const receiveSMS = https.onRequest(async (req, res) => {
     const value = await calculateSellDecision(replyText.toLowerCase());
 
     const symbol = value.cryptoSymbol.toUpperCase();
-    const price = `$${value.currentPrice}`;
-    const prob = `${Number(value.probability) * 100}%`;
+    const price = formatter.format(value.currentPrice);
+    const prob = `${(Number(value.probability) * 100).toFixed(3)}%`;
     const rec =
       value.recommendation.charAt(0).toUpperCase() +
       value.recommendation.slice(1);
     const conditions = value.metConditions.join(", ");
-    const smsMessage = `${symbol}: ${price}\n\nProbability: ${prob}\nRecommendation: ${rec}\nConditions: ${conditions}\n\nReply with a cryptocurrency to run the analysis.`;
+    const smsMessage = `${symbol}: ${price}\n\nProbability: ${prob}\nRecommendation: ${rec}\nConditions: ${conditions}\n\nReply with a cryptocurrency to run the analysis again`;
 
     await sendSMS(smsMessage);
     res.status(200).send("Reply received and logged!");

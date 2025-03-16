@@ -75,7 +75,6 @@ export function computeFeatures(
       : 0;
   const upperBand = sma20 + 2 * stdDev20;
 
-  // Dynamic OBV normalization over a 30-day window
   let obv = 0;
   const obvValues = [0];
   for (let i = 1; i <= dayIndex; i++) {
@@ -83,7 +82,7 @@ export function computeFeatures(
     obv += priceChange > 0 ? volumes[i] : priceChange < 0 ? -volumes[i] : 0;
     obvValues.push(obv);
   }
-  const obvWindow = obvValues.slice(-30); // Last 30 days
+  const obvWindow = obvValues.slice(-30);
   const obvMin = Math.min(...obvWindow);
   const obvMax = Math.max(...obvWindow);
   const normalizedObv =
@@ -153,6 +152,13 @@ export function computeFeatures(
     dayIndex >= 4 ? calculateSMA(volumes.slice(dayIndex - 4, dayIndex + 1)) : 0;
   const isVolumeSpike = currentVolume > volSma5 * 2;
 
+  // New features
+  const momentum = dayIndex >= 9 ? currentPrice - prices[dayIndex - 9] : 0; // 10-day momentum
+  const priceChangePct =
+    dayIndex >= 1
+      ? ((currentPrice - prices[dayIndex - 1]) / prices[dayIndex - 1]) * 100
+      : 0;
+
   const features = [
     rsi,
     prevRsi,
@@ -180,6 +186,8 @@ export function computeFeatures(
     prevMacdLine,
     isTripleTop ? 1 : 0,
     isVolumeSpike ? 1 : 0,
+    momentum,
+    priceChangePct,
   ];
 
   return features;

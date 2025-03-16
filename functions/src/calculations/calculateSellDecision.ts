@@ -123,6 +123,15 @@ export const calculateSellDecision = async (
     );
     const isTripleTop = detectTripleTop(prices, volumes, currentPrice);
 
+    const momentum =
+      prices.length >= 10 ? currentPrice - prices[prices.length - 10] : 0; // 10-day momentum
+    const priceChangePct =
+      prices.length >= 2
+        ? ((currentPrice - prices[prices.length - 2]) /
+            prices[prices.length - 2]) *
+          100
+        : 0;
+
     // Predict Sell using ML
     const { metConditions, probability, recommendation } = await predictSell({
       rsi,
@@ -151,6 +160,8 @@ export const calculateSellDecision = async (
       prevMacdLine,
       isTripleTop,
       isVolumeSpike,
+      momentum,
+      priceChangePct,
     });
 
     return {

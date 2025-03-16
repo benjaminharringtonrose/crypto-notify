@@ -56,6 +56,8 @@ export interface Indicators {
   prevMacdLine: number;
   isTripleTop: boolean;
   isVolumeSpike: boolean;
+  momentum: number;
+  priceChangePct: number;
 }
 
 export interface PredictSell {

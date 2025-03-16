@@ -21,7 +21,7 @@ export const trainSellModel = async () => {
 
   for (let i = 34; i < prices.length; i++) {
     const features = computeFeatures(prices, volumes, i, prices[i]);
-    if (features.length !== 26) {
+    if (features.length !== 28) {
       console.error(
         `Unexpected feature length: ${features.length} at index ${i}`
       );
@@ -46,26 +46,25 @@ export const trainSellModel = async () => {
   const X_tensor = tf.tensor2d(X);
   const y_tensor = tf.tensor1d(y);
 
-  console.log("X_tensor shape:", X_tensor.shape);
-  console.log("y_tensor shape:", y_tensor.shape);
-
   const X_min = X_tensor.min(0);
   const X_max = X_tensor.max(0);
   const X_normalized = X_tensor.sub(X_min).div(X_max.sub(X_min).add(1e-6));
 
   const model = tf.sequential();
   model.add(
-    tf.layers.dense({ units: 1, activation: "sigmoid", inputShape: [26] })
+    tf.layers.dense({ units: 16, activation: "relu", inputShape: [28] })
   );
+  model.add(tf.layers.dropout({ rate: 0.2 }));
+  model.add(tf.layers.dense({ units: 1, activation: "sigmoid" }));
   model.compile({
-    optimizer: "adam",
+    optimizer: tf.train.adam(0.001),
     loss: "binaryCrossentropy",
     metrics: ["accuracy"],
   });
 
   await model.fit(X_normalized, y_tensor, {
-    epochs: 50,
-    batchSize: 32,
+    epochs: 100,
+    batchSize: 64,
     validationSplit: 0.2,
     callbacks: {
       onEpochEnd: (epoch, logs) => {
@@ -76,18 +75,19 @@ export const trainSellModel = async () => {
     },
   });
 
-  const [weights, bias] = model.getWeights();
-  const weightsArray = await weights.data();
-  const biasValue = (await bias.data())[0];
+  const [weights1, bias1, weights2, bias2] = model.getWeights();
+  const weights1Array = await weights1.data();
+  const bias1Array = await bias1.data();
+  const weights2Array = await weights2.data();
+  const bias2Value = (await bias2.data())[0];
   const featureMinsArray = Array.from(await X_min.data());
   const featureMaxsArray = Array.from(await X_max.data());
 
-  console.log("Weights shape:", weights.shape); // Should be [26, 1]
-  console.log("Weights array length:", weightsArray.length); // Should be 26
-
   const weightsJson = {
-    weights: Array.from(weightsArray),
-    bias: biasValue,
+    weights1: Array.from(weights1Array),
+    bias1: Array.from(bias1Array),
+    weights2: Array.from(weights2Array),
+    bias2: bias2Value,
     featureMins: featureMinsArray,
     featureMaxs: featureMaxsArray,
   };
@@ -103,8 +103,10 @@ export const trainSellModel = async () => {
   X_tensor.dispose();
   y_tensor.dispose();
   X_normalized.dispose();
-  weights.dispose();
-  bias.dispose();
+  weights1.dispose();
+  bias1.dispose();
+  weights2.dispose();
+  bias2.dispose();
   X_min.dispose();
   X_max.dispose();
 };

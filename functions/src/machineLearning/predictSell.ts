@@ -29,15 +29,18 @@ export const predictSell = async ({
   prevMacdLine,
   isTripleTop,
   isVolumeSpike,
+  momentum,
+  priceChangePct,
 }: Indicators): Promise<PredictSell> => {
-  // Load trained weights from Firestore
   const modelRef = admin.firestore().collection("models").doc("sellPredictor");
   const modelDoc = await modelRef.get();
   const modelData = modelDoc.data();
   if (!modelData) throw new Error("Model weights not found in Firestore");
 
-  const weights = tf.tensor1d(modelData.weights);
-  const bias = tf.scalar(modelData.bias);
+  const weights1 = tf.tensor2d(modelData.weights1, [28, 16]);
+  const bias1 = tf.tensor1d(modelData.bias1);
+  const weights2 = tf.tensor2d(modelData.weights2, [16, 1]);
+  const bias2 = tf.scalar(modelData.bias2);
   const featureMins = tf.tensor1d(modelData.featureMins);
   const featureMaxs = tf.tensor1d(modelData.featureMaxs);
 
@@ -49,7 +52,6 @@ export const predictSell = async ({
       ? (obvValues[obvValues.length - 1] - obvMin) / (obvMax - obvMin)
       : 0;
 
-  // Features (26 total)
   const featuresRaw = tf.tensor1d([
     rsi || 0,
     prevRsi || 0,
@@ -77,31 +79,21 @@ export const predictSell = async ({
     prevMacdLine,
     isTripleTop ? 1 : 0,
     isVolumeSpike ? 1 : 0,
+    momentum || 0,
+    priceChangePct || 0,
   ]);
 
-  // Normalize and clamp to [0, 1]
   const featuresNormalized = featuresRaw
     .sub(featureMins)
     .div(featureMaxs.sub(featureMins).add(1e-6));
-  const features = featuresNormalized.clipByValue(0, 1); // Clamp to 0-1 range
+  const features = featuresNormalized.clipByValue(0, 1);
 
-  // Predict
-  const logits = features.dot(weights).add(bias);
+  // Two-layer prediction
+  const hidden = features.dot(weights1).add(bias1).relu();
+  const logits = hidden.dot(weights2).add(bias2);
   const probabilityTensor = logits.sigmoid();
   const probability = (await probabilityTensor.data())[0];
 
-  console.log("Raw Features:", await featuresRaw.array());
-  console.log(
-    "Normalized Features (pre-clamp):",
-    await featuresNormalized.array()
-  );
-  console.log("Normalized Features (post-clamp):", await features.array());
-  console.log("Weights:", await weights.array());
-  console.log("Bias:", (await bias.data())[0]);
-  console.log("Logits:", (await logits.data())[0]);
-  console.log("Probability:", probability);
-
-  // Conditions for metConditions
   const conditions: Condition[] = [
     { name: "RSI Overbought", met: !!rsi && rsi > 70, weight: 0.1 },
     {
@@ -160,6 +152,7 @@ export const predictSell = async ({
     },
     { name: "Triple Top Pattern", met: isTripleTop, weight: 0.08 },
     { name: "Volume Spike", met: isVolumeSpike, weight: 0.06 },
+    { name: "Negative Momentum", met: momentum < 0, weight: 0.07 },
   ];
 
   const metConditions = conditions
@@ -168,19 +161,17 @@ export const predictSell = async ({
   const recommendation =
     probability >= 0.5 ? Recommendation.Sell : Recommendation.Hold;
 
-  // Clean up tensors
-  weights.dispose();
-  bias.dispose();
+  weights1.dispose();
+  bias1.dispose();
+  weights2.dispose();
+  bias2.dispose();
   featureMins.dispose();
   featureMaxs.dispose();
   featuresRaw.dispose();
   features.dispose();
+  hidden.dispose();
   logits.dispose();
   probabilityTensor.dispose();
 
-  return {
-    metConditions,
-    probability,
-    recommendation,
-  };
+  return { metConditions, probability, recommendation };
 };

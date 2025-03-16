@@ -57,3 +57,9 @@ export interface Condition {
   met: boolean;
   weight: number;
 }
+
+export interface RecieveSMSRequest {
+  body: {
+    text: string;
+  };
+}

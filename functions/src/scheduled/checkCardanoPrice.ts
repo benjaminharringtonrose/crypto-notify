@@ -7,7 +7,7 @@ import {
   EVERY_MIN,
   PRICES,
   RUNNING_SCHEDULE_CHECK_MESSAGE,
-} from "./constants";
+} from "../constants";
 import {
   checkCardanoPriceErrorMessage,
   cooldownMessage,
@@ -16,10 +16,10 @@ import {
   notExceededMessage,
   notificationSentMessage,
   priceAlertTextMessage,
-} from "./utils";
-import { sendSMS } from "./notifications/sendSMS";
-import { getCurrentPrice } from "./api/getCurrentPrice";
-import { Collections, CryptoIds, Currencies, Docs } from "./types";
+} from "../utils";
+import { sendSMS } from "../notifications/sendSMS";
+import { getCurrentPrice } from "../api/getCurrentPrice";
+import { Collections, CryptoIds, Currencies, Docs } from "../types";
 
 dotenv.config();
 

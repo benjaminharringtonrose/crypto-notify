@@ -1,27 +1,30 @@
 import { https } from "firebase-functions";
 import { calculateSellDecision } from "../calculations/calculateSellDecision";
 import { sendSMS } from "./sendSMS";
+import { RecieveSMSRequest } from "../types";
 import { formatCurrency } from "../utils";
 
-export const receiveSMS = https.onRequest(async (req, res) => {
-  try {
-    const replyText = req.body.text || "No message";
+export const receiveSMS = https.onRequest(
+  async (request: RecieveSMSRequest, response) => {
+    try {
+      const replyText = request.body.text || "No message";
 
-    const value = await calculateSellDecision(replyText.toLowerCase());
+      const value = await calculateSellDecision(replyText.toLowerCase().trim());
 
-    const symbol = value.cryptoSymbol.toUpperCase();
-    const price = formatCurrency(value.currentPrice);
-    const prob = `${(Number(value.probability) * 100).toFixed(3)}%`;
-    const rec =
-      value.recommendation.charAt(0).toUpperCase() +
-      value.recommendation.slice(1);
-    const conditions = value.metConditions.join(", ");
-    const smsMessage = `${symbol}: ${price}\n\nProbability: ${prob}\n\nRecommendation: ${rec}\n\nSell conditions met: ${conditions}\n\nReply with a cryptocurrency to run the analysis again`;
+      const symbol = value.cryptoSymbol.toUpperCase();
+      const price = formatCurrency(value.currentPrice);
+      const prob = `${(Number(value.probability) * 100).toFixed(3)}%`;
+      const rec =
+        value.recommendation.charAt(0).toUpperCase() +
+        value.recommendation.slice(1);
+      const conditions = value.metConditions.join(", ");
+      const smsMessage = `${symbol}: ${price}\n\nProbability: ${prob}\n\nRecommendation: ${rec}\n\nSell conditions met: ${conditions}\n\nReply with a cryptocurrency to run the analysis again`;
 
-    await sendSMS(smsMessage);
-    res.status(200).send("Reply received and logged!");
-  } catch (error: any) {
-    await sendSMS("Incorrect name, please try again.");
-    res.status(500).send("Error logging reply: " + error.message);
+      await sendSMS(smsMessage);
+      response.status(200).send("Reply received and logged!");
+    } catch (error: any) {
+      await sendSMS("Incorrect name, please try again.");
+      response.status(500).send("Error logging reply: " + error.message);
+    }
   }
-});
+);

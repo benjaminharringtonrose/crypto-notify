@@ -1,10 +1,10 @@
 import dotenv from "dotenv";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { calculateSellDecision } from "./calculations/calculateSellDecision";
-import { sendSMS } from "./notifications/sendSMS";
-import { EVERY_MIN, RUNNING_ANALYSIS_MODEL_MESSAGE } from "./constants";
-import { CryptoIds, Recommendation } from "./types";
-import { formatAnalysisResults } from "./utils";
+import { calculateSellDecision } from "../calculations/calculateSellDecision";
+import { sendSMS } from "../notifications/sendSMS";
+import { EVERY_MIN, RUNNING_ANALYSIS_MODEL_MESSAGE } from "../constants";
+import { CryptoIds, Recommendation } from "../types";
+import { formatAnalysisResults } from "../utils";
 
 dotenv.config();
 

@@ -21,6 +21,7 @@ export const receiveSMS = https.onRequest(async (req, res) => {
     await sendSMS(smsMessage);
     res.status(200).send("Reply received and logged!");
   } catch (error: any) {
+    await sendSMS("Incorrect name, please try again.");
     res.status(500).send("Error logging reply: " + error.message);
   }
 });

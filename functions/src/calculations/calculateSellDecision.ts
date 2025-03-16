@@ -1,6 +1,6 @@
 import * as admin from "firebase-admin";
 import axios, { AxiosResponse } from "axios";
-import { COINGECKO_API_URL } from "../constants";
+import { BUY_PRICE_AVERAGE, COINGECKO_API_URL } from "../constants";
 import { calculateRSI } from "./calculateRSI";
 import { calculateSMA } from "./calculateSMA";
 import { calculateEMA } from "./calculateEMA";
@@ -13,7 +13,11 @@ import { detectDoubleTop } from "../detections/detectDoubleTop";
 import { detectHeadAndShoulders } from "../detections/detectHeadAndShoulders";
 import { detectTripleTop } from "../detections/detectTripleTop";
 import { predictSell } from "../machineLearning/predictSell";
-import { CoinGeckoMarketChartResponse, SellDecision } from "../types";
+import {
+  CoinGeckoMarketChartResponse,
+  Recommendation,
+  SellDecision,
+} from "../types";
 
 export const calculateSellDecision = async (
   cryptoSymbol: string
@@ -164,6 +168,16 @@ export const calculateSellDecision = async (
       priceChangePct,
     });
 
+    // Adjust recommendation based on BUY_PRICE
+    const profitPercentage =
+      ((currentPrice - BUY_PRICE_AVERAGE) / BUY_PRICE_AVERAGE) * 100;
+    let recommendationAfterConsideringBuyPriceAverage = recommendation;
+    if (profitPercentage > 5 && probability > 0.3) {
+      recommendationAfterConsideringBuyPriceAverage = Recommendation.Sell; // Lock in gains if >5% profit and moderate drop risk
+    } else if (currentPrice < BUY_PRICE_AVERAGE && probability > 0.6) {
+      recommendationAfterConsideringBuyPriceAverage = Recommendation.Sell; // Cut losses if below buy price and high drop risk
+    }
+
     return {
       cryptoSymbol,
       currentPrice,
@@ -185,7 +199,7 @@ export const calculateSellDecision = async (
       volumeOscillator: volumeOscillator.toFixed(2),
       metConditions,
       probability: probability.toFixed(3),
-      recommendation,
+      recommendation: recommendationAfterConsideringBuyPriceAverage,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     };
   } catch (error: any) {

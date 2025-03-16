@@ -8,6 +8,7 @@ export interface CoinGeckoMarketChartResponse {
 
 export enum Recommendation {
   Hold = "hold",
+  HoldBasedOnBuyPrice = "hold based on buy price",
   Sell = "sell",
 }
 

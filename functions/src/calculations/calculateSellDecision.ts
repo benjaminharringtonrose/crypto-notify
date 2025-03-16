@@ -170,7 +170,9 @@ export const calculateSellDecision = async (
 
     // Adjust recommendation based on BUY_PRICE
     const recommendationBasedOnBuyPrice =
-      currentPrice < AVERAGE_BUY_PRICE ? Recommendation.Hold : recommendation;
+      currentPrice < AVERAGE_BUY_PRICE
+        ? Recommendation.HoldBasedOnBuyPrice
+        : recommendation;
 
     return {
       cryptoSymbol,

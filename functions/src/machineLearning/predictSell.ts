@@ -37,34 +37,23 @@ export const predictSell = async ({
   const modelData = modelDoc.data();
   if (!modelData) throw new Error("Model weights not found in Firestore");
 
-  const weights = JSON.parse(modelDoc.data()?.weights);
-  console.log("lstmWeights length:", weights.lstmWeights.length); // Should be 7168
-  console.log(
-    "lstmRecurrentWeights length:",
-    weights.lstmRecurrentWeights.length
-  ); // Should be 16384
-
-  // Load weights from Version 24's LSTM model with debugging
-  const lstmWeightsData = JSON.parse(modelData.weights).lstmWeights;
-  console.log("lstmWeights length:", lstmWeightsData.length);
-  const lstmWeights = tf.tensor2d(lstmWeightsData, [28, 256]); // [inputDim, 4 * units]
-
-  const lstmRecurrentWeightsData = JSON.parse(
-    modelData.weights
-  ).lstmRecurrentWeights;
-  console.log("lstmRecurrentWeights length:", lstmRecurrentWeightsData.length);
-  const lstmRecurrentWeights = tf.tensor2d(lstmRecurrentWeightsData, [64, 256]); // [units, 4 * units]
-
-  const lstmBias = tf.tensor1d(JSON.parse(modelData.weights).lstmBias); // [4 * units]
+  const lstmWeights = tf.tensor2d(
+    JSON.parse(modelData.weights).lstmWeights,
+    [28, 256]
+  );
+  const lstmRecurrentWeights = tf.tensor2d(
+    JSON.parse(modelData.weights).lstmRecurrentWeights,
+    [64, 256]
+  );
+  const lstmBias = tf.tensor1d(JSON.parse(modelData.weights).lstmBias);
   const denseWeights = tf.tensor2d(
     JSON.parse(modelData.weights).denseWeights,
     [64, 1]
-  ); // [units, output]
-  const denseBias = tf.scalar(JSON.parse(modelData.weights).denseBias); // scalar
+  );
+  const denseBias = tf.scalar(JSON.parse(modelData.weights).denseBias);
   const featureMins = tf.tensor1d(JSON.parse(modelData.weights).featureMins);
   const featureMaxs = tf.tensor1d(JSON.parse(modelData.weights).featureMaxs);
 
-  // Compute normalized OBV
   const obvWindow = obvValues.slice(-30);
   const obvMin = Math.min(...obvWindow);
   const obvMax = Math.max(...obvWindow);
@@ -73,7 +62,6 @@ export const predictSell = async ({
       ? (obvValues[obvValues.length - 1] - obvMin) / (obvMax - obvMin)
       : 0;
 
-  // Prepare single-timestep input features (matching computeFeatures.ts)
   const featuresRaw = tf.tensor1d([
     rsi || 0,
     prevRsi || 0,
@@ -93,7 +81,7 @@ export const predictSell = async ({
     stochRsi,
     prevStochRsi,
     fib61_8,
-    prices[prices.length - 2], // Previous price
+    prices[prices.length - 2],
     volumeOscillator,
     prevVolumeOscillator,
     isDoubleTop ? 1 : 0,
@@ -105,16 +93,14 @@ export const predictSell = async ({
     priceChangePct || 0,
   ]);
 
-  // Normalize features as done during training
   const featuresNormalized = featuresRaw
     .sub(featureMins)
     .div(featureMaxs.sub(featureMins).add(1e-6));
-  const features = featuresNormalized.clipByValue(0, 1).reshape([1, 1, 28]); // [batch, timesteps, features]
+  const features = featuresNormalized.clipByValue(0, 1).reshape([1, 1, 28]);
 
-  // Simplified LSTM prediction for a single timestep (no sequence history)
-  const [Wi, Wf, Wc, Wo] = tf.split(lstmWeights, 4, 1); // Input, Forget, Cell, Output weights
-  const [Ri, Rf, Rc, Ro] = tf.split(lstmRecurrentWeights, 4, 1); // Recurrent weights
-  const [bi, bf, bc, bo] = tf.split(lstmBias, 4); // Biases
+  const [Wi, Wf, Wc, Wo] = tf.split(lstmWeights, 4, 1);
+  const [Ri, Rf, Rc, Ro] = tf.split(lstmRecurrentWeights, 4, 1);
+  const [bi, bf, bc, bo] = tf.split(lstmBias, 4);
 
   const hPrev = tf.zeros([1, 64]);
   const cPrev = tf.zeros([1, 64]);

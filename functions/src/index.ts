@@ -4,3 +4,4 @@ admin.initializeApp();
 
 export { checkCardanoPrice } from "./checkCardanoPrice";
 export { runAnalysisModel } from "./runAnalysisModel";
+export { receiveSMS } from "./notifications/recieveSMS";

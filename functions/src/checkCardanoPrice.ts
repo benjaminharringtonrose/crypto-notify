@@ -21,7 +21,7 @@ import {
   notificationSentMessage,
   textMessage,
 } from "./utils";
-import { sendSmsNotification } from "./notifications/sendSmsNotification";
+import { sendSMS } from "./notifications/sendSMS";
 import { getCurrentPrice } from "./api/getCurrentPrice";
 
 dotenv.config();
@@ -60,7 +60,7 @@ export const checkCardanoPrice = onSchedule(PRICE_CHECK_SCHEDULE, async () => {
       exceededThreshold > lastNotifiedThreshold &&
       !cooldownActive
     ) {
-      await sendSmsNotification(textMessage(exceededThreshold, currentPrice));
+      await sendSMS(textMessage(exceededThreshold, currentPrice));
 
       const lastNotifiedPayload = {
         lastNotified: firestore.FieldValue.serverTimestamp(),

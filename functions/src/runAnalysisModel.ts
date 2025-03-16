@@ -2,7 +2,7 @@ import "firebase-admin";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { ANALYSIS_SCHEDULE, TIME_ZONE } from "./constants";
 import { calculateSellDecision } from "./calculations/calculateSellDecision";
-import { sendSmsNotification } from "./notifications/sendSmsNotification";
+import { sendSMS } from "./notifications/sendSMS";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -22,9 +22,9 @@ export const runAnalysisModel = onSchedule(
       value.recommendation.charAt(0).toUpperCase() +
       value.recommendation.slice(1);
     const conditions = value.metConditions.join(", ");
-    const smsMessage = `${symbol}: ${price}, Prob: ${prob}, Rec: ${rec} (${conditions})`;
+    const smsMessage = `${symbol}: ${price}\nProb: ${prob}\nRec: ${rec}\nConditions: ${conditions}\nReply with a crypto to check again.`;
 
-    await sendSmsNotification(smsMessage);
+    await sendSMS(smsMessage);
     console.log("SMS Message:", smsMessage);
     console.log("Full Result:", value);
   }

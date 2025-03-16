@@ -22,7 +22,12 @@ export const trainSellModel = async () => {
       );
       continue;
     }
-    const label = labelData(prices, i);
+    const label = labelData({
+      prices,
+      dayIndex: i,
+      threshold: 0.01,
+      horizon: 2,
+    });
     X.push(features);
     y.push(label);
   }

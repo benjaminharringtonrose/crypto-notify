@@ -1,6 +1,6 @@
 import * as tf from "@tensorflow/tfjs-node";
 import * as admin from "firebase-admin";
-import { Condition, Indicators, PredictSell, Recommendation } from "../types";
+import { Condition, Indicators, PredictTrade, Recommendation } from "../types";
 
 export const predictTradeActionBTC = async ({
   rsi,
@@ -31,8 +31,8 @@ export const predictTradeActionBTC = async ({
   isVolumeSpike,
   momentum,
   priceChangePct,
-}: Indicators): Promise<PredictSell> => {
-  const modelRef = admin.firestore().collection("models").doc("sellPredictor");
+}: Indicators): Promise<PredictTrade> => {
+  const modelRef = admin.firestore().collection("models").doc("tradePredictor");
   const modelDoc = await modelRef.get();
   const modelData = modelDoc.data();
   if (!modelData) throw new Error("Model weights not found in Firestore");
@@ -48,9 +48,9 @@ export const predictTradeActionBTC = async ({
   const lstmBias = tf.tensor1d(JSON.parse(modelData.weights).lstmBias);
   const denseWeights = tf.tensor2d(
     JSON.parse(modelData.weights).denseWeights,
-    [64, 1]
-  );
-  const denseBias = tf.scalar(JSON.parse(modelData.weights).denseBias);
+    [64, 3]
+  ); // 3 outputs
+  const denseBias = tf.tensor1d(JSON.parse(modelData.weights).denseBias);
   const featureMins = tf.tensor1d(JSON.parse(modelData.weights).featureMins);
   const featureMaxs = tf.tensor1d(JSON.parse(modelData.weights).featureMaxs);
 
@@ -123,10 +123,18 @@ export const predictTradeActionBTC = async ({
   const hDropped = hNext.mul(dropoutMask).div(0.65);
 
   const logits = hDropped.matMul(denseWeights).add(denseBias);
-  const probabilityTensor = logits.sigmoid();
-  const probability = (await probabilityTensor.data())[0];
+  const probabilityTensor = tf.softmax(logits);
+  const probabilities = await probabilityTensor.data();
+  const [sellProb, holdProb, buyProb] = probabilities;
+
+  const sma20 = prices.slice(-20).reduce((a, b) => a + b, 0) / 20;
+  const stdDev20 = Math.sqrt(
+    prices.slice(-20).reduce((sum, p) => sum + Math.pow(p - sma20, 2), 0) / 20
+  );
+  const lowerBand = sma20 - 2 * stdDev20;
 
   const conditions: Condition[] = [
+    // Sell Conditions
     { name: "RSI Overbought", met: !!rsi && rsi > 70, weight: 0.1 },
     {
       name: "SMA Death Cross",
@@ -185,13 +193,66 @@ export const predictTradeActionBTC = async ({
     { name: "Triple Top Pattern", met: isTripleTop, weight: 0.08 },
     { name: "Volume Spike", met: isVolumeSpike, weight: 0.06 },
     { name: "Negative Momentum", met: momentum < 0, weight: 0.07 },
+    // Buy Conditions
+    { name: "RSI Oversold", met: !!rsi && rsi < 30, weight: 0.1 },
+    {
+      name: "SMA Golden Cross",
+      met: sma7 > sma21 && prevSma7 <= prevSma21,
+      weight: 0.07,
+    },
+    { name: "MACD Bullish", met: macdLine > signalLine, weight: 0.1 },
+    {
+      name: "Below Bollinger Lower",
+      met: currentPrice < lowerBand,
+      weight: 0.06,
+    },
+    {
+      name: "OBV Rising",
+      met: obvValues[obvValues.length - 1] > obvValues[obvValues.length - 2],
+      weight: 0.06,
+    },
+    {
+      name: "Bullish RSI Divergence",
+      met:
+        currentPrice < prices[prices.length - 2] &&
+        !!rsi &&
+        !!prevRsi &&
+        rsi > prevRsi,
+      weight: 0.07,
+    },
+    { name: "Low ATR Volatility", met: atr < atrBaseline * 0.5, weight: 0.05 },
+    { name: "Z-Score Low", met: zScore < -2, weight: 0.07 },
+    { name: "Below VWAP", met: currentPrice < vwap * 0.95, weight: 0.06 },
+    {
+      name: "StochRSI Oversold",
+      met: stochRsi < 20 && stochRsi > prevStochRsi,
+      weight: 0.07,
+    },
+    {
+      name: "Bullish MACD Divergence",
+      met: currentPrice < prices[prices.length - 2] && macdLine > prevMacdLine,
+      weight: 0.07,
+    },
+    {
+      name: "Volume Oscillator Rising",
+      met: volumeOscillator > 0 && volumeOscillator > prevVolumeOscillator,
+      weight: 0.06,
+    },
+    { name: "Positive Momentum", met: momentum > 0, weight: 0.07 },
   ];
 
   const metConditions = conditions
     .filter((cond) => cond.met)
     .map((cond) => cond.name);
-  const recommendation =
-    probability >= 0.45 ? Recommendation.Sell : Recommendation.Hold;
+
+  const maxProb = Math.max(buyProb, holdProb, sellProb);
+
+  let recommendation: Recommendation = Recommendation.Hold;
+
+  if (maxProb === buyProb && buyProb >= 0.45)
+    recommendation = Recommendation.Buy;
+  else if (maxProb === sellProb && sellProb >= 0.45)
+    recommendation = Recommendation.Sell;
 
   lstmWeights.dispose();
   lstmRecurrentWeights.dispose();
@@ -227,5 +288,9 @@ export const predictTradeActionBTC = async ({
   logits.dispose();
   probabilityTensor.dispose();
 
-  return { metConditions, probability, recommendation };
+  return {
+    metConditions,
+    probabilities: { buy: buyProb, hold: holdProb, sell: sellProb },
+    recommendation,
+  };
 };

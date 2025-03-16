@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { determineTradeActionBTC } from "../machineLearning/determineTradeActionBTC";
+import { determineTradeBTC } from "../machineLearning/determineTradeBTC";
 import { sendSMS } from "../notifications/sendSMS";
 import { EVERY_MIN, RUNNING_ANALYSIS_MODEL_MESSAGE } from "../constants";
 import { CryptoIds, Recommendation } from "../types";
@@ -8,21 +8,21 @@ import { formatAnalysisResults } from "../utils";
 
 dotenv.config();
 
-export const runSellModel = onSchedule(EVERY_MIN, async () => {
+export const runTradeModel = onSchedule(EVERY_MIN, async () => {
   console.log(RUNNING_ANALYSIS_MODEL_MESSAGE);
 
   const {
     cryptoSymbol,
     currentPrice,
-    probability,
+    probabilities,
     recommendation,
     metConditions,
-  } = await determineTradeActionBTC(CryptoIds.Bitcoin);
+  } = await determineTradeBTC(CryptoIds.Bitcoin);
 
   const smsMessage = formatAnalysisResults({
     cryptoSymbol,
     currentPrice,
-    probability,
+    probabilities,
     recommendation,
     metConditions,
   });

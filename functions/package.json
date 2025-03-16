@@ -10,7 +10,7 @@
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
     "test": "npx ts-node src/test.ts",
-    "train": "npx ts-node src/machineLearning/trainSellModel.ts"
+    "train:trade:model:btc": "npx ts-node src/machineLearning/trainTradeModelBTC.ts"
   },
   "engines": {
     "node": "20"

@@ -12,7 +12,7 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount as any),
 });
 
-export const trainBitcoinModel = async () => {
+export const trainTradeModelBTC = async () => {
   const { prices, volumes } = await getHistoricalData(
     "BTC",
     FIVE_YEARS_IN_DAYS
@@ -47,24 +47,31 @@ export const trainBitcoinModel = async () => {
   console.log(`Feature sequence sample (first entry): ${JSON.stringify(X[0])}`);
   console.log(`Label sample (first 5): ${y.slice(0, 5)}`);
 
-  const sellCount = y.filter((label) => label === 1).length;
-  const holdCount = y.filter((label) => label === 0).length;
+  const buyCount = y.filter((label) => label === 2).length;
+  const holdCount = y.filter((label) => label === 1).length;
+  const sellCount = y.filter((label) => label === 0).length;
   console.log(
-    `Training data: ${sellCount} sell (${((sellCount / y.length) * 100).toFixed(
+    `Training data: ${buyCount} buy (${((buyCount / y.length) * 100).toFixed(
       2
-    )}%), ${holdCount} hold (${((holdCount / y.length) * 100).toFixed(
-      2
-    )}%), total: ${y.length}`
+    )}%), ` +
+      `${holdCount} hold (${((holdCount / y.length) * 100).toFixed(2)}%), ` +
+      `${sellCount} sell (${((sellCount / y.length) * 100).toFixed(
+        2
+      )}%), total: ${y.length}`
   );
 
-  if (sellCount / y.length < 0.1 || holdCount / y.length < 0.1) {
+  if (
+    buyCount / y.length < 0.1 ||
+    holdCount / y.length < 0.1 ||
+    sellCount / y.length < 0.1
+  ) {
     console.warn(
       "Data imbalance detected - one class is less than 10% of total samples"
     );
   }
 
   const X_tensor = tf.tensor3d(X);
-  const y_tensor = tf.tensor1d(y);
+  const y_tensor = tf.oneHot(tf.tensor1d(y, "int32"), 3); // One-hot encode for 3 classes
 
   const X_min = X_tensor.min([0, 1]);
   const X_max = X_tensor.max([0, 1]);
@@ -82,16 +89,16 @@ export const trainBitcoinModel = async () => {
   model.add(tf.layers.dropout({ rate: 0.35 }));
   model.add(
     tf.layers.dense({
-      units: 1,
-      activation: "sigmoid",
+      units: 3, // 3 classes: buy, hold, sell
+      activation: "softmax", // Softmax for multi-class
       kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
     })
   );
 
   model.compile({
     optimizer: tf.train.adam(0.002),
-    loss: "binaryCrossentropy",
-    metrics: ["accuracy", "precision"],
+    loss: "categoricalCrossentropy", // Multi-class loss
+    metrics: ["accuracy"],
   });
 
   const earlyStoppingCallback = new EarlyStopping({
@@ -100,7 +107,7 @@ export const trainBitcoinModel = async () => {
     mode: "max",
   });
 
-  const classWeight = { 0: 1.0, 1: 5.0 };
+  const classWeight = { 0: 5.0, 1: 1.0, 2: 5.0 }; // Weight rare classes (buy/sell) higher
 
   await model.fit(X_normalized, y_tensor, {
     epochs: 200,
@@ -111,75 +118,48 @@ export const trainBitcoinModel = async () => {
   });
 
   const preds = model.predict(X_normalized) as tf.Tensor;
-  const predArray = Array.from(await preds.data());
-  const yArray = Array.from(await y_tensor.data());
-  const threshold = 0.45;
-  const binaryPreds = predArray.map((p) => (p >= threshold ? 1 : 0));
+  const predArray = (await preds.array()) as number[][]; // Array of [sellProb, holdProb, buyProb]
+  const yArray = Array.from(await y_tensor.argMax(-1).data()); // Ground truth labels
 
+  const predictedLabels = predArray.map((p: number[]) =>
+    p.indexOf(Math.max(...p))
+  );
   console.log(
     "Predictions vs Labels (first 5):",
-    predArray.slice(0, 5).map((p) => p.toFixed(4)),
+    predictedLabels.slice(0, 5),
     yArray.slice(0, 5)
   );
+
+  const truePositivesBuy = predictedLabels.reduce(
+    (sum, p, i) => sum + (p === 2 && yArray[i] === 2 ? 1 : 0),
+    0
+  );
+  const truePositivesSell = predictedLabels.reduce(
+    (sum, p, i) => sum + (p === 0 && yArray[i] === 0 ? 1 : 0),
+    0
+  );
+  const predictedBuys = predictedLabels.reduce(
+    (sum, p) => sum + (p === 2 ? 1 : 0),
+    0
+  );
+  const predictedSells = predictedLabels.reduce(
+    (sum, p) => sum + (p === 0 ? 1 : 0),
+    0
+  );
+  const precisionBuy = predictedBuys > 0 ? truePositivesBuy / predictedBuys : 0;
+  const precisionSell =
+    predictedSells > 0 ? truePositivesSell / predictedSells : 0;
   console.log(
-    "Binary Predictions vs Labels (first 10):",
-    binaryPreds.slice(0, 10),
-    yArray.slice(0, 10)
+    `Precision Buy: ${precisionBuy.toFixed(
+      4
+    )}, Precision Sell: ${precisionSell.toFixed(4)}`
   );
 
-  const sellIndices = yArray.reduce(
-    (acc: number[], label, i) => (label === 1 ? [...acc, i] : acc),
-    []
-  );
-  console.log(
-    "Predictions vs Labels (first 5 sell samples):",
-    sellIndices.slice(0, 5).map((i) => predArray[i].toFixed(4)),
-    sellIndices.slice(0, 5).map((i) => yArray[i])
-  );
-
-  const truePositives = binaryPreds.reduce(
-    (sum: number, p, i) => sum + (p === 1 && yArray[i] === 1 ? 1 : 0),
-    0 as number
-  );
-  const predictedPositives = binaryPreds.reduce(
-    (sum: number, p) => sum + p,
-    0 as number
-  );
-  const precision =
-    predictedPositives > 0 ? truePositives / predictedPositives : 0;
-  console.log(
-    `Custom Precision (threshold=${threshold}): ${precision.toFixed(4)}`
-  );
-
-  const tp = binaryPreds.reduce(
-    (sum: number, p, i) => sum + (p === 1 && yArray[i] === 1 ? 1 : 0),
-    0 as number
-  );
-  const fp = binaryPreds.reduce(
-    (sum: number, p, i) => sum + (p === 1 && yArray[i] === 0 ? 1 : 0),
-    0 as number
-  );
-  const tn = binaryPreds.reduce(
-    (sum: number, p, i) => sum + (p === 0 && yArray[i] === 0 ? 1 : 0),
-    0 as number
-  );
-  const fn = binaryPreds.reduce(
-    (sum: number, p, i) => sum + (p === 0 && yArray[i] === 1 ? 1 : 0),
-    0 as number
-  );
-  console.log(`Confusion Matrix: TP=${tp}, FP=${fp}, TN=${tn}, FN=${fn}`);
-
-  const recall = tp / (tp + fn);
-  const f1 = (2 * (precision * recall)) / (precision + recall || 1);
-  console.log(`F1 Score (threshold=${threshold}): ${f1.toFixed(4)}`);
-
-  // Get weights from the LSTM layer directly
   const lstmLayerWeights = model.layers[0].getWeights();
   const [lstmKernel, lstmRecurrentKernel, lstmBias] = lstmLayerWeights;
   const denseLayerWeights = model.layers[2].getWeights();
   const [denseWeights, denseBias] = denseLayerWeights;
 
-  // Log tensor shapes and sizes
   console.log(
     "LSTM Kernel shape:",
     lstmKernel.shape,
@@ -217,7 +197,7 @@ export const trainBitcoinModel = async () => {
       lstmBias: Array.from(await lstmBias.data()),
       lstmRecurrentWeights: Array.from(await lstmRecurrentKernel.data()),
       denseWeights: Array.from(await denseWeights.data()),
-      denseBias: (await denseBias.data())[0],
+      denseBias: Array.from(await denseBias.data()),
       featureMins: Array.from(await X_min.data()),
       featureMaxs: Array.from(await X_max.data()),
     }),
@@ -226,9 +206,8 @@ export const trainBitcoinModel = async () => {
   await admin
     .firestore()
     .collection(Collections.Models)
-    .doc(Docs.SellPredictor)
+    .doc(Docs.TradePredictor)
     .set(weightsJson);
-
   console.log("Model weights saved to Firestore");
 
   X_tensor.dispose();
@@ -244,4 +223,4 @@ export const trainBitcoinModel = async () => {
   preds.dispose();
 };
 
-trainBitcoinModel().catch(console.error);
+trainTradeModelBTC().catch(console.error);

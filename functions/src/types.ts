@@ -1,15 +1,7 @@
-import { FieldValue } from "firebase-admin/firestore";
-
 export interface CoinGeckoMarketChartResponse {
   prices: [number, number][];
   market_caps: [number, number][];
   total_volumes: [number, number][];
-}
-
-export enum Recommendation {
-  Hold = "hold",
-  HoldBasedOnBuyPrice = "hold based on buy price",
-  Sell = "sell",
 }
 
 export enum CryptoIds {
@@ -28,7 +20,7 @@ export enum Collections {
 
 export enum Docs {
   PriceAlert = "priceAlert",
-  SellPredictor = "sellPredictor",
+  TradePredictor = "tradePredictor",
 }
 
 export interface Indicators {
@@ -62,13 +54,25 @@ export interface Indicators {
   priceChangePct: number;
 }
 
-export interface PredictSell {
-  metConditions: string[];
-  probability: number;
-  recommendation: Recommendation;
+export enum Recommendation {
+  Buy = "BUY",
+  Hold = "HOLD",
+  Sell = "SELL",
+  HoldBasedOnBuyPrice = "HOLD_BASED_ON_BUY_PRICE",
 }
 
-export interface SellDecision {
+export interface Probabilities {
+  buy: number;
+  hold: number;
+  sell: number;
+}
+
+export interface PredictTrade {
+  metConditions: string[];
+  probabilities: Probabilities;
+  recommendation: Recommendation;
+}
+export interface TradeDecision {
   cryptoSymbol: string;
   currentPrice: number;
   rsi?: string;
@@ -88,9 +92,9 @@ export interface SellDecision {
   fib61_8: string;
   volumeOscillator: string;
   metConditions: string[];
-  probability: string;
+  probabilities: Probabilities;
   recommendation: Recommendation;
-  timestamp: FieldValue;
+  timestamp: any;
 }
 
 export interface Condition {

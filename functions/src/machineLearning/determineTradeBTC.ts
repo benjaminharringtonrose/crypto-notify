@@ -12,16 +12,16 @@ import { calculateFibonacciLevels } from "../calculations/calculateFibonacciLeve
 import { detectDoubleTop } from "../detections/detectDoubleTop";
 import { detectHeadAndShoulders } from "../detections/detectHeadAndShoulders";
 import { detectTripleTop } from "../detections/detectTripleTop";
-import { predictTradeActionBTC } from "./predictTradeActionBTC";
+import { predictTradeActionBTC } from "./predictTradeBTC";
 import {
   CoinGeckoMarketChartResponse,
   Recommendation,
-  SellDecision,
+  TradeDecision,
 } from "../types";
 
-export const determineTradeActionBTC = async (
+export const determineTradeBTC = async (
   cryptoSymbol: string
-): Promise<SellDecision> => {
+): Promise<TradeDecision> => {
   try {
     const priceResponse = await axios.get(
       `${COINGECKO_API_URL}/simple/price?ids=${cryptoSymbol.toLowerCase()}&vs_currencies=usd`
@@ -37,17 +37,12 @@ export const determineTradeActionBTC = async (
       ([_, vol]) => vol
     );
 
-    // RSI
     const rsi = calculateRSI(prices.slice(-15));
     const prevRsi = calculateRSI(prices.slice(-16, -1));
-
-    // SMA
     const sma7 = calculateSMA(prices.slice(-7));
     const sma21 = calculateSMA(prices.slice(-21));
     const prevSma7 = calculateSMA(prices.slice(-8, -1));
     const prevSma21 = calculateSMA(prices.slice(-22, -1));
-
-    // MACD
     const ema12 = calculateEMA(prices.slice(-12), 12);
     const ema26 = calculateEMA(prices.slice(-26), 26);
     const macdLine = ema12 - ema26;
@@ -61,13 +56,11 @@ export const determineTradeActionBTC = async (
     const prevEma12 = calculateEMA(prices.slice(-13, -1), 12);
     const prevEma26 = calculateEMA(prices.slice(-27, -1), 26);
     const prevMacdLine = prevEma12 - prevEma26;
-
-    // Bollinger Bands (and Z-Score prep)
     const sma20 = calculateSMA(prices.slice(-20));
     const stdDev20 = calculateStdDev(prices.slice(-20), sma20);
     const upperBand = sma20 + 2 * stdDev20;
+    const lowerBand = sma20 - 2 * stdDev20;
 
-    // OBV
     let obv = 0;
     const obvValues = [0];
     for (let i = 1; i < prices.length; i++) {
@@ -76,17 +69,10 @@ export const determineTradeActionBTC = async (
       obvValues.push(obv);
     }
 
-    // ATR
     const atr = calculateATR(prices, 14);
     const atrBaseline = calculateATR(prices.slice(0, -1), 14);
-
-    // Z-Score
     const zScore = (currentPrice - sma20) / stdDev20;
-
-    // VWAP
     const vwap = calculateVWAP(prices, volumes, 7);
-
-    // StochRSI
     const { stochRsi, signal: stochRsiSignal } = calculateStochRSI(
       prices,
       14,
@@ -99,12 +85,8 @@ export const determineTradeActionBTC = async (
       14,
       3
     ).stochRsi;
-
-    // Fibonacci Levels
     const { levels: fibLevels } = calculateFibonacciLevels(prices, 30);
     const fib61_8 = fibLevels[3];
-
-    // Volume Oscillator
     const volSmaShort = calculateSMA(volumes.slice(-5));
     const volSmaLong = calculateSMA(volumes.slice(-14));
     const volumeOscillator = ((volSmaShort - volSmaLong) / volSmaLong) * 100;
@@ -112,13 +94,9 @@ export const determineTradeActionBTC = async (
     const prevVolSmaLong = calculateSMA(volumes.slice(-15, -1));
     const prevVolumeOscillator =
       ((prevVolSmaShort - prevVolSmaLong) / prevVolSmaLong) * 100;
-
-    // Volume Spike
     const currentVolume = volumes[volumes.length - 1];
     const volSma5 = calculateSMA(volumes.slice(-5));
     const isVolumeSpike = currentVolume > volSma5 * 2;
-
-    // Pattern Detections
     const isDoubleTop = detectDoubleTop(prices, volumes, currentPrice);
     const isHeadAndShoulders = detectHeadAndShoulders(
       prices,
@@ -126,9 +104,8 @@ export const determineTradeActionBTC = async (
       currentPrice
     );
     const isTripleTop = detectTripleTop(prices, volumes, currentPrice);
-
     const momentum =
-      prices.length >= 10 ? currentPrice - prices[prices.length - 10] : 0; // 10-day momentum
+      prices.length >= 10 ? currentPrice - prices[prices.length - 10] : 0;
     const priceChangePct =
       prices.length >= 2
         ? ((currentPrice - prices[prices.length - 2]) /
@@ -136,8 +113,7 @@ export const determineTradeActionBTC = async (
           100
         : 0;
 
-    // Predict Sell using ML
-    const { metConditions, probability, recommendation } =
+    const { metConditions, probabilities, recommendation } =
       await predictTradeActionBTC({
         rsi,
         prevRsi,
@@ -169,9 +145,8 @@ export const determineTradeActionBTC = async (
         priceChangePct,
       });
 
-    // Adjust recommendation based on BUY_PRICE
     const recommendationBasedOnBuyPrice =
-      currentPrice < AVERAGE_BUY_PRICE
+      currentPrice < AVERAGE_BUY_PRICE && recommendation === Recommendation.Sell
         ? Recommendation.HoldBasedOnBuyPrice
         : recommendation;
 
@@ -185,7 +160,7 @@ export const determineTradeActionBTC = async (
       signalLine: signalLine.toFixed(2),
       sma20: sma20.toFixed(2),
       upperBand: upperBand.toFixed(2),
-      lowerBand: (sma20 - 2 * stdDev20).toFixed(2),
+      lowerBand: lowerBand.toFixed(2),
       obv: obv.toFixed(0),
       atr: atr.toFixed(2),
       zScore: zScore.toFixed(2),
@@ -195,12 +170,12 @@ export const determineTradeActionBTC = async (
       fib61_8: fib61_8.toFixed(2),
       volumeOscillator: volumeOscillator.toFixed(2),
       metConditions,
-      probability: probability.toFixed(3),
+      probabilities,
       recommendation: recommendationBasedOnBuyPrice,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     };
   } catch (error: any) {
-    console.error("Error in calculateSellDecision:", error.message);
-    return error;
+    console.error("Error in determineTradeActionBTC:", error.message);
+    throw error;
   }
 };

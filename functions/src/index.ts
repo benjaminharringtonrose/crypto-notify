@@ -2,7 +2,7 @@ import * as admin from "firebase-admin";
 
 admin.initializeApp();
 
-export { checkCardanoPrice } from "./scheduled/checkCardanoPrice";
-export { runSellModel } from "./scheduled/runSellModel";
-export { runSellModelDaily } from "./scheduled/runSellModelDaily";
+export { schedulePriceCheckADA } from "./scheduled/schedulePriceCheckADA";
+export { runTradeModel } from "./scheduled/runTradeModel";
+export { runTradeModelDaily } from "./scheduled/runTradeModelDaily";
 export { receiveSMS } from "./notifications/recieveSMS";

@@ -1,4 +1,4 @@
-import { Recommendation } from "./types";
+import { Probabilities, Recommendation, TradeDecision } from "./types";
 
 export const isAboveThreshold = ({
   prices,
@@ -49,19 +49,19 @@ export const priceAlertTextMessage = (
 export const formatAnalysisResults = ({
   cryptoSymbol,
   currentPrice,
-  probability,
+  probabilities,
   recommendation,
   metConditions,
 }: {
   cryptoSymbol: string;
   currentPrice: number;
-  probability: string;
+  probabilities: Probabilities;
   recommendation: Recommendation;
   metConditions: string[];
 }) => {
   const symbol = cryptoSymbol.toUpperCase();
   const price = formatCurrency(currentPrice);
-  const prob = `${(Number(probability) * 100).toFixed(3)}%`;
+  const prob = `${(Number(probabilities) * 100).toFixed(3)}%`;
   const rec = recommendation.charAt(0).toUpperCase() + recommendation.slice(1);
   const conditions = metConditions.join(", ");
 

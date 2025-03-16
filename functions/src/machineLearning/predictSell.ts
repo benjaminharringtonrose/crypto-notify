@@ -74,6 +74,14 @@ export async function predictSell(indicators: {
   const featureMins = tf.tensor1d(modelData.featureMins);
   const featureMaxs = tf.tensor1d(modelData.featureMaxs);
 
+  const obvWindow = obvValues.slice(-30);
+  const obvMin = Math.min(...obvWindow);
+  const obvMax = Math.max(...obvWindow);
+  const normalizedObv =
+    obvMax !== obvMin
+      ? (obvValues[obvValues.length - 1] - obvMin) / (obvMax - obvMin)
+      : 0;
+
   // Features (26 total)
   const featuresRaw = tf.tensor1d([
     rsi || 0,
@@ -86,7 +94,7 @@ export async function predictSell(indicators: {
     signalLine,
     currentPrice,
     upperBand,
-    obvValues[obvValues.length - 1],
+    normalizedObv,
     atr,
     atrBaseline,
     zScore,

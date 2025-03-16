@@ -2,15 +2,20 @@ import * as tf from "@tensorflow/tfjs-node";
 import * as admin from "firebase-admin";
 import { computeFeatures } from "./computeFeatures";
 import { labelData } from "./labelData";
-import { getHistoricalData } from "../api/getHistoricalData";
 import serviceAccount from "../../../serviceAccount.json";
+import { getHistoricalData } from "../api/getHistoricalData";
+import { FIVE_YEARS_IN_DAYS } from "../constants";
+import { Collections, Docs } from "../types";
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount as any),
 });
 
 export const trainSellModel = async () => {
-  const { prices, volumes } = await getHistoricalData("bitcoin", 365);
+  const { prices, volumes } = await getHistoricalData(
+    "BTC",
+    FIVE_YEARS_IN_DAYS
+  );
   const X: number[][] = [];
   const y: number[] = [];
 
@@ -26,7 +31,7 @@ export const trainSellModel = async () => {
       prices,
       dayIndex: i,
       threshold: 0.01,
-      horizon: 2,
+      horizon: 3,
     });
     X.push(features);
     y.push(label);
@@ -77,6 +82,9 @@ export const trainSellModel = async () => {
   const featureMinsArray = Array.from(await X_min.data());
   const featureMaxsArray = Array.from(await X_max.data());
 
+  console.log("Weights shape:", weights.shape); // Should be [26, 1]
+  console.log("Weights array length:", weightsArray.length); // Should be 26
+
   const weightsJson = {
     weights: Array.from(weightsArray),
     bias: biasValue,
@@ -86,9 +94,10 @@ export const trainSellModel = async () => {
 
   await admin
     .firestore()
-    .collection("models")
-    .doc("sellPredictor")
+    .collection(Collections.Models)
+    .doc(Docs.SellPredictor)
     .set(weightsJson);
+
   console.log("Model weights saved to Firestore");
 
   X_tensor.dispose();
@@ -100,4 +109,4 @@ export const trainSellModel = async () => {
   X_max.dispose();
 };
 
-trainSellModel();
+trainSellModel().catch(console.error);

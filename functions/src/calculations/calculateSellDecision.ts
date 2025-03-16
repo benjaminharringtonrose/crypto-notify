@@ -15,14 +15,6 @@ import { detectTripleTop } from "../detections/detectTripleTop";
 import { predictSell } from "../machineLearning/predictSell";
 import { CoinGeckoMarketChartResponse, SellDecision } from "../types";
 
-/**
- * Calculates a sell decision for a cryptocurrency using machine learning prediction based on indicators: RSI, SMA, MACD, Bollinger Bands, OBV, RSI divergence, ATR, Z-Score, VWAP, StochRSI, Fibonacci levels, MACD divergence, Volume Oscillator, Double Top, Head and Shoulders, Triple Top patterns, and Volume Spike.
- *
- * Computes indicators and delegates prediction to predictSell.
- *
- * @param {string} cryptoSymbol - The CoinGecko ID of the cryptocurrency (e.g., "bitcoin").
- * @returns {Promise<SellDecision | Error>} Trading decision details, including met conditions and probability, or an error.
- */
 export const calculateSellDecision = async (
   cryptoSymbol: string
 ): Promise<SellDecision> => {
@@ -106,11 +98,11 @@ export const calculateSellDecision = async (
 
     // Fibonacci Levels
     const { levels: fibLevels } = calculateFibonacciLevels(prices, 30);
-    const fib61_8 = fibLevels[3]; // 61.8% level
+    const fib61_8 = fibLevels[3];
 
     // Volume Oscillator
-    const volSmaShort = calculateSMA(volumes.slice(-5)); // 5-day SMA
-    const volSmaLong = calculateSMA(volumes.slice(-14)); // 14-day SMA
+    const volSmaShort = calculateSMA(volumes.slice(-5));
+    const volSmaLong = calculateSMA(volumes.slice(-14));
     const volumeOscillator = ((volSmaShort - volSmaLong) / volSmaLong) * 100;
     const prevVolSmaShort = calculateSMA(volumes.slice(-6, -1));
     const prevVolSmaLong = calculateSMA(volumes.slice(-15, -1));
@@ -181,7 +173,7 @@ export const calculateSellDecision = async (
       fib61_8: fib61_8.toFixed(2),
       volumeOscillator: volumeOscillator.toFixed(2),
       metConditions,
-      probability: probability.toFixed(3), // Replace score with probability
+      probability: probability.toFixed(3),
       recommendation,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     };

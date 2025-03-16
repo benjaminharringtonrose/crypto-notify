@@ -10,7 +10,6 @@ import { detectDoubleTop } from "../detections/detectDoubleTop";
 import { detectHeadAndShoulders } from "../detections/detectHeadAndShoulders";
 import { detectTripleTop } from "../detections/detectTripleTop";
 
-// computeFeatures.ts
 export function computeFeatures(
   prices: number[],
   volumes: number[],
@@ -75,6 +74,8 @@ export function computeFeatures(
       ? calculateStdDev(prices.slice(dayIndex - 19, dayIndex + 1), sma20)
       : 0;
   const upperBand = sma20 + 2 * stdDev20;
+
+  // Dynamic OBV normalization over a 30-day window
   let obv = 0;
   const obvValues = [0];
   for (let i = 1; i <= dayIndex; i++) {
@@ -82,6 +83,14 @@ export function computeFeatures(
     obv += priceChange > 0 ? volumes[i] : priceChange < 0 ? -volumes[i] : 0;
     obvValues.push(obv);
   }
+  const obvWindow = obvValues.slice(-30); // Last 30 days
+  const obvMin = Math.min(...obvWindow);
+  const obvMax = Math.max(...obvWindow);
+  const normalizedObv =
+    obvMax !== obvMin
+      ? (obvValues[obvValues.length - 1] - obvMin) / (obvMax - obvMin)
+      : 0;
+
   const atr =
     dayIndex >= 13 ? calculateATR(prices.slice(0, dayIndex + 1), 14) : 0;
   const atrBaseline =
@@ -155,7 +164,7 @@ export function computeFeatures(
     signalLine,
     currentPrice,
     upperBand,
-    obvValues[obvValues.length - 1],
+    normalizedObv,
     atr,
     atrBaseline,
     zScore,
@@ -163,7 +172,7 @@ export function computeFeatures(
     stochRsi,
     prevStochRsi,
     fib61_8,
-    prices[dayIndex - 1], // prices[prices.length - 2]
+    prices[dayIndex - 1],
     volumeOscillator,
     prevVolumeOscillator,
     isDoubleTop ? 1 : 0,
@@ -173,6 +182,5 @@ export function computeFeatures(
     isVolumeSpike ? 1 : 0,
   ];
 
-  console.log("Features length:", features.length); // Debug: Should be 17
   return features;
 }

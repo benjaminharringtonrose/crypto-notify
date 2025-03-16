@@ -21,10 +21,12 @@ export enum Currencies {
 
 export enum Collections {
   Config = "config",
+  Models = "models",
 }
 
 export enum Docs {
   PriceAlert = "priceAlert",
+  SellPredictor = "sellPredictor",
 }
 
 export interface SellDecision {

@@ -4,7 +4,6 @@ import { sendSMS } from "./sendSMS";
 import { formatCurrency } from "../utils";
 
 export const receiveSMS = https.onRequest(async (req, res) => {
-  // Log the reply to Firebase Realtime Database or Firestore
   try {
     const replyText = req.body.text || "No message";
 

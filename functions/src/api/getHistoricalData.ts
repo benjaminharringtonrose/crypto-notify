@@ -1,4 +1,5 @@
 import axios from "axios";
+import { CRYPTOCOMPARE_API_URL } from "../constants";
 
 export const getHistoricalData = async (
   cryptoSymbol: string,
@@ -31,17 +32,14 @@ export const getHistoricalData = async (
       )
     );
 
-    const response = await axios.get(
-      `https://min-api.cryptocompare.com/data/v2/histoday`,
-      {
-        params: {
-          fsym: cryptoSymbol.toUpperCase(),
-          tsym: "USD",
-          limit: limit,
-          toTs: toTimestamp,
-        },
-      }
-    );
+    const response = await axios.get(`${CRYPTOCOMPARE_API_URL}/histoday`, {
+      params: {
+        fsym: cryptoSymbol.toUpperCase(),
+        tsym: "USD",
+        limit: limit,
+        toTs: toTimestamp,
+      },
+    });
 
     const data = response.data.Data.Data;
     const chunkPrices = data.map((entry: any) => entry.close);
@@ -49,11 +47,6 @@ export const getHistoricalData = async (
 
     prices.unshift(...chunkPrices);
     volumes.unshift(...chunkVolumes);
-
-    // Delay to respect rate limits (adjust as needed)
-    if (i < numChunks - 1) {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    }
   }
 
   return { prices, volumes };

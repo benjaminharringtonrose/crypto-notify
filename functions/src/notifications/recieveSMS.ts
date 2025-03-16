@@ -21,7 +21,7 @@ export const receiveSMS = https.onRequest(async (req, res) => {
       value.recommendation.charAt(0).toUpperCase() +
       value.recommendation.slice(1);
     const conditions = value.metConditions.join(", ");
-    const smsMessage = `${symbol}: ${price}\n\nProbability: ${prob}\nRecommendation: ${rec}\nConditions: ${conditions}\n\nReply with a cryptocurrency to run the analysis again`;
+    const smsMessage = `${symbol}: ${price}\n\nProbability: ${prob}\n\nRecommendation: ${rec}\n\nSell conditions met: ${conditions}\n\nReply with a cryptocurrency to run the analysis again`;
 
     await sendSMS(smsMessage);
     res.status(200).send("Reply received and logged!");

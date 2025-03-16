@@ -8,7 +8,7 @@ import {
   Docs,
   MERGE_PAYLOAD,
   NOTIFICATION_COOLDOWN,
-  PRICE_CHECK_SCHEDULE,
+  EVERY_MIN,
   PRICES,
   RUNNING_SCHEDULE_CHECK_MESSAGE,
 } from "./constants";
@@ -26,7 +26,7 @@ import { getCurrentPrice } from "./api/getCurrentPrice";
 
 dotenv.config();
 
-export const checkCardanoPrice = onSchedule(PRICE_CHECK_SCHEDULE, async () => {
+export const checkCardanoPrice = onSchedule(EVERY_MIN, async () => {
   try {
     console.log(RUNNING_SCHEDULE_CHECK_MESSAGE);
 

@@ -29,6 +29,41 @@ export enum Docs {
   SellPredictor = "sellPredictor",
 }
 
+export interface Indicators {
+  rsi?: number;
+  prevRsi?: number;
+  sma7: number;
+  sma21: number;
+  prevSma7: number;
+  prevSma21: number;
+  macdLine: number;
+  signalLine: number;
+  currentPrice: number;
+  upperBand: number;
+  obvValues: number[];
+  atr: number;
+  atrBaseline: number;
+  zScore: number;
+  vwap: number;
+  stochRsi: number;
+  prevStochRsi: number;
+  fib61_8: number;
+  prices: number[];
+  volumeOscillator: number;
+  prevVolumeOscillator: number;
+  isDoubleTop: boolean;
+  isHeadAndShoulders: boolean;
+  prevMacdLine: number;
+  isTripleTop: boolean;
+  isVolumeSpike: boolean;
+}
+
+export interface PredictSell {
+  metConditions: string[];
+  probability: number;
+  recommendation: Recommendation;
+}
+
 export interface SellDecision {
   cryptoSymbol: string;
   currentPrice: number;

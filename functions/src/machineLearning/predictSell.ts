@@ -1,68 +1,35 @@
 import * as tf from "@tensorflow/tfjs-node";
 import * as admin from "firebase-admin";
-import { Condition, Recommendation } from "../types";
+import { Condition, Indicators, PredictSell, Recommendation } from "../types";
 
-export async function predictSell(indicators: {
-  rsi?: number;
-  prevRsi?: number;
-  sma7: number;
-  sma21: number;
-  prevSma7: number;
-  prevSma21: number;
-  macdLine: number;
-  signalLine: number;
-  currentPrice: number;
-  upperBand: number;
-  obvValues: number[];
-  atr: number;
-  atrBaseline: number;
-  zScore: number;
-  vwap: number;
-  stochRsi: number;
-  prevStochRsi: number;
-  fib61_8: number;
-  prices: number[];
-  volumeOscillator: number;
-  prevVolumeOscillator: number;
-  isDoubleTop: boolean;
-  isHeadAndShoulders: boolean;
-  prevMacdLine: number;
-  isTripleTop: boolean;
-  isVolumeSpike: boolean;
-}): Promise<{
-  metConditions: string[];
-  probability: number;
-  recommendation: Recommendation;
-}> {
-  const {
-    rsi,
-    prevRsi,
-    sma7,
-    sma21,
-    prevSma7,
-    prevSma21,
-    macdLine,
-    signalLine,
-    currentPrice,
-    upperBand,
-    obvValues,
-    atr,
-    atrBaseline,
-    zScore,
-    vwap,
-    stochRsi,
-    prevStochRsi,
-    fib61_8,
-    prices,
-    volumeOscillator,
-    prevVolumeOscillator,
-    isDoubleTop,
-    isHeadAndShoulders,
-    prevMacdLine,
-    isTripleTop,
-    isVolumeSpike,
-  } = indicators;
-
+export const predictSell = async ({
+  rsi,
+  prevRsi,
+  sma7,
+  sma21,
+  prevSma7,
+  prevSma21,
+  macdLine,
+  signalLine,
+  currentPrice,
+  upperBand,
+  obvValues,
+  atr,
+  atrBaseline,
+  zScore,
+  vwap,
+  stochRsi,
+  prevStochRsi,
+  fib61_8,
+  prices,
+  volumeOscillator,
+  prevVolumeOscillator,
+  isDoubleTop,
+  isHeadAndShoulders,
+  prevMacdLine,
+  isTripleTop,
+  isVolumeSpike,
+}: Indicators): Promise<PredictSell> => {
   // Load trained weights from Firestore
   const modelRef = admin.firestore().collection("models").doc("sellPredictor");
   const modelDoc = await modelRef.get();
@@ -216,4 +183,4 @@ export async function predictSell(indicators: {
     probability,
     recommendation,
   };
-}
+};

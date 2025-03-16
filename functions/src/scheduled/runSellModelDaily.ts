@@ -6,7 +6,7 @@ import {
   ANALYSIS_SCHEDULE,
   RUNNING_ANALYSIS_MODEL_MESSAGE,
 } from "../constants";
-import { CryptoIds, Recommendation } from "../types";
+import { CryptoIds } from "../types";
 import { formatAnalysisResults } from "../utils";
 
 dotenv.config();
@@ -30,7 +30,5 @@ export const runSellModelDaily = onSchedule(ANALYSIS_SCHEDULE, async () => {
     metConditions,
   });
 
-  if (recommendation === Recommendation.Sell) {
-    await sendSMS(smsMessage);
-  }
+  await sendSMS(smsMessage);
 });

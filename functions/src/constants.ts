@@ -5,7 +5,7 @@ export const COINGECKO_API_URL = "https://api.coingecko.com/api/v3";
 
 export const PRICES = [0.8, 0.9, 1.0, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
 export const EVERY_MIN = `*/1 * * * *`; // every 1 min
-export const EVERYDAY_AT = `40 11 * * *`; // every day at 11:40 AM ET
+export const EVERYDAY_AT = `50 11 * * *`; // every day at 11:40 AM ET
 export const TIME_ZONE = "America/New_York";
 export const NOTIFICATION_COOLDOWN = 30 * 60 * 1000; // 30 mins
 

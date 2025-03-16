@@ -1,6 +1,6 @@
 import * as admin from "firebase-admin";
 import axios, { AxiosResponse } from "axios";
-import { BUY_PRICE_AVERAGE, COINGECKO_API_URL } from "../constants";
+import { AVERAGE_BUY_PRICE, COINGECKO_API_URL } from "../constants";
 import { calculateRSI } from "./calculateRSI";
 import { calculateSMA } from "./calculateSMA";
 import { calculateEMA } from "./calculateEMA";
@@ -169,14 +169,8 @@ export const calculateSellDecision = async (
     });
 
     // Adjust recommendation based on BUY_PRICE
-    const profitPercentage =
-      ((currentPrice - BUY_PRICE_AVERAGE) / BUY_PRICE_AVERAGE) * 100;
-    let recommendationAfterConsideringBuyPriceAverage = recommendation;
-    if (profitPercentage > 5 && probability > 0.3) {
-      recommendationAfterConsideringBuyPriceAverage = Recommendation.Sell; // Lock in gains if >5% profit and moderate drop risk
-    } else if (currentPrice < BUY_PRICE_AVERAGE && probability > 0.6) {
-      recommendationAfterConsideringBuyPriceAverage = Recommendation.Sell; // Cut losses if below buy price and high drop risk
-    }
+    const recommendationBasedOnBuyPrice =
+      currentPrice < AVERAGE_BUY_PRICE ? Recommendation.Hold : recommendation;
 
     return {
       cryptoSymbol,
@@ -199,7 +193,7 @@ export const calculateSellDecision = async (
       volumeOscillator: volumeOscillator.toFixed(2),
       metConditions,
       probability: probability.toFixed(3),
-      recommendation: recommendationAfterConsideringBuyPriceAverage,
+      recommendation: recommendationBasedOnBuyPrice,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     };
   } catch (error: any) {

@@ -4,13 +4,9 @@ import { EVERY_MIN } from "./constants";
 import { calculateSellDecision } from "./calculations/calculateSellDecision";
 import { sendSMS } from "./notifications/sendSMS";
 import dotenv from "dotenv";
+import { formatCurrency } from "./utils";
 
 dotenv.config();
-
-const formatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
 
 export const runAnalysisModel = onSchedule(EVERY_MIN, async () => {
   console.log("Running analytics model...");
@@ -24,7 +20,7 @@ export const runAnalysisModel = onSchedule(EVERY_MIN, async () => {
   } = await calculateSellDecision("cardano");
 
   const symbol = cryptoSymbol.toUpperCase();
-  const price = formatter.format(currentPrice);
+  const price = formatCurrency(currentPrice);
   const prob = `${(Number(probability) * 100).toFixed(3)}%`;
   const rec = recommendation.charAt(0).toUpperCase() + recommendation.slice(1);
   const conditions = metConditions.join(", ");

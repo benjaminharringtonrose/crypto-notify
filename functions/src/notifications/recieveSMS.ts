@@ -1,12 +1,7 @@
 import { https } from "firebase-functions";
 import { calculateSellDecision } from "../calculations/calculateSellDecision";
 import { sendSMS } from "./sendSMS";
-
-const formatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 2,
-});
+import { formatCurrency } from "../utils";
 
 export const receiveSMS = https.onRequest(async (req, res) => {
   // Log the reply to Firebase Realtime Database or Firestore
@@ -16,7 +11,7 @@ export const receiveSMS = https.onRequest(async (req, res) => {
     const value = await calculateSellDecision(replyText.toLowerCase());
 
     const symbol = value.cryptoSymbol.toUpperCase();
-    const price = formatter.format(value.currentPrice);
+    const price = formatCurrency(value.currentPrice);
     const prob = `${(Number(value.probability) * 100).toFixed(3)}%`;
     const rec =
       value.recommendation.charAt(0).toUpperCase() +

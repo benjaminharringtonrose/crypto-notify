@@ -27,8 +27,6 @@ export const runAnalysisModel = onSchedule(EVERY_MIN, async () => {
     metConditions,
   });
 
-  await sendSMS(smsMessage);
-
   if (recommendation === Recommendation.Sell) {
     await sendSMS(smsMessage);
   }

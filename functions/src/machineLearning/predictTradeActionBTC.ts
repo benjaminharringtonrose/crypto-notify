@@ -2,7 +2,7 @@ import * as tf from "@tensorflow/tfjs-node";
 import * as admin from "firebase-admin";
 import { Condition, Indicators, PredictSell, Recommendation } from "../types";
 
-export const predictSell = async ({
+export const predictTradeActionBTC = async ({
   rsi,
   prevRsi,
   sma7,

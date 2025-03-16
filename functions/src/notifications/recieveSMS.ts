@@ -1,24 +1,29 @@
 import { https } from "firebase-functions";
-import { calculateSellDecision } from "../calculations/calculateSellDecision";
-import { sendSMS } from "./sendSMS";
+import { determineTradeActionBTC } from "../machineLearning/determineTradeActionBTC";
 import { RecieveSMSRequest } from "../types";
-import { formatCurrency } from "../utils";
+import { formatAnalysisResults, formatCurrency } from "../utils";
+import { sendSMS } from "./sendSMS";
 
 export const receiveSMS = https.onRequest(
   async (request: RecieveSMSRequest, response) => {
     try {
       const replyText = request.body.text || "No message";
 
-      const value = await calculateSellDecision(replyText.toLowerCase().trim());
+      const {
+        cryptoSymbol,
+        currentPrice,
+        probability,
+        recommendation,
+        metConditions,
+      } = await determineTradeActionBTC(replyText.toLowerCase().trim());
 
-      const symbol = value.cryptoSymbol.toUpperCase();
-      const price = formatCurrency(value.currentPrice);
-      const prob = `${(Number(value.probability) * 100).toFixed(3)}%`;
-      const rec =
-        value.recommendation.charAt(0).toUpperCase() +
-        value.recommendation.slice(1);
-      const conditions = value.metConditions.join(", ");
-      const smsMessage = `${symbol}: ${price}\n\nProbability: ${prob}\n\nRecommendation: ${rec}\n\nSell conditions met: ${conditions}\n\nReply with a cryptocurrency to run the analysis again`;
+      const smsMessage = formatAnalysisResults({
+        cryptoSymbol,
+        currentPrice,
+        probability,
+        recommendation,
+        metConditions,
+      });
 
       await sendSMS(smsMessage);
       response.status(200).send("Reply received and logged!");

@@ -12,7 +12,7 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount as any),
 });
 
-export const trainSellModel = async () => {
+export const trainBitcoinModel = async () => {
   const { prices, volumes } = await getHistoricalData(
     "BTC",
     FIVE_YEARS_IN_DAYS
@@ -244,4 +244,4 @@ export const trainSellModel = async () => {
   preds.dispose();
 };
 
-trainSellModel().catch(console.error);
+trainBitcoinModel().catch(console.error);

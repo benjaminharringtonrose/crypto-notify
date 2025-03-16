@@ -13,6 +13,7 @@ export enum Recommendation {
 }
 
 export enum CryptoIds {
+  Bitcoin = "bitcoin",
   Cardano = "cardano",
 }
 

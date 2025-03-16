@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { calculateSellDecision } from "../calculations/calculateSellDecision";
+import { determineTradeActionBTC } from "../machineLearning/determineTradeActionBTC";
 import { sendSMS } from "../notifications/sendSMS";
 import { EVERY_MIN, RUNNING_ANALYSIS_MODEL_MESSAGE } from "../constants";
 import { CryptoIds, Recommendation } from "../types";
@@ -17,7 +17,7 @@ export const runSellModel = onSchedule(EVERY_MIN, async () => {
     probability,
     recommendation,
     metConditions,
-  } = await calculateSellDecision(CryptoIds.Cardano);
+  } = await determineTradeActionBTC(CryptoIds.Bitcoin);
 
   const smsMessage = formatAnalysisResults({
     cryptoSymbol,

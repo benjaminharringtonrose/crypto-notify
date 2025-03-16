@@ -1,25 +1,25 @@
 import * as admin from "firebase-admin";
 import axios, { AxiosResponse } from "axios";
 import { AVERAGE_BUY_PRICE, COINGECKO_API_URL } from "../constants";
-import { calculateRSI } from "./calculateRSI";
-import { calculateSMA } from "./calculateSMA";
-import { calculateEMA } from "./calculateEMA";
-import { calculateStdDev } from "./calculateStdDev";
-import { calculateATR } from "./calculateATR";
-import { calculateVWAP } from "./calculateVWAP";
-import { calculateStochRSI } from "./calculateStochRSI";
-import { calculateFibonacciLevels } from "./calculateFibonacciLevels";
+import { calculateRSI } from "../calculations/calculateRSI";
+import { calculateSMA } from "../calculations/calculateSMA";
+import { calculateEMA } from "../calculations/calculateEMA";
+import { calculateStdDev } from "../calculations/calculateStdDev";
+import { calculateATR } from "../calculations/calculateATR";
+import { calculateVWAP } from "../calculations/calculateVWAP";
+import { calculateStochRSI } from "../calculations/calculateStochRSI";
+import { calculateFibonacciLevels } from "../calculations/calculateFibonacciLevels";
 import { detectDoubleTop } from "../detections/detectDoubleTop";
 import { detectHeadAndShoulders } from "../detections/detectHeadAndShoulders";
 import { detectTripleTop } from "../detections/detectTripleTop";
-import { predictSell } from "../machineLearning/predictSell";
+import { predictTradeActionBTC } from "./predictTradeActionBTC";
 import {
   CoinGeckoMarketChartResponse,
   Recommendation,
   SellDecision,
 } from "../types";
 
-export const calculateSellDecision = async (
+export const determineTradeActionBTC = async (
   cryptoSymbol: string
 ): Promise<SellDecision> => {
   try {
@@ -137,36 +137,37 @@ export const calculateSellDecision = async (
         : 0;
 
     // Predict Sell using ML
-    const { metConditions, probability, recommendation } = await predictSell({
-      rsi,
-      prevRsi,
-      sma7,
-      sma21,
-      prevSma7,
-      prevSma21,
-      macdLine,
-      signalLine,
-      currentPrice,
-      upperBand,
-      obvValues,
-      atr,
-      atrBaseline,
-      zScore,
-      vwap,
-      stochRsi,
-      prevStochRsi,
-      fib61_8,
-      prices,
-      volumeOscillator,
-      prevVolumeOscillator,
-      isDoubleTop,
-      isHeadAndShoulders,
-      prevMacdLine,
-      isTripleTop,
-      isVolumeSpike,
-      momentum,
-      priceChangePct,
-    });
+    const { metConditions, probability, recommendation } =
+      await predictTradeActionBTC({
+        rsi,
+        prevRsi,
+        sma7,
+        sma21,
+        prevSma7,
+        prevSma21,
+        macdLine,
+        signalLine,
+        currentPrice,
+        upperBand,
+        obvValues,
+        atr,
+        atrBaseline,
+        zScore,
+        vwap,
+        stochRsi,
+        prevStochRsi,
+        fib61_8,
+        prices,
+        volumeOscillator,
+        prevVolumeOscillator,
+        isDoubleTop,
+        isHeadAndShoulders,
+        prevMacdLine,
+        isTripleTop,
+        isVolumeSpike,
+        momentum,
+        priceChangePct,
+      });
 
     // Adjust recommendation based on BUY_PRICE
     const recommendationBasedOnBuyPrice =

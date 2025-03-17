@@ -28,7 +28,7 @@ function customRecall(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
 
 const focalLoss = (yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar => {
   const gamma = 2.0;
-  const alpha = tf.tensor1d([2.0, 1.0, 2.0]); // Sell, Hold, Buy
+  const alpha = tf.tensor1d([1.5, 1.0, 1.5]); // Sell, Hold, Buy
   const ce = tf.losses.softmaxCrossEntropy(yTrue, yPred);
   const pt = yTrue.mul(yPred).sum(-1);
   const focalWeight = tf.pow(tf.sub(1, pt), gamma);
@@ -58,7 +58,7 @@ export const trainTradeModelADA = async () => {
         );
         continue;
       }
-      if (Math.random() < 0.05) continue;
+      if (Math.random() < 0.03) continue;
       const scale = 0.9 + Math.random() * 0.2;
       const noisyFeatures = features.map(
         (f) => f * scale + (Math.random() - 0.5) * 0.005
@@ -198,7 +198,7 @@ export const trainTradeModelADA = async () => {
     .apply(tf.layers.flatten().apply(bn3)) as tf.SymbolicTensor;
   const add = tf.layers.add().apply([bn4, residual]) as tf.SymbolicTensor;
   const dropout = tf.layers
-    .dropout({ rate: 0.3 })
+    .dropout({ rate: 0.25 })
     .apply(add) as tf.SymbolicTensor;
   const dense1 = tf.layers
     .dense({
@@ -220,7 +220,7 @@ export const trainTradeModelADA = async () => {
   console.log("Model summary:");
   model.summary();
 
-  const initialLr = 0.002;
+  const initialLr = 0.0025;
   const optimizer = tf.train.adam(initialLr);
 
   model.compile({
@@ -252,7 +252,7 @@ export const trainTradeModelADA = async () => {
     }
 
     async onEpochBegin(epoch: number) {
-      const decayRate = 0.95;
+      const decayRate = 0.96;
       const newLr = initialLr * Math.pow(decayRate, epoch);
       // @ts-ignore learningRate is protected
       optimizer.learningRate = newLr;
@@ -265,7 +265,7 @@ export const trainTradeModelADA = async () => {
     epochs: 150,
     validationData: valDataset,
     callbacks: [
-      tf.callbacks.earlyStopping({ monitor: "val_loss", patience: 40 }),
+      tf.callbacks.earlyStopping({ monitor: "val_loss", patience: 50 }),
       new BestWeightsCallback({}),
       new ExponentialDecayLearningRateCallback({}),
     ],

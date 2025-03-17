@@ -10,7 +10,7 @@
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
     "test": "npx ts-node src/test.ts",
-    "train:trade:model:ada": "npx ts-node src/cardano/trainTradeModelADA.ts"
+    "train:trade:model:ada": "npx ts-node src/cardano/trainTradeModel.ts"
   },
   "engines": {
     "node": "20"

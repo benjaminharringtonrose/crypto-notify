@@ -13,7 +13,7 @@ import { calculateFibonacciLevels } from "../calculations/calculateFibonacciLeve
 import { detectDoubleTop } from "../detections/detectDoubleTop";
 import { detectHeadAndShoulders } from "../detections/detectHeadAndShoulders";
 import { detectTripleTop } from "../detections/detectTripleTop";
-import { predictTradeADA } from "./predictTradeADA";
+import { predictTrade } from "./predictTrade";
 import {
   CoinGeckoMarketChartResponse,
   Recommendation,
@@ -22,7 +22,7 @@ import {
 
 dotenv.config();
 
-export const determineTradeADA = async (
+export const determineTrade = async (
   cryptoSymbol: string
 ): Promise<TradeDecision> => {
   try {
@@ -116,8 +116,8 @@ export const determineTradeADA = async (
           100
         : 0;
 
-    const { metConditions, probabilities, recommendation } =
-      await predictTradeADA({
+    const { metConditions, probabilities, recommendation } = await predictTrade(
+      {
         rsi,
         prevRsi,
         sma7,
@@ -146,7 +146,8 @@ export const determineTradeADA = async (
         isVolumeSpike,
         momentum,
         priceChangePct,
-      });
+      }
+    );
 
     const recommendationBasedOnBuyPrice =
       currentPrice < AVERAGE_BUY_PRICE && recommendation === Recommendation.Sell

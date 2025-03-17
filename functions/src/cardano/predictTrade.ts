@@ -5,7 +5,7 @@ import { Condition, Indicators, PredictTrade, Recommendation } from "../types";
 
 dotenv.config();
 
-export const predictTradeADA = async ({
+export const predictTrade = async ({
   rsi,
   prevRsi,
   sma7,

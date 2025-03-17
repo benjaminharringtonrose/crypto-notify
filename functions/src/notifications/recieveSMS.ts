@@ -1,5 +1,5 @@
 import { https } from "firebase-functions";
-import { determineTradeADA } from "../cardano/determineTradeADA";
+import { determineTrade } from "../cardano/determineTrade";
 import { RecieveSMSRequest } from "../types";
 import { formatAnalysisResults } from "../utils";
 import { sendSMS } from "./sendSMS";
@@ -15,7 +15,7 @@ export const receiveSMS = https.onRequest(
         probabilities,
         recommendation,
         metConditions,
-      } = await determineTradeADA(replyText.toLowerCase().trim());
+      } = await determineTrade(replyText.toLowerCase().trim());
 
       const smsMessage = formatAnalysisResults({
         cryptoSymbol,

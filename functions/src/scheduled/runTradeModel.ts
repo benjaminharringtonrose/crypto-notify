@@ -24,15 +24,16 @@ export const runTradeModel = onSchedule(EVERY_MIN, async () => {
     metConditions,
   } = await determineTrade(CryptoIds.Cardano);
 
-  // Reference to the document storing the last recommendation
   const lastRecommendationRef = db
     .collection(Collections.TradeRecommendations)
     .doc(Docs.Cardano);
 
-  // Get the previous recommendation
   const lastRecommendationDoc = await lastRecommendationRef.get();
   const previousRecommendation = lastRecommendationDoc.exists
     ? lastRecommendationDoc.data()?.recommendation
+    : null;
+  const previousProbability = lastRecommendationDoc.exists
+    ? lastRecommendationDoc.data()?.probability
     : null;
 
   const smsMessage = formatAnalysisResults({
@@ -43,18 +44,48 @@ export const runTradeModel = onSchedule(EVERY_MIN, async () => {
     metConditions,
   });
 
-  // Only send SMS if it's buy or sell and not the same as the previous
-  if (
-    (recommendation === Recommendation.Buy ||
-      recommendation === Recommendation.Sell) &&
-    recommendation !== previousRecommendation
-  ) {
-    await sendSMS(smsMessage);
+  const isBuy = recommendation === Recommendation.Buy;
+  const isSell = recommendation === Recommendation.Sell;
+  const sameAsPrevious = recommendation === previousRecommendation;
+  const differentFromPrevious = recommendation !== previousRecommendation;
 
-    // Store the current recommendation
+  if (sameAsPrevious) {
+    if (isBuy && probabilities.buy > previousProbability) {
+      await sendSMS(`Buy probability increased!\n\n${smsMessage}`);
+      await lastRecommendationRef.set({
+        recommendation,
+        probability: probabilities.buy,
+        timestamp: new Date().toISOString(),
+      });
+    }
+    if (isSell && probabilities.sell > previousProbability) {
+      await sendSMS(`Sell probability increased!\n\n${smsMessage}`);
+      await lastRecommendationRef.set({
+        recommendation,
+        probability: probabilities.buy,
+        timestamp: new Date().toISOString(),
+      });
+    }
+    return;
+  }
+
+  if (isBuy && differentFromPrevious) {
+    await sendSMS(smsMessage);
     await lastRecommendationRef.set({
       recommendation,
+      probability: probabilities.buy,
       timestamp: new Date().toISOString(),
     });
+    return;
+  }
+
+  if (isSell && differentFromPrevious) {
+    await sendSMS(smsMessage);
+    await lastRecommendationRef.set({
+      recommendation,
+      probability: probabilities.sell,
+      timestamp: new Date().toISOString(),
+    });
+    return;
   }
 });

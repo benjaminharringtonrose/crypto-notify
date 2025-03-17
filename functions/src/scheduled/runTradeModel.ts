@@ -3,7 +3,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { determineTrade } from "../cardano/determineTrade";
 import { sendSMS } from "../notifications/sendSMS";
 import { EVERY_MIN, RUNNING_ANALYSIS_MODEL_MESSAGE } from "../constants";
-import { Collections, CryptoIds, Docs, Recommendation } from "../types";
+import { Collections, CryptoIds, Docs } from "../types";
 import { formatAnalysisResults } from "../utils";
 // Add Firestore import
 import { getFirestore } from "firebase-admin/firestore";

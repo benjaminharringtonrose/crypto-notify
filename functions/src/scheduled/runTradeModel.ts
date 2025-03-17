@@ -44,30 +44,10 @@ export const runTradeModel = onSchedule(EVERY_MIN, async () => {
 
   const isBuy = recommendation === Recommendation.Buy;
   const isSell = recommendation === Recommendation.Sell;
-  const sameAsPrevious = recommendation === previousRecommendation;
-  const differentFromPrevious = recommendation !== previousRecommendation;
 
-  if (sameAsPrevious) {
-    if (isBuy && probabilities.buy > previousProbability) {
-      await sendSMS(`Buy probability increased: ${probabilities.buy}`);
-      await recommendationRef.set({
-        recommendation,
-        probability: probabilities.buy,
-        timestamp: new Date().toISOString(),
-      });
-    }
-    if (isSell && probabilities.sell > previousProbability) {
-      await sendSMS(`Sell probability increased: ${probabilities.sell}`);
-      await recommendationRef.set({
-        recommendation,
-        probability: probabilities.sell,
-        timestamp: new Date().toISOString(),
-      });
-    }
-    return;
-  }
+  const sameRecommendation = recommendation === previousRecommendation;
 
-  if (differentFromPrevious) {
+  if (!sameRecommendation) {
     await sendSMS(smsMessage);
     if (isBuy) {
       await recommendationRef.set({
@@ -78,6 +58,27 @@ export const runTradeModel = onSchedule(EVERY_MIN, async () => {
       return;
     }
     if (isSell) {
+      await recommendationRef.set({
+        recommendation,
+        probability: probabilities.sell,
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+  }
+
+  if (sameRecommendation) {
+    if (isBuy && probabilities.buy > previousProbability) {
+      await sendSMS(`Buy probability increased: ${probabilities.buy}`);
+      await recommendationRef.set({
+        recommendation,
+        probability: probabilities.buy,
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+    if (isSell && probabilities.sell > previousProbability) {
+      await sendSMS(`Sell probability increased: ${probabilities.sell}`);
       await recommendationRef.set({
         recommendation,
         probability: probabilities.sell,

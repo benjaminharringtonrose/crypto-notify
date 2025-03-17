@@ -39,8 +39,12 @@ const focalLoss = (yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar => {
 };
 
 export const trainTradeModelADA = async () => {
-  const { prices, volumes } = await getHistoricalData(
+  const { prices: adaPrices, volumes: adaVolumes } = await getHistoricalData(
     "ADA",
+    FIVE_YEARS_IN_DAYS
+  );
+  const { prices: btcPrices, volumes: btcVolumes } = await getHistoricalData(
+    "BTC",
     FIVE_YEARS_IN_DAYS
   );
   const timesteps = 7;
@@ -48,29 +52,43 @@ export const trainTradeModelADA = async () => {
   const y: number[] = [];
 
   const allFeatures: number[] = [];
-  for (let i = 34 + timesteps - 1; i < prices.length; i++) {
+  for (let i = 34 + timesteps - 1; i < adaPrices.length; i++) {
     const sequence: number[][] = [];
     for (let j = i - timesteps + 1; j <= i; j++) {
-      const features = computeFeatures(prices, volumes, j, prices[j]);
-      if (features.length !== 28) {
+      const adaFeatures = computeFeatures(
+        adaPrices,
+        adaVolumes,
+        j,
+        adaPrices[j]
+      );
+      const btcFeatures = computeFeatures(
+        btcPrices,
+        btcVolumes,
+        j,
+        btcPrices[j]
+      );
+      if (adaFeatures.length !== 28 || btcFeatures.length !== 28) {
         console.error(
-          `Unexpected feature length: ${features.length} at index ${j}`
+          `Unexpected feature length at index ${j}: ADA ${adaFeatures.length}, BTC ${btcFeatures.length}`
         );
         continue;
       }
       if (Math.random() < 0.03) continue;
       const scale = 0.9 + Math.random() * 0.2;
-      const noisyFeatures = features.map(
+      const noisyAdaFeatures = adaFeatures.map(
         (f) => f * scale + (Math.random() - 0.5) * 0.005
       );
-      sequence.push(noisyFeatures);
-      allFeatures.push(...noisyFeatures);
+      const noisyBtcFeatures = btcFeatures.map(
+        (f) => f * scale + (Math.random() - 0.5) * 0.005
+      );
+      sequence.push([...noisyAdaFeatures, ...noisyBtcFeatures]);
+      allFeatures.push(...noisyAdaFeatures, ...noisyBtcFeatures);
     }
     while (sequence.length < timesteps)
       sequence.push(sequence[sequence.length - 1]);
     while (sequence.length > timesteps) sequence.pop();
     const label = labelData({
-      prices,
+      prices: adaPrices,
       dayIndex: i,
       threshold: 0.02,
       horizon: 3,
@@ -142,7 +160,7 @@ export const trainTradeModelADA = async () => {
     })
     .batch(128);
 
-  const input = tf.input({ shape: [timesteps, 28] });
+  const input = tf.input({ shape: [timesteps, 56] }); // 28 ADA + 28 BTC features
   const conv1 = tf.layers
     .conv1d({
       filters: 64,

@@ -23,7 +23,7 @@ import { Collections, CryptoIds, Currencies, Docs } from "../types";
 
 dotenv.config();
 
-export const schedulePriceCheckADA = onSchedule(EVERY_MIN, async () => {
+export const runPriceCheckADA = onSchedule(EVERY_MIN, async () => {
   try {
     console.log(RUNNING_SCHEDULE_CHECK_MESSAGE);
 

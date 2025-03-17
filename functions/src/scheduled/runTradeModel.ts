@@ -48,50 +48,57 @@ export const runTradeModel = onSchedule(EVERY_MIN, async () => {
     metConditions,
   });
 
-  const isBuy = recommendation === Recommendation.Buy;
-  const isSell = recommendation === Recommendation.Sell;
-
   const sameRecommendation = recommendation === previousRecommendation;
 
   if (!sameRecommendation) {
-    if (isBuy) {
-      await sendSMS(smsMessage);
-      await recommendationRef.set({
-        recommendation,
-        probability: probabilities.buy,
-        timestamp: new Date().toISOString(),
-      });
-      return;
-    }
-    if (isSell) {
-      await sendSMS(smsMessage);
-      await recommendationRef.set({
-        recommendation,
-        probability: probabilities.sell,
-        timestamp: new Date().toISOString(),
-      });
-      return;
+    switch (recommendation) {
+      case Recommendation.Buy:
+        await sendSMS(smsMessage);
+        await recommendationRef.set({
+          recommendation,
+          probability: probabilities.buy,
+          timestamp: new Date().toISOString(),
+        });
+        return;
+      case Recommendation.Sell:
+        await sendSMS(smsMessage);
+        await recommendationRef.set({
+          recommendation,
+          probability: probabilities.sell,
+          timestamp: new Date().toISOString(),
+        });
+        return;
+      case Recommendation.Hold:
+      case Recommendation.HoldBasedOnBuyPrice:
+        return;
     }
   }
 
   if (sameRecommendation) {
-    if (isBuy && probabilities.buy > previousProbability) {
-      await sendSMS(`Buy probability increased: ${probabilities.buy}`);
-      await recommendationRef.set({
-        recommendation,
-        probability: probabilities.buy,
-        timestamp: new Date().toISOString(),
-      });
-      return;
-    }
-    if (isSell && probabilities.sell > previousProbability) {
-      await sendSMS(`Sell probability increased: ${probabilities.sell}`);
-      await recommendationRef.set({
-        recommendation,
-        probability: probabilities.sell,
-        timestamp: new Date().toISOString(),
-      });
-      return;
+    switch (recommendation) {
+      case Recommendation.Buy:
+        if (probabilities.buy > previousProbability) {
+          await sendSMS(`Buy probability increased: ${probabilities.buy}`);
+          await recommendationRef.set({
+            recommendation,
+            probability: probabilities.buy,
+            timestamp: new Date().toISOString(),
+          });
+        }
+        return;
+      case Recommendation.Sell:
+        if (probabilities.sell > previousProbability) {
+          await sendSMS(`Sell probability increased: ${probabilities.sell}`);
+          await recommendationRef.set({
+            recommendation,
+            probability: probabilities.sell,
+            timestamp: new Date().toISOString(),
+          });
+        }
+        return;
+      case Recommendation.Hold:
+      case Recommendation.HoldBasedOnBuyPrice:
+        return;
     }
   }
 });

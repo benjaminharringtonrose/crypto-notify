@@ -1,5 +1,5 @@
 import { https } from "firebase-functions";
-import { determineTradeBTC } from "../machineLearning/determineTradeBTC";
+import { determineTradeADA } from "../cnn/determineTradeADA";
 import { RecieveSMSRequest } from "../types";
 import { formatAnalysisResults } from "../utils";
 import { sendSMS } from "./sendSMS";
@@ -15,7 +15,7 @@ export const receiveSMS = https.onRequest(
         probabilities,
         recommendation,
         metConditions,
-      } = await determineTradeBTC(replyText.toLowerCase().trim());
+      } = await determineTradeADA(replyText.toLowerCase().trim());
 
       const smsMessage = formatAnalysisResults({
         cryptoSymbol,

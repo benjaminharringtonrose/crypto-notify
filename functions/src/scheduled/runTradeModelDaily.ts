@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { determineTradeBTC } from "../machineLearning/determineTradeBTC";
+import { determineTradeADA } from "../cnn/determineTradeADA";
 import { sendSMS } from "../notifications/sendSMS";
 import {
   ANALYSIS_SCHEDULE,
@@ -20,7 +20,7 @@ export const runTradeModelDaily = onSchedule(ANALYSIS_SCHEDULE, async () => {
     probabilities,
     recommendation,
     metConditions,
-  } = await determineTradeBTC(CryptoIds.Bitcoin);
+  } = await determineTradeADA(CryptoIds.Cardano);
 
   const smsMessage = formatAnalysisResults({
     cryptoSymbol,

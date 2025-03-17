@@ -2,7 +2,7 @@ import * as tf from "@tensorflow/tfjs-node";
 import * as admin from "firebase-admin";
 import { Condition, Indicators, PredictTrade, Recommendation } from "../types";
 
-export const predictTradeActionBTC = async ({
+export const predictTradeADA = async ({
   rsi,
   prevRsi,
   sma7,
@@ -32,27 +32,22 @@ export const predictTradeActionBTC = async ({
   momentum,
   priceChangePct,
 }: Indicators): Promise<PredictTrade> => {
-  const modelRef = admin.firestore().collection("models").doc("tradePredictor");
-  const modelDoc = await modelRef.get();
-  const modelData = modelDoc.data();
-  if (!modelData) throw new Error("Model weights not found in Firestore");
+  const bucket = admin.storage().bucket();
+  const file = bucket.file("tradePredictorWeights.json");
+  const [weightsData] = await file.download();
+  const modelData = JSON.parse(weightsData.toString());
+  const parsedWeights = modelData.weights;
 
-  const lstmWeights = tf.tensor2d(
-    JSON.parse(modelData.weights).lstmWeights,
-    [28, 256]
-  );
-  const lstmRecurrentWeights = tf.tensor2d(
-    JSON.parse(modelData.weights).lstmRecurrentWeights,
-    [64, 256]
-  );
-  const lstmBias = tf.tensor1d(JSON.parse(modelData.weights).lstmBias);
-  const denseWeights = tf.tensor2d(
-    JSON.parse(modelData.weights).denseWeights,
-    [64, 3]
-  ); // 3 outputs
-  const denseBias = tf.tensor1d(JSON.parse(modelData.weights).denseBias);
-  const featureMins = tf.tensor1d(JSON.parse(modelData.weights).featureMins);
-  const featureMaxs = tf.tensor1d(JSON.parse(modelData.weights).featureMaxs);
+  const conv1Weights = tf.tensor3d(parsedWeights.conv1Weights, [2, 28, 64]);
+  const conv1Bias = tf.tensor1d(parsedWeights.conv1Bias);
+  const conv2Weights = tf.tensor3d(parsedWeights.conv2Weights, [2, 64, 32]);
+  const conv2Bias = tf.tensor1d(parsedWeights.conv2Bias);
+  const conv3Weights = tf.tensor3d(parsedWeights.conv3Weights, [2, 32, 16]);
+  const conv3Bias = tf.tensor1d(parsedWeights.conv3Bias);
+  const denseWeights = tf.tensor2d(parsedWeights.denseWeights, [16, 3]);
+  const denseBias = tf.tensor1d(parsedWeights.denseBias);
+  const featureMins = tf.tensor1d(parsedWeights.featureMins);
+  const featureMaxs = tf.tensor1d(parsedWeights.featureMaxs);
 
   const obvWindow = obvValues.slice(-30);
   const obvMin = Math.min(...obvWindow);
@@ -62,67 +57,94 @@ export const predictTradeActionBTC = async ({
       ? (obvValues[obvValues.length - 1] - obvMin) / (obvMax - obvMin)
       : 0;
 
-  const featuresRaw = tf.tensor1d([
-    rsi || 0,
-    prevRsi || 0,
-    sma7,
-    sma21,
-    prevSma7,
-    prevSma21,
-    macdLine,
-    signalLine,
-    currentPrice,
-    upperBand,
-    normalizedObv,
-    atr,
-    atrBaseline,
-    zScore,
-    vwap,
-    stochRsi,
-    prevStochRsi,
-    fib61_8,
-    prices[prices.length - 2],
-    volumeOscillator,
-    prevVolumeOscillator,
-    isDoubleTop ? 1 : 0,
-    isHeadAndShoulders ? 1 : 0,
-    prevMacdLine,
-    isTripleTop ? 1 : 0,
-    isVolumeSpike ? 1 : 0,
-    momentum || 0,
-    priceChangePct || 0,
-  ]);
+  const timesteps = 7;
+  const featureSequence: number[][] = [];
+  for (let i = Math.max(0, prices.length - timesteps); i < prices.length; i++) {
+    const dayFeatures = [
+      rsi || 0,
+      prevRsi || 0,
+      sma7,
+      sma21,
+      prevSma7,
+      prevSma21,
+      macdLine,
+      signalLine,
+      prices[i],
+      upperBand,
+      normalizedObv,
+      atr,
+      atrBaseline,
+      zScore,
+      vwap,
+      stochRsi,
+      prevStochRsi,
+      fib61_8,
+      i > 0 ? prices[i - 1] : prices[0],
+      volumeOscillator,
+      prevVolumeOscillator,
+      isDoubleTop ? 1 : 0,
+      isHeadAndShoulders ? 1 : 0,
+      prevMacdLine,
+      isTripleTop ? 1 : 0,
+      isVolumeSpike ? 1 : 0,
+      momentum || 0,
+      priceChangePct || 0,
+    ];
+    featureSequence.push(dayFeatures);
+  }
 
+  while (featureSequence.length < timesteps) {
+    featureSequence.unshift(featureSequence[0]);
+  }
+
+  const featuresRaw = tf.tensor2d(featureSequence, [timesteps, 28]);
   const featuresNormalized = featuresRaw
     .sub(featureMins)
     .div(featureMaxs.sub(featureMins).add(1e-6));
-  const features = featuresNormalized.clipByValue(0, 1).reshape([1, 1, 28]);
+  const features = featuresNormalized
+    .clipByValue(0, 1)
+    .reshape([1, timesteps, 28]) as tf.Tensor3D;
 
-  const [Wi, Wf, Wc, Wo] = tf.split(lstmWeights, 4, 1);
-  const [Ri, Rf, Rc, Ro] = tf.split(lstmRecurrentWeights, 4, 1);
-  const [bi, bf, bc, bo] = tf.split(lstmBias, 4);
+  let conv1Output = tf
+    .conv1d(features, conv1Weights, 1, "same")
+    .add(conv1Bias) as tf.Tensor3D;
+  conv1Output = tf.relu(conv1Output);
+  conv1Output = tf.pool(
+    conv1Output,
+    2,
+    "max",
+    "valid",
+    undefined,
+    2
+  ) as tf.Tensor3D;
 
-  const hPrev = tf.zeros([1, 64]);
-  const cPrev = tf.zeros([1, 64]);
+  let conv2Output = tf
+    .conv1d(conv1Output, conv2Weights, 1, "same")
+    .add(conv2Bias) as tf.Tensor3D;
+  conv2Output = tf.relu(conv2Output);
+  conv2Output = tf.pool(
+    conv2Output,
+    2,
+    "max",
+    "valid",
+    undefined,
+    2
+  ) as tf.Tensor3D;
 
-  const inputGate = tf.sigmoid(
-    features.matMul(Wi).add(hPrev.matMul(Ri)).add(bi)
-  );
-  const forgetGate = tf.sigmoid(
-    features.matMul(Wf).add(hPrev.matMul(Rf)).add(bf)
-  );
-  const cellGate = tf.tanh(features.matMul(Wc).add(hPrev.matMul(Rc)).add(bc));
-  const outputGate = tf.sigmoid(
-    features.matMul(Wo).add(hPrev.matMul(Ro)).add(bo)
-  );
+  let conv3Output = tf
+    .conv1d(conv2Output, conv3Weights, 1, "same")
+    .add(conv3Bias) as tf.Tensor3D;
+  conv3Output = tf.relu(conv3Output);
 
-  const cNext = forgetGate.mul(cPrev).add(inputGate.mul(cellGate));
-  const hNext = outputGate.mul(tf.tanh(cNext));
+  const flatOutput = conv3Output.reshape([1, -1]) as tf.Tensor2D;
+  console.log("Flat output shape:", flatOutput.shape);
+  const dropoutMask = tf
+    .randomUniform([1, flatOutput.shape[1]])
+    .greater(0.4)
+    .cast("float32");
+  const droppedOutput = flatOutput.mul(dropoutMask).div(0.6);
 
-  const dropoutMask = tf.randomUniform([1, 64]).greater(0.35).cast("float32");
-  const hDropped = hNext.mul(dropoutMask).div(0.65);
-
-  const logits = hDropped.matMul(denseWeights).add(denseBias);
+  const logits = droppedOutput.matMul(denseWeights).add(denseBias);
   const probabilityTensor = tf.softmax(logits);
   const probabilities = await probabilityTensor.data();
   const [sellProb, holdProb, buyProb] = probabilities;
@@ -134,7 +156,6 @@ export const predictTradeActionBTC = async ({
   const lowerBand = sma20 - 2 * stdDev20;
 
   const conditions: Condition[] = [
-    // Sell Conditions
     { name: "RSI Overbought", met: !!rsi && rsi > 70, weight: 0.1 },
     {
       name: "SMA Death Cross",
@@ -193,7 +214,6 @@ export const predictTradeActionBTC = async ({
     { name: "Triple Top Pattern", met: isTripleTop, weight: 0.08 },
     { name: "Volume Spike", met: isVolumeSpike, weight: 0.06 },
     { name: "Negative Momentum", met: momentum < 0, weight: 0.07 },
-    // Buy Conditions
     { name: "RSI Oversold", met: !!rsi && rsi < 30, weight: 0.1 },
     {
       name: "SMA Golden Cross",
@@ -248,43 +268,29 @@ export const predictTradeActionBTC = async ({
   const maxProb = Math.max(buyProb, holdProb, sellProb);
 
   let recommendation: Recommendation = Recommendation.Hold;
-
   if (maxProb === buyProb && buyProb >= 0.45)
     recommendation = Recommendation.Buy;
   else if (maxProb === sellProb && sellProb >= 0.45)
     recommendation = Recommendation.Sell;
 
-  lstmWeights.dispose();
-  lstmRecurrentWeights.dispose();
-  lstmBias.dispose();
+  conv1Weights.dispose();
+  conv1Bias.dispose();
+  conv2Weights.dispose();
+  conv2Bias.dispose();
+  conv3Weights.dispose();
+  conv3Bias.dispose();
   denseWeights.dispose();
   denseBias.dispose();
   featureMins.dispose();
   featureMaxs.dispose();
   featuresRaw.dispose();
   features.dispose();
-  Wi.dispose();
-  Wf.dispose();
-  Wc.dispose();
-  Wo.dispose();
-  Ri.dispose();
-  Rf.dispose();
-  Rc.dispose();
-  Ro.dispose();
-  bi.dispose();
-  bf.dispose();
-  bc.dispose();
-  bo.dispose();
-  hPrev.dispose();
-  cPrev.dispose();
-  inputGate.dispose();
-  forgetGate.dispose();
-  cellGate.dispose();
-  outputGate.dispose();
-  cNext.dispose();
-  hNext.dispose();
+  conv1Output.dispose();
+  conv2Output.dispose();
+  conv3Output.dispose();
+  flatOutput.dispose();
   dropoutMask.dispose();
-  hDropped.dispose();
+  droppedOutput.dispose();
   logits.dispose();
   probabilityTensor.dispose();
 

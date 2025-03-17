@@ -12,14 +12,14 @@ import { calculateFibonacciLevels } from "../calculations/calculateFibonacciLeve
 import { detectDoubleTop } from "../detections/detectDoubleTop";
 import { detectHeadAndShoulders } from "../detections/detectHeadAndShoulders";
 import { detectTripleTop } from "../detections/detectTripleTop";
-import { predictTradeActionBTC } from "./predictTradeBTC";
+import { predictTradeADA } from "./predictTradeADA";
 import {
   CoinGeckoMarketChartResponse,
   Recommendation,
   TradeDecision,
 } from "../types";
 
-export const determineTradeBTC = async (
+export const determineTradeADA = async (
   cryptoSymbol: string
 ): Promise<TradeDecision> => {
   try {
@@ -114,7 +114,7 @@ export const determineTradeBTC = async (
         : 0;
 
     const { metConditions, probabilities, recommendation } =
-      await predictTradeActionBTC({
+      await predictTradeADA({
         rsi,
         prevRsi,
         sma7,

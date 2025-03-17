@@ -26,15 +26,16 @@ function customRecall(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
   return truePos.div(actualPos.add(1e-6)) as tf.Scalar;
 }
 
-const weightedCrossEntropy = (
-  yTrue: tf.Tensor,
-  yPred: tf.Tensor
-): tf.Scalar => {
-  const weights = tf.tensor1d([4.5, 2.5, 2.0]); // Sell, Hold, Buy
+const focalLoss = (yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar => {
+  const gamma = 2.0;
+  const alpha = tf.tensor1d([2.0, 1.0, 2.0]); // Sell, Hold, Buy
   const ce = tf.losses.softmaxCrossEntropy(yTrue, yPred);
-  const weightedCe = ce.mul(yTrue.mul(weights).sum(-1)).mean() as tf.Scalar;
-  weights.dispose();
-  return weightedCe;
+  const pt = yTrue.mul(yPred).sum(-1);
+  const focalWeight = tf.pow(tf.sub(1, pt), gamma);
+  const alphaWeighted = yTrue.mul(alpha).sum(-1);
+  const loss = ce.mul(focalWeight).mul(alphaWeighted).mean() as tf.Scalar;
+  alpha.dispose();
+  return loss;
 };
 
 export const trainTradeModelADA = async () => {
@@ -46,30 +47,28 @@ export const trainTradeModelADA = async () => {
   const X: number[][][] = [];
   const y: number[] = [];
 
-  // Precompute and standardize features globally with time warping
   const allFeatures: number[] = [];
   for (let i = 34 + timesteps - 1; i < prices.length; i++) {
     const sequence: number[][] = [];
-    const warpFactor = 0.95 + Math.random() * 0.1; // Random stretch/compress
-    for (
-      let j = Math.floor((i - timesteps + 1) * warpFactor);
-      j <= Math.floor(i * warpFactor);
-      j++
-    ) {
-      const idx = Math.min(Math.max(j, 0), prices.length - 1); // Clamp index
-      const features = computeFeatures(prices, volumes, idx, prices[idx]);
+    for (let j = i - timesteps + 1; j <= i; j++) {
+      const features = computeFeatures(prices, volumes, j, prices[j]);
       if (features.length !== 28) {
         console.error(
-          `Unexpected feature length: ${features.length} at index ${idx}`
+          `Unexpected feature length: ${features.length} at index ${j}`
         );
         continue;
       }
-      sequence.push(features);
-      allFeatures.push(...features);
+      if (Math.random() < 0.05) continue;
+      const scale = 0.9 + Math.random() * 0.2;
+      const noisyFeatures = features.map(
+        (f) => f * scale + (Math.random() - 0.5) * 0.005
+      );
+      sequence.push(noisyFeatures);
+      allFeatures.push(...noisyFeatures);
     }
     while (sequence.length < timesteps)
-      sequence.push(sequence[sequence.length - 1]); // Pad if needed
-    while (sequence.length > timesteps) sequence.pop(); // Trim if needed
+      sequence.push(sequence[sequence.length - 1]);
+    while (sequence.length > timesteps) sequence.pop();
     const label = labelData({
       prices,
       dayIndex: i,
@@ -87,9 +86,7 @@ export const trainTradeModelADA = async () => {
     ) || 1;
   for (let i = 0; i < X.length; i++) {
     for (let j = 0; j < X[i].length; j++) {
-      X[i][j] = X[i][j].map(
-        (f) => ((f - mean) / std) * (0.95 + Math.random() * 0.1)
-      );
+      X[i][j] = X[i][j].map((f) => (f - mean) / std);
     }
   }
 
@@ -173,12 +170,28 @@ export const trainTradeModelADA = async () => {
   const bn2 = tf.layers
     .batchNormalization({ momentum: 0.9 })
     .apply(conv2) as tf.SymbolicTensor;
-  const gru = tf.layers
-    .gru({ units: 32, returnSequences: false })
+  const gru1 = tf.layers
+    .gru({ units: 32, returnSequences: true })
     .apply(bn2) as tf.SymbolicTensor;
+  const bn3 = tf.layers
+    .batchNormalization({ momentum: 0.9 })
+    .apply(gru1) as tf.SymbolicTensor;
+  const residual = tf.layers
+    .dense({
+      units: 16,
+      kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
+    })
+    .apply(tf.layers.flatten().apply(bn3)) as tf.SymbolicTensor;
+  const gru2 = tf.layers
+    .gru({ units: 16, returnSequences: false })
+    .apply(bn3) as tf.SymbolicTensor;
+  const bn4 = tf.layers
+    .batchNormalization({ momentum: 0.9 })
+    .apply(gru2) as tf.SymbolicTensor;
+  const add = tf.layers.add().apply([bn4, residual]) as tf.SymbolicTensor;
   const dropout = tf.layers
-    .dropout({ rate: 0.3 })
-    .apply(gru) as tf.SymbolicTensor;
+    .dropout({ rate: 0.4 })
+    .apply(add) as tf.SymbolicTensor;
   const dense = tf.layers
     .dense({
       units: 3,
@@ -192,12 +205,12 @@ export const trainTradeModelADA = async () => {
   console.log("Model summary:");
   model.summary();
 
-  const initialLearningRate = 0.001;
-  const optimizer = tf.train.adam(initialLearningRate);
+  const initialLr = 0.001;
+  const optimizer = tf.train.adam(initialLr);
 
   model.compile({
     optimizer,
-    loss: weightedCrossEntropy as any,
+    loss: focalLoss as any,
     metrics: [tf.metrics.categoricalAccuracy, customPrecision, customRecall],
   });
 
@@ -218,16 +231,14 @@ export const trainTradeModelADA = async () => {
     }
   }
 
-  class CosineDecayCallback extends tf.CustomCallback {
+  class ExponentialDecayLearningRateCallback extends tf.CustomCallback {
     constructor(args: tf.CustomCallbackArgs) {
       super(args);
     }
 
     async onEpochBegin(epoch: number) {
-      const cycleLength = 75;
-      const progress = (epoch % cycleLength) / cycleLength;
-      const newLr =
-        (initialLearningRate * (1 + Math.cos(Math.PI * progress))) / 2;
+      const decayRate = 0.98;
+      const newLr = initialLr * Math.pow(decayRate, epoch);
       // @ts-ignore learningRate is protected
       optimizer.learningRate = newLr;
       console.log(`Epoch ${epoch + 1}: Learning rate set to ${newLr}`);
@@ -239,9 +250,9 @@ export const trainTradeModelADA = async () => {
     epochs: 150,
     validationData: valDataset,
     callbacks: [
-      tf.callbacks.earlyStopping({ monitor: "val_loss", patience: 30 }),
+      tf.callbacks.earlyStopping({ monitor: "val_loss", patience: 40 }),
       new BestWeightsCallback({}),
-      new CosineDecayCallback({}),
+      new ExponentialDecayLearningRateCallback({}),
     ],
   });
 
@@ -300,8 +311,10 @@ export const trainTradeModelADA = async () => {
 
   const conv1Weights = model.getLayer("conv1d_Conv1D1").getWeights();
   const conv2Weights = model.getLayer("conv1d_Conv1D2").getWeights();
-  const gruWeights = model.getLayer("gru_GRU1").getWeights();
-  const denseWeights = model.getLayer("dense_Dense1").getWeights();
+  const gru1Weights = model.getLayer("gru_GRU1").getWeights();
+  const gru2Weights = model.getLayer("gru_GRU2").getWeights();
+  const residualWeights = model.getLayer("dense_Dense1").getWeights();
+  const denseWeights = model.getLayer("dense_Dense2").getWeights();
 
   const weightsJson = {
     weights: {
@@ -317,11 +330,26 @@ export const trainTradeModelADA = async () => {
       conv2Bias: conv2Weights[1]
         ? Array.from(await conv2Weights[1].data())
         : [],
-      gruWeights: gruWeights[0] ? Array.from(await gruWeights[0].data()) : [],
-      gruRecurrentWeights: gruWeights[1]
-        ? Array.from(await gruWeights[1].data())
+      gru1Weights: gru1Weights[0]
+        ? Array.from(await gru1Weights[0].data())
         : [],
-      gruBias: gruWeights[2] ? Array.from(await gruWeights[2].data()) : [],
+      gru1RecurrentWeights: gru1Weights[1]
+        ? Array.from(await gru1Weights[1].data())
+        : [],
+      gru1Bias: gru1Weights[2] ? Array.from(await gru1Weights[2].data()) : [],
+      gru2Weights: gru2Weights[0]
+        ? Array.from(await gru2Weights[0].data())
+        : [],
+      gru2RecurrentWeights: gru2Weights[1]
+        ? Array.from(await gru2Weights[1].data())
+        : [],
+      gru2Bias: gru2Weights[2] ? Array.from(await gru2Weights[2].data()) : [],
+      residualWeights: residualWeights[0]
+        ? Array.from(await residualWeights[0].data())
+        : [],
+      residualBias: residualWeights[1]
+        ? Array.from(await residualWeights[1].data())
+        : [],
       denseWeights: denseWeights[0]
         ? Array.from(await denseWeights[0].data())
         : [],

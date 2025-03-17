@@ -43,11 +43,8 @@ export const runTradeModel = onSchedule(EVERY_MIN, async () => {
     metConditions,
   });
 
-  // Only send SMS if recommendation is Sell and it's different from the previous recommendation
-  if (
-    recommendation === Recommendation.Sell &&
-    recommendation !== previousRecommendation
-  ) {
+  // Only send SMS if it's different from the previous recommendation
+  if (recommendation !== previousRecommendation) {
     await sendSMS(smsMessage);
   }
 

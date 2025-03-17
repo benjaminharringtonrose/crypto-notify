@@ -45,8 +45,8 @@ export const runTradeModel = onSchedule(EVERY_MIN, async () => {
 
   // Only send SMS if it's buy or sell and not the same as the previous
   if (
-    recommendation !== Recommendation.Hold &&
-    recommendation !== Recommendation.HoldBasedOnBuyPrice &&
+    (recommendation === Recommendation.Buy ||
+      recommendation === Recommendation.Sell) &&
     recommendation !== previousRecommendation
   ) {
     await sendSMS(smsMessage);

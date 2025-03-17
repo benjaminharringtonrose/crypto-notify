@@ -16,11 +16,13 @@ export enum Currencies {
 export enum Collections {
   Config = "config",
   Models = "models",
+  TradeRecommendations = "tradeRecommendations",
 }
 
 export enum Docs {
   PriceAlert = "priceAlert",
   TradePredictor = "tradePredictor",
+  Cardano = "cardano",
 }
 
 export interface Indicators {

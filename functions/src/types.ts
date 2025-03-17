@@ -52,6 +52,34 @@ export interface Indicators {
   isVolumeSpike: boolean;
   momentum: number;
   priceChangePct: number;
+  btcRsi?: number;
+  btcPrevRsi?: number;
+  btcSma7: number;
+  btcSma21: number;
+  btcPrevSma7: number;
+  btcPrevSma21: number;
+  btcMacdLine: number;
+  btcSignalLine: number;
+  btcCurrentPrice: number;
+  btcUpperBand: number;
+  btcObvValues: number[];
+  btcAtr: number;
+  btcAtrBaseline: number;
+  btcZScore: number;
+  btcVwap: number;
+  btcStochRsi: number;
+  btcPrevStochRsi: number;
+  btcFib61_8: number;
+  btcPrices: number[];
+  btcVolumeOscillator: number;
+  btcPrevVolumeOscillator: number;
+  btcIsDoubleTop: boolean;
+  btcIsHeadAndShoulders: boolean;
+  btcPrevMacdLine: number;
+  btcIsTripleTop: boolean;
+  btcIsVolumeSpike: boolean;
+  btcMomentum: number;
+  btcPriceChangePct: number;
 }
 
 export enum Recommendation {

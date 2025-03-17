@@ -34,6 +34,34 @@ export const predictTrade = async ({
   isVolumeSpike,
   momentum,
   priceChangePct,
+  btcRsi,
+  btcPrevRsi,
+  btcSma7,
+  btcSma21,
+  btcPrevSma7,
+  btcPrevSma21,
+  btcMacdLine,
+  btcSignalLine,
+  btcCurrentPrice,
+  btcUpperBand,
+  btcObvValues,
+  btcAtr,
+  btcAtrBaseline,
+  btcZScore,
+  btcVwap,
+  btcStochRsi,
+  btcPrevStochRsi,
+  btcFib61_8,
+  btcPrices,
+  btcVolumeOscillator,
+  btcPrevVolumeOscillator,
+  btcIsDoubleTop,
+  btcIsHeadAndShoulders,
+  btcPrevMacdLine,
+  btcIsTripleTop,
+  btcIsVolumeSpike,
+  btcMomentum,
+  btcPriceChangePct,
 }: Indicators): Promise<PredictTrade> => {
   const bucket = admin.storage().bucket(process.env.STORAGE_BUCKET);
   const file = bucket.file("tradePredictorWeights.json");
@@ -58,8 +86,8 @@ export const predictTrade = async ({
     }
   };
 
-  // Validate weights matching the training architecture
-  validateArray(parsedWeights.conv1Weights, 2 * 28 * 64, "conv1Weights"); // [2, 28, 64] = 3584
+  // Validate weights for Version 18 architecture
+  validateArray(parsedWeights.conv1Weights, 2 * 56 * 64, "conv1Weights"); // [2, 56, 64] = 7168
   validateArray(parsedWeights.conv1Bias, 64, "conv1Bias");
   validateArray(parsedWeights.conv2Weights, 2 * 64 * 32, "conv2Weights"); // [2, 64, 32] = 4096
   validateArray(parsedWeights.conv2Bias, 32, "conv2Bias");
@@ -83,11 +111,11 @@ export const predictTrade = async ({
   validateArray(parsedWeights.dense1Bias, 8, "dense1Bias");
   validateArray(parsedWeights.dense2Weights, 8 * 3, "dense2Weights"); // [8, 3] = 24
   validateArray(parsedWeights.dense2Bias, 3, "dense2Bias");
-  validateArray(parsedWeights.featureMins, 28, "featureMins");
-  validateArray(parsedWeights.featureMaxs, 28, "featureMaxs");
+  validateArray(parsedWeights.featureMins, 56, "featureMins"); // 28 ADA + 28 BTC
+  validateArray(parsedWeights.featureMaxs, 56, "featureMaxs");
 
   // Load tensors
-  const conv1Weights = tf.tensor3d(parsedWeights.conv1Weights, [2, 28, 64]);
+  const conv1Weights = tf.tensor3d(parsedWeights.conv1Weights, [2, 56, 64]);
   const conv1Bias = tf.tensor1d(parsedWeights.conv1Bias);
   const conv2Weights = tf.tensor3d(parsedWeights.conv2Weights, [2, 64, 32]);
   const conv2Bias = tf.tensor1d(parsedWeights.conv2Bias);
@@ -115,7 +143,11 @@ export const predictTrade = async ({
   // Feature preprocessing
   const timesteps = 7;
   const featureSequence: number[][] = [];
-  for (let i = Math.max(0, prices.length - timesteps); i < prices.length; i++) {
+  for (
+    let i = Math.max(0, prices.length - timesteps);
+    i < prices.length && i < btcPrices.length;
+    i++
+  ) {
     const dayFeatures = [
       rsi || 0,
       prevRsi || 0,
@@ -145,22 +177,50 @@ export const predictTrade = async ({
       isVolumeSpike ? 1 : 0,
       momentum || 0,
       priceChangePct || 0,
+      btcRsi || 0,
+      btcPrevRsi || 0,
+      btcSma7,
+      btcSma21,
+      btcPrevSma7,
+      btcPrevSma21,
+      btcMacdLine,
+      btcSignalLine,
+      btcPrices[i],
+      btcUpperBand,
+      btcObvValues[btcObvValues.length - 1] / 1e6,
+      btcAtr,
+      btcAtrBaseline,
+      btcZScore,
+      btcVwap,
+      btcStochRsi,
+      btcPrevStochRsi,
+      btcFib61_8,
+      i > 0 ? btcPrices[i - 1] : btcPrices[0],
+      btcVolumeOscillator,
+      btcPrevVolumeOscillator,
+      btcIsDoubleTop ? 1 : 0,
+      btcIsHeadAndShoulders ? 1 : 0,
+      btcPrevMacdLine,
+      btcIsTripleTop ? 1 : 0,
+      btcIsVolumeSpike ? 1 : 0,
+      btcMomentum || 0,
+      btcPriceChangePct || 0,
     ];
     featureSequence.push(dayFeatures);
   }
 
   while (featureSequence.length < timesteps) {
-    featureSequence.unshift(featureSequence[0] || Array(28).fill(0));
+    featureSequence.unshift(featureSequence[0] || Array(56).fill(0));
   }
 
-  const featuresRaw = tf.tensor2d(featureSequence, [timesteps, 28]);
+  const featuresRaw = tf.tensor2d(featureSequence, [timesteps, 56]);
   const featuresNormalized = featuresRaw
     .sub(featureMins)
     .div(featureMaxs.sub(featureMins).add(1e-6))
     .clipByValue(0, 1)
-    .reshape([1, timesteps, 28]) as tf.Tensor3D;
+    .reshape([1, timesteps, 56]) as tf.Tensor3D;
 
-  // Model inference matching training architecture
+  // Model inference
   let conv1Output = tf
     .conv1d(featuresNormalized, conv1Weights, 1, "same")
     .add(conv1Bias) as tf.Tensor3D; // [1, 7, 64]
@@ -203,8 +263,8 @@ export const predictTrade = async ({
 
   const combinedOutput = tf.add(gru2Output, residualOutput) as tf.Tensor2D; // [1, 16]
   const dropoutOutput = combinedOutput
-    .mul(tf.randomUniform([1, 16]).greater(0.3).cast("float32"))
-    .div(0.7) as tf.Tensor2D; // [1, 16]
+    .mul(tf.randomUniform([1, 16]).greater(0.25).cast("float32"))
+    .div(0.75) as tf.Tensor2D; // [1, 16]
 
   const dense1Output = tf.layers
     .dense({

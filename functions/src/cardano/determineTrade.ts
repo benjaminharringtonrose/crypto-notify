@@ -27,19 +27,27 @@ export const determineTrade = async (
 ): Promise<TradeDecision> => {
   try {
     const priceResponse = await axios.get(
-      `${COINGECKO_API_URL}/simple/price?ids=${cryptoSymbol.toLowerCase()}&vs_currencies=usd`
+      `${COINGECKO_API_URL}/simple/price?ids=${cryptoSymbol.toLowerCase()},bitcoin&vs_currencies=usd`
     );
     const currentPrice = priceResponse.data[cryptoSymbol.toLowerCase()].usd;
+    const currentBtcPrice = priceResponse.data.bitcoin.usd;
 
     const historicalResponse: AxiosResponse<CoinGeckoMarketChartResponse> =
       await axios.get(
         `${COINGECKO_API_URL}/coins/${cryptoSymbol.toLowerCase()}/market_chart?vs_currency=usd&days=30`
       );
+    const btcResponse: AxiosResponse<CoinGeckoMarketChartResponse> =
+      await axios.get(
+        `${COINGECKO_API_URL}/coins/bitcoin/market_chart?vs_currency=usd&days=30`
+      );
     const prices = historicalResponse.data.prices.map(([_, price]) => price);
     const volumes = historicalResponse.data.total_volumes.map(
       ([_, vol]) => vol
     );
+    const btcPrices = btcResponse.data.prices.map(([_, price]) => price);
+    const btcVolumes = btcResponse.data.total_volumes.map(([_, vol]) => vol);
 
+    // ADA Features
     const rsi = calculateRSI(prices.slice(-15));
     const prevRsi = calculateRSI(prices.slice(-16, -1));
     const sma7 = calculateSMA(prices.slice(-7));
@@ -116,6 +124,89 @@ export const determineTrade = async (
           100
         : 0;
 
+    // BTC Features
+    const btcRsi = calculateRSI(btcPrices.slice(-15));
+    const btcPrevRsi = calculateRSI(btcPrices.slice(-16, -1));
+    const btcSma7 = calculateSMA(btcPrices.slice(-7));
+    const btcSma21 = calculateSMA(btcPrices.slice(-21));
+    const btcPrevSma7 = calculateSMA(btcPrices.slice(-8, -1));
+    const btcPrevSma21 = calculateSMA(btcPrices.slice(-22, -1));
+    const btcEma12 = calculateEMA(btcPrices.slice(-12), 12);
+    const btcEma26 = calculateEMA(btcPrices.slice(-26), 26);
+    const btcMacdLine = btcEma12 - btcEma26;
+    const btcSignalLine = calculateEMA(
+      btcPrices.slice(-9).map((_, i) => {
+        const slice = btcPrices.slice(-26 - i, -14 - i);
+        return calculateEMA(slice.slice(-12), 12) - calculateEMA(slice, 26);
+      }),
+      9
+    );
+    const btcPrevEma12 = calculateEMA(btcPrices.slice(-13, -1), 12);
+    const btcPrevEma26 = calculateEMA(btcPrices.slice(-27, -1), 26);
+    const btcPrevMacdLine = btcPrevEma12 - btcPrevEma26;
+    const btcSma20 = calculateSMA(btcPrices.slice(-20));
+    const btcStdDev20 = calculateStdDev(btcPrices.slice(-20), btcSma20);
+    const btcUpperBand = btcSma20 + 2 * btcStdDev20;
+
+    let btcObv = 0;
+    const btcObvValues = [0];
+    for (let i = 1; i < btcPrices.length; i++) {
+      const priceChange = btcPrices[i] - btcPrices[i - 1];
+      btcObv +=
+        priceChange > 0 ? btcVolumes[i] : priceChange < 0 ? -btcVolumes[i] : 0;
+      btcObvValues.push(btcObv);
+    }
+
+    const btcAtr = calculateATR(btcPrices, 14);
+    const btcAtrBaseline = calculateATR(btcPrices.slice(0, -1), 14);
+    const btcZScore = (currentBtcPrice - btcSma20) / btcStdDev20;
+    const btcVwap = calculateVWAP(btcPrices, btcVolumes, 7);
+    const { stochRsi: btcStochRsi } = calculateStochRSI(btcPrices, 14, 14, 3);
+    const btcPrevStochRsi = calculateStochRSI(
+      btcPrices.slice(0, -1),
+      14,
+      14,
+      3
+    ).stochRsi;
+    const { levels: btcFibLevels } = calculateFibonacciLevels(btcPrices, 30);
+    const btcFib61_8 = btcFibLevels[3];
+    const btcVolSmaShort = calculateSMA(btcVolumes.slice(-5));
+    const btcVolSmaLong = calculateSMA(btcVolumes.slice(-14));
+    const btcVolumeOscillator =
+      ((btcVolSmaShort - btcVolSmaLong) / btcVolSmaLong) * 100;
+    const btcPrevVolSmaShort = calculateSMA(btcVolumes.slice(-6, -1));
+    const btcPrevVolSmaLong = calculateSMA(btcVolumes.slice(-15, -1));
+    const btcPrevVolumeOscillator =
+      ((btcPrevVolSmaShort - btcPrevVolSmaLong) / btcPrevVolSmaLong) * 100;
+    const btcCurrentVolume = btcVolumes[btcVolumes.length - 1];
+    const btcVolSma5 = calculateSMA(btcVolumes.slice(-5));
+    const btcIsVolumeSpike = btcCurrentVolume > btcVolSma5 * 2;
+    const btcIsDoubleTop = detectDoubleTop(
+      btcPrices,
+      btcVolumes,
+      currentBtcPrice
+    );
+    const btcIsHeadAndShoulders = detectHeadAndShoulders(
+      btcPrices,
+      btcVolumes,
+      currentBtcPrice
+    );
+    const btcIsTripleTop = detectTripleTop(
+      btcPrices,
+      btcVolumes,
+      currentBtcPrice
+    );
+    const btcMomentum =
+      btcPrices.length >= 10
+        ? currentBtcPrice - btcPrices[btcPrices.length - 10]
+        : 0;
+    const btcPriceChangePct =
+      btcPrices.length >= 2
+        ? ((currentBtcPrice - btcPrices[btcPrices.length - 2]) /
+            btcPrices[btcPrices.length - 2]) *
+          100
+        : 0;
+
     const { metConditions, probabilities, recommendation } = await predictTrade(
       {
         rsi,
@@ -146,6 +237,34 @@ export const determineTrade = async (
         isVolumeSpike,
         momentum,
         priceChangePct,
+        btcRsi,
+        btcPrevRsi,
+        btcSma7,
+        btcSma21,
+        btcPrevSma7,
+        btcPrevSma21,
+        btcMacdLine,
+        btcSignalLine,
+        btcCurrentPrice: currentBtcPrice,
+        btcUpperBand,
+        btcObvValues,
+        btcAtr,
+        btcAtrBaseline,
+        btcZScore,
+        btcVwap,
+        btcStochRsi,
+        btcPrevStochRsi,
+        btcFib61_8,
+        btcPrices,
+        btcVolumeOscillator,
+        btcPrevVolumeOscillator,
+        btcIsDoubleTop,
+        btcIsHeadAndShoulders,
+        btcPrevMacdLine,
+        btcIsTripleTop,
+        btcIsVolumeSpike,
+        btcMomentum,
+        btcPriceChangePct,
       }
     );
 

@@ -158,7 +158,7 @@ export const trainTradeModelADA = async () => {
 
   const earlyStoppingCallback = new EarlyStopping({
     monitor: "val_categoricalAccuracy",
-    patience: 20,
+    patience: 50,
     mode: "max",
   });
 
@@ -174,10 +174,10 @@ export const trainTradeModelADA = async () => {
 
   const lrDecayCallback = new ExponentialDecayLR(0.001, (500 * 1807) / 32, 0.5);
 
-  const classWeight = { 0: 3.0, 1: 2.5, 2: 2.5 };
+  const classWeight = { 0: 3.0, 1: 2.5, 2: 2.0 };
 
   await model.fit(X_normalized, y_tensor, {
-    epochs: 150,
+    epochs: 500,
     batchSize: 32,
     validationSplit: 0.2,
     callbacks: [

@@ -15,13 +15,11 @@ export enum Currencies {
 
 export enum Collections {
   Config = "config",
-  Models = "models",
   TradeRecommendations = "tradeRecommendations",
 }
 
 export enum Docs {
   PriceAlert = "priceAlert",
-  TradePredictor = "tradePredictor",
   Cardano = "cardano",
 }
 
@@ -137,4 +135,10 @@ export interface RecieveSMSRequest {
   body: {
     text: string;
   };
+}
+
+export interface TradeRecommendation {
+  probability: number;
+  recommendation: Recommendation;
+  timestamp: string;
 }

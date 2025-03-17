@@ -298,7 +298,7 @@ export const determineTrade = async (
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     };
   } catch (error: any) {
-    console.error("Error in determineTradeADA:", error.message);
+    console.error("Error in determineTradeADA:", JSON.stringify(error));
     throw error;
   }
 };

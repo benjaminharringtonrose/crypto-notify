@@ -1,6 +1,9 @@
+import dotenv from "dotenv";
 import * as tf from "@tensorflow/tfjs-node";
 import * as admin from "firebase-admin";
 import { Condition, Indicators, PredictTrade, Recommendation } from "../types";
+
+dotenv.config();
 
 export const predictTradeADA = async ({
   rsi,
@@ -32,11 +35,39 @@ export const predictTradeADA = async ({
   momentum,
   priceChangePct,
 }: Indicators): Promise<PredictTrade> => {
-  const bucket = admin.storage().bucket();
+  const bucket = admin.storage().bucket(process.env.STORAGE_BUCKET);
   const file = bucket.file("tradePredictorWeights.json");
   const [weightsData] = await file.download();
   const modelData = JSON.parse(weightsData.toString());
   const parsedWeights = modelData.weights;
+
+  const validateArray = (
+    arr: number[],
+    expectedLength: number,
+    name: string
+  ) => {
+    if (!arr || arr.length !== expectedLength) {
+      throw new Error(
+        `Invalid ${name} length: ${
+          arr?.length || 0
+        }, expected ${expectedLength}`
+      );
+    }
+    if (arr.some((v) => !Number.isFinite(v))) {
+      throw new Error(`${name} contains NaN or Infinity`);
+    }
+  };
+
+  validateArray(parsedWeights.conv1Weights, 2 * 28 * 64, "conv1Weights");
+  validateArray(parsedWeights.conv1Bias, 64, "conv1Bias");
+  validateArray(parsedWeights.conv2Weights, 2 * 64 * 32, "conv2Weights");
+  validateArray(parsedWeights.conv2Bias, 32, "conv2Bias");
+  validateArray(parsedWeights.conv3Weights, 2 * 32 * 16, "conv3Weights");
+  validateArray(parsedWeights.conv3Bias, 16, "conv3Bias");
+  validateArray(parsedWeights.denseWeights, 16 * 3, "denseWeights");
+  validateArray(parsedWeights.denseBias, 3, "denseBias");
+  validateArray(parsedWeights.featureMins, 28, "featureMins");
+  validateArray(parsedWeights.featureMaxs, 28, "featureMaxs");
 
   const conv1Weights = tf.tensor3d(parsedWeights.conv1Weights, [2, 28, 64]);
   const conv1Bias = tf.tensor1d(parsedWeights.conv1Bias);
@@ -49,6 +80,19 @@ export const predictTradeADA = async ({
   const featureMins = tf.tensor1d(parsedWeights.featureMins);
   const featureMaxs = tf.tensor1d(parsedWeights.featureMaxs);
 
+  console.log("conv1Weights shape:", conv1Weights.shape);
+  console.log(
+    "conv1Weights sample:",
+    Array.from(await conv1Weights.data()).slice(0, 5)
+  );
+  console.log(
+    "conv1Bias sample:",
+    Array.from(await conv1Bias.data()).slice(0, 5)
+  );
+  console.log("conv2Weights shape:", conv2Weights.shape);
+  console.log("conv3Weights shape:", conv3Weights.shape);
+  console.log("denseWeights shape:", denseWeights.shape);
+
   const obvWindow = obvValues.slice(-30);
   const obvMin = Math.min(...obvWindow);
   const obvMax = Math.max(...obvWindow);
@@ -59,6 +103,11 @@ export const predictTradeADA = async ({
 
   const timesteps = 7;
   const featureSequence: number[][] = [];
+
+  if (!prices || prices.length === 0) {
+    throw new Error("Prices array is empty or undefined");
+  }
+
   for (let i = Math.max(0, prices.length - timesteps); i < prices.length; i++) {
     const dayFeatures = [
       rsi || 0,
@@ -94,57 +143,116 @@ export const predictTradeADA = async ({
   }
 
   while (featureSequence.length < timesteps) {
-    featureSequence.unshift(featureSequence[0]);
+    if (featureSequence.length === 0) {
+      const defaultRow = [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        currentPrice || 0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        prices.length > 0 ? prices[0] : 0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+      ];
+      featureSequence.push(defaultRow);
+    } else {
+      featureSequence.unshift(featureSequence[0]);
+    }
   }
 
-  const featuresRaw = tf.tensor2d(featureSequence, [timesteps, 28]);
+  if (
+    featureSequence.length !== timesteps ||
+    featureSequence[0].length !== 28
+  ) {
+    throw new Error(
+      `featureSequence has invalid shape: [${featureSequence.length}, ${
+        featureSequence[0]?.length || 0
+      }] (expected [${timesteps}, 28])`
+    );
+  }
+
+  const featuresRaw = tf.tensor2d(featureSequence, [timesteps, 28]); // [7, 28]
   const featuresNormalized = featuresRaw
     .sub(featureMins)
     .div(featureMaxs.sub(featureMins).add(1e-6));
   const features = featuresNormalized
     .clipByValue(0, 1)
-    .reshape([1, timesteps, 28]) as tf.Tensor3D;
+    .reshape([1, timesteps, 28]) as tf.Tensor3D; // [1, 7, 28]
+  console.log("features shape:", features.shape);
+  console.log(
+    "features sample:",
+    Array.from(await features.data()).slice(0, 5)
+  );
 
   let conv1Output = tf
     .conv1d(features, conv1Weights, 1, "same")
     .add(conv1Bias) as tf.Tensor3D;
   conv1Output = tf.relu(conv1Output);
-  conv1Output = tf.pool(
-    conv1Output,
-    2,
-    "max",
-    "valid",
-    undefined,
-    2
-  ) as tf.Tensor3D;
+  console.log("conv1PrePool shape:", conv1Output.shape);
+  console.log(
+    "conv1PrePool sample:",
+    Array.from(await conv1Output.data()).slice(0, 5)
+  );
+  // Reshape to 4D for maxPool: [batch, timesteps, 1, channels]
+  const conv1Reshaped = conv1Output.reshape([1, 7, 1, 64]) as tf.Tensor4D;
+  conv1Output = tf
+    .maxPool(conv1Reshaped, [2, 1], [2, 1], "valid")
+    .reshape([1, 3, 64]); // [1, 3, 64]
+  if (conv1Output.shape[0] === 0) {
+    throw new Error("conv1Output batch size is 0 after pooling");
+  }
+  console.log("conv1Output shape:", conv1Output.shape);
+  console.log(
+    "conv1Output sample:",
+    Array.from(await conv1Output.data()).slice(0, 5)
+  );
 
   let conv2Output = tf
     .conv1d(conv1Output, conv2Weights, 1, "same")
     .add(conv2Bias) as tf.Tensor3D;
   conv2Output = tf.relu(conv2Output);
-  conv2Output = tf.pool(
-    conv2Output,
-    2,
-    "max",
-    "valid",
-    undefined,
-    2
-  ) as tf.Tensor3D;
+  const conv2Reshaped = conv2Output.reshape([1, 3, 1, 32]) as tf.Tensor4D;
+  conv2Output = tf
+    .maxPool(conv2Reshaped, [2, 1], [2, 1], "valid")
+    .reshape([1, 1, 32]); // [1, 1, 32]
+  console.log("conv2Output shape:", conv2Output.shape);
 
   let conv3Output = tf
     .conv1d(conv2Output, conv3Weights, 1, "same")
     .add(conv3Bias) as tf.Tensor3D;
-  conv3Output = tf.relu(conv3Output);
+  conv3Output = tf.relu(conv3Output); // [1, 1, 16]
+  console.log("conv3Output shape:", conv3Output.shape);
 
-  const flatOutput = conv3Output.reshape([1, -1]) as tf.Tensor2D;
-  console.log("Flat output shape:", flatOutput.shape);
+  const flatOutput = conv3Output.reshape([1, -1]) as tf.Tensor2D; // [1, 16]
+  console.log("flatOutput shape:", flatOutput.shape);
+
   const dropoutMask = tf
     .randomUniform([1, flatOutput.shape[1]])
     .greater(0.4)
     .cast("float32");
-  const droppedOutput = flatOutput.mul(dropoutMask).div(0.6);
+  const droppedOutput = flatOutput.mul(dropoutMask).div(0.6); // [1, 16]
+  console.log("droppedOutput shape:", droppedOutput.shape);
 
-  const logits = droppedOutput.matMul(denseWeights).add(denseBias);
+  const logits = droppedOutput.matMul(denseWeights).add(denseBias); // [1, 16] × [16, 3] = [1, 3]
   const probabilityTensor = tf.softmax(logits);
   const probabilities = await probabilityTensor.data();
   const [sellProb, holdProb, buyProb] = probabilities;

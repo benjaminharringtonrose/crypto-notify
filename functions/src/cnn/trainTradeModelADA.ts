@@ -141,6 +141,9 @@ export const trainTradeModelADA = async () => {
     })
   );
 
+  console.log("Model summary:");
+  model.summary();
+
   function focalLoss(gamma = 2.0, alpha = 0.3) {
     return (yTrue: tf.Tensor, yPred: tf.Tensor) => {
       const ce = tf.losses.softmaxCrossEntropy(yTrue, yPred);
@@ -176,6 +179,7 @@ export const trainTradeModelADA = async () => {
 
   const classWeight = { 0: 3.0, 1: 2.5, 2: 2.0 };
 
+  console.log("Starting model training...");
   await model.fit(X_normalized, y_tensor, {
     epochs: 500,
     batchSize: 32,
@@ -188,6 +192,7 @@ export const trainTradeModelADA = async () => {
     ],
     classWeight,
   });
+  console.log("Model training completed.");
 
   const preds = model.predict(X_normalized) as tf.Tensor;
   const predArray = (await preds.array()) as number[][];
@@ -238,7 +243,20 @@ export const trainTradeModelADA = async () => {
   const conv1Weights = model.layers[0].getWeights();
   const conv2Weights = model.layers[3].getWeights();
   const conv3Weights = model.layers[6].getWeights();
-  const denseWeights = model.layers[9].getWeights();
+  const denseWeights = model.layers[10].getWeights(); // Corrected to index 10
+
+  console.log("Conv1 Weights Shape:", conv1Weights[0]?.shape);
+  console.log("Conv2 Weights Shape:", conv2Weights[0]?.shape);
+  console.log("Conv3 Weights Shape:", conv3Weights[0]?.shape);
+  console.log("Dense Weights Shape:", denseWeights[0]?.shape);
+  console.log(
+    "Dense Weights Sample:",
+    denseWeights[0] ? Array.from(await denseWeights[0].data()).slice(0, 5) : []
+  );
+
+  if (!denseWeights[0] || (await denseWeights[0].data()).length === 0) {
+    throw new Error("Dense layer weights are empty or not initialized!");
+  }
 
   const weightsJson = {
     weights: {
@@ -270,6 +288,11 @@ export const trainTradeModelADA = async () => {
       featureMaxs: Array.from(await X_max.data()),
     },
   };
+
+  console.log(
+    "Weights JSON sample (denseWeights first 5):",
+    weightsJson.weights.denseWeights.slice(0, 5)
+  );
 
   const bucket = admin.storage().bucket();
   await bucket

@@ -1,3 +1,4 @@
+import dotenv from "dotenv";
 import * as admin from "firebase-admin";
 import axios, { AxiosResponse } from "axios";
 import { AVERAGE_BUY_PRICE, COINGECKO_API_URL } from "../constants";
@@ -18,6 +19,8 @@ import {
   Recommendation,
   TradeDecision,
 } from "../types";
+
+dotenv.config();
 
 export const determineTradeADA = async (
   cryptoSymbol: string
@@ -175,7 +178,7 @@ export const determineTradeADA = async (
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     };
   } catch (error: any) {
-    console.error("Error in determineTradeActionBTC:", error.message);
+    console.error("Error in determineTradeADA:", error.message);
     throw error;
   }
 };

@@ -51,7 +51,7 @@ export const runTradeModel = onSchedule(EVERY_MIN, async () => {
 
   if (sameAsPrevious) {
     if (isBuy && probabilities.buy > previousProbability) {
-      await sendSMS(`Buy probability increased!\n\n${smsMessage}`);
+      await sendSMS(`Buy probability increased: ${probabilities.buy}`);
       await lastRecommendationRef.set({
         recommendation,
         probability: probabilities.buy,
@@ -59,10 +59,10 @@ export const runTradeModel = onSchedule(EVERY_MIN, async () => {
       });
     }
     if (isSell && probabilities.sell > previousProbability) {
-      await sendSMS(`Sell probability increased!\n\n${smsMessage}`);
+      await sendSMS(`Sell probability increased: ${probabilities.sell}`);
       await lastRecommendationRef.set({
         recommendation,
-        probability: probabilities.buy,
+        probability: probabilities.sell,
         timestamp: new Date().toISOString(),
       });
     }

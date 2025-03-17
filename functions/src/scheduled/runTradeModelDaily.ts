@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { determineTradeADA } from "../cnn/determineTradeADA";
+import { determineTradeADA } from "../cardano/determineTradeADA";
 import { sendSMS } from "../notifications/sendSMS";
 import {
   ANALYSIS_SCHEDULE,

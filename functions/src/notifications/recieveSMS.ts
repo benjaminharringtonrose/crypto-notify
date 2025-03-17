@@ -1,5 +1,5 @@
 import { https } from "firebase-functions";
-import { determineTradeADA } from "../cnn/determineTradeADA";
+import { determineTradeADA } from "../cardano/determineTradeADA";
 import { RecieveSMSRequest } from "../types";
 import { formatAnalysisResults } from "../utils";
 import { sendSMS } from "./sendSMS";

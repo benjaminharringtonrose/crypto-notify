@@ -48,8 +48,8 @@ export const runTradeModel = onSchedule(EVERY_MIN, async () => {
   const sameRecommendation = recommendation === previousRecommendation;
 
   if (!sameRecommendation) {
-    await sendSMS(smsMessage);
     if (isBuy) {
+      await sendSMS(smsMessage);
       await recommendationRef.set({
         recommendation,
         probability: probabilities.buy,
@@ -58,6 +58,7 @@ export const runTradeModel = onSchedule(EVERY_MIN, async () => {
       return;
     }
     if (isSell) {
+      await sendSMS(smsMessage);
       await recommendationRef.set({
         recommendation,
         probability: probabilities.sell,

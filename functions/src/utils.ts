@@ -1,4 +1,4 @@
-import { Probabilities, Recommendation, TradeDecision } from "./types";
+import { Probabilities, Recommendation } from "./types";
 
 export const isAboveThreshold = ({
   prices,

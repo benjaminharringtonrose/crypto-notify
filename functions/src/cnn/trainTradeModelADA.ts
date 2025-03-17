@@ -171,41 +171,56 @@ export const trainTradeModelADA = async () => {
     .batchNormalization({ momentum: 0.9 })
     .apply(conv2) as tf.SymbolicTensor;
   const gru1 = tf.layers
-    .gru({ units: 32, returnSequences: true })
+    .gru({
+      units: 32,
+      returnSequences: true,
+      kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
+    })
     .apply(bn2) as tf.SymbolicTensor;
   const bn3 = tf.layers
     .batchNormalization({ momentum: 0.9 })
     .apply(gru1) as tf.SymbolicTensor;
+  const gru2 = tf.layers
+    .gru({
+      units: 16,
+      returnSequences: false,
+      kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
+    })
+    .apply(bn3) as tf.SymbolicTensor;
+  const bn4 = tf.layers
+    .batchNormalization({ momentum: 0.9 })
+    .apply(gru2) as tf.SymbolicTensor;
   const residual = tf.layers
     .dense({
       units: 16,
       kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
     })
     .apply(tf.layers.flatten().apply(bn3)) as tf.SymbolicTensor;
-  const gru2 = tf.layers
-    .gru({ units: 16, returnSequences: false })
-    .apply(bn3) as tf.SymbolicTensor;
-  const bn4 = tf.layers
-    .batchNormalization({ momentum: 0.9 })
-    .apply(gru2) as tf.SymbolicTensor;
   const add = tf.layers.add().apply([bn4, residual]) as tf.SymbolicTensor;
   const dropout = tf.layers
-    .dropout({ rate: 0.4 })
+    .dropout({ rate: 0.3 })
     .apply(add) as tf.SymbolicTensor;
-  const dense = tf.layers
+  const dense1 = tf.layers
+    .dense({
+      units: 8,
+      activation: "relu",
+      kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
+    })
+    .apply(dropout) as tf.SymbolicTensor;
+  const dense2 = tf.layers
     .dense({
       units: 3,
       activation: "softmax",
       kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
     })
-    .apply(dropout) as tf.SymbolicTensor;
+    .apply(dense1) as tf.SymbolicTensor;
 
-  const model = tf.model({ inputs: input, outputs: dense });
+  const model = tf.model({ inputs: input, outputs: dense2 });
 
   console.log("Model summary:");
   model.summary();
 
-  const initialLr = 0.001;
+  const initialLr = 0.002;
   const optimizer = tf.train.adam(initialLr);
 
   model.compile({
@@ -237,7 +252,7 @@ export const trainTradeModelADA = async () => {
     }
 
     async onEpochBegin(epoch: number) {
-      const decayRate = 0.98;
+      const decayRate = 0.95;
       const newLr = initialLr * Math.pow(decayRate, epoch);
       // @ts-ignore learningRate is protected
       optimizer.learningRate = newLr;
@@ -314,7 +329,8 @@ export const trainTradeModelADA = async () => {
   const gru1Weights = model.getLayer("gru_GRU1").getWeights();
   const gru2Weights = model.getLayer("gru_GRU2").getWeights();
   const residualWeights = model.getLayer("dense_Dense1").getWeights();
-  const denseWeights = model.getLayer("dense_Dense2").getWeights();
+  const dense1Weights = model.getLayer("dense_Dense2").getWeights();
+  const dense2Weights = model.getLayer("dense_Dense3").getWeights();
 
   const weightsJson = {
     weights: {
@@ -350,11 +366,17 @@ export const trainTradeModelADA = async () => {
       residualBias: residualWeights[1]
         ? Array.from(await residualWeights[1].data())
         : [],
-      denseWeights: denseWeights[0]
-        ? Array.from(await denseWeights[0].data())
+      dense1Weights: dense1Weights[0]
+        ? Array.from(await dense1Weights[0].data())
         : [],
-      denseBias: denseWeights[1]
-        ? Array.from(await denseWeights[1].data())
+      dense1Bias: dense1Weights[1]
+        ? Array.from(await dense1Weights[1].data())
+        : [],
+      dense2Weights: dense2Weights[0]
+        ? Array.from(await dense2Weights[0].data())
+        : [],
+      dense2Bias: dense2Weights[1]
+        ? Array.from(await dense2Weights[1].data())
         : [],
       featureMins: Array.from(await X_min.data()),
       featureMaxs: Array.from(await X_max.data()),

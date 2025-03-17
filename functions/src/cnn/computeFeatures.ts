@@ -82,13 +82,7 @@ export function computeFeatures(
     obv += priceChange > 0 ? volumes[i] : priceChange < 0 ? -volumes[i] : 0;
     obvValues.push(obv);
   }
-  const obvWindow = obvValues.slice(-30);
-  const obvMin = Math.min(...obvWindow);
-  const obvMax = Math.max(...obvWindow);
-  const normalizedObv =
-    obvMax !== obvMin
-      ? (obvValues[obvValues.length - 1] - obvMin) / (obvMax - obvMin)
-      : 0;
+  const normalizedObv = obvValues[obvValues.length - 1] / 1e6; // Scale OBV to match training
 
   const atr =
     dayIndex >= 13 ? calculateATR(prices.slice(0, dayIndex + 1), 14) : 0;
@@ -152,8 +146,7 @@ export function computeFeatures(
     dayIndex >= 4 ? calculateSMA(volumes.slice(dayIndex - 4, dayIndex + 1)) : 0;
   const isVolumeSpike = currentVolume > volSma5 * 2;
 
-  // New features
-  const momentum = dayIndex >= 9 ? currentPrice - prices[dayIndex - 9] : 0; // 10-day momentum
+  const momentum = dayIndex >= 9 ? currentPrice - prices[dayIndex - 9] : 0;
   const priceChangePct =
     dayIndex >= 1
       ? ((currentPrice - prices[dayIndex - 1]) / prices[dayIndex - 1]) * 100
@@ -178,7 +171,7 @@ export function computeFeatures(
     stochRsi,
     prevStochRsi,
     fib61_8,
-    prices[dayIndex - 1],
+    prices[dayIndex - 1] || prices[0],
     volumeOscillator,
     prevVolumeOscillator,
     isDoubleTop ? 1 : 0,

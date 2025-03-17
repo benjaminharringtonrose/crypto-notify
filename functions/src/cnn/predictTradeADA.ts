@@ -58,56 +58,63 @@ export const predictTradeADA = async ({
     }
   };
 
-  validateArray(parsedWeights.conv1Weights, 2 * 28 * 64, "conv1Weights");
+  // Validate weights matching the training architecture
+  validateArray(parsedWeights.conv1Weights, 2 * 28 * 64, "conv1Weights"); // [2, 28, 64] = 3584
   validateArray(parsedWeights.conv1Bias, 64, "conv1Bias");
-  validateArray(parsedWeights.conv2Weights, 2 * 64 * 32, "conv2Weights");
+  validateArray(parsedWeights.conv2Weights, 2 * 64 * 32, "conv2Weights"); // [2, 64, 32] = 4096
   validateArray(parsedWeights.conv2Bias, 32, "conv2Bias");
-  validateArray(parsedWeights.conv3Weights, 2 * 32 * 16, "conv3Weights");
-  validateArray(parsedWeights.conv3Bias, 16, "conv3Bias");
-  validateArray(parsedWeights.denseWeights, 16 * 3, "denseWeights");
-  validateArray(parsedWeights.denseBias, 3, "denseBias");
+  validateArray(parsedWeights.gru1Weights, 32 * 96, "gru1Weights"); // [32, 32*3] = 3072
+  validateArray(
+    parsedWeights.gru1RecurrentWeights,
+    32 * 96,
+    "gru1RecurrentWeights"
+  ); // [32, 32*3] = 3072
+  validateArray(parsedWeights.gru1Bias, 96, "gru1Bias");
+  validateArray(parsedWeights.gru2Weights, 32 * 48, "gru2Weights"); // [32, 16*3] = 1536
+  validateArray(
+    parsedWeights.gru2RecurrentWeights,
+    16 * 48,
+    "gru2RecurrentWeights"
+  ); // [16, 16*3] = 768
+  validateArray(parsedWeights.gru2Bias, 48, "gru2Bias");
+  validateArray(parsedWeights.residualWeights, 96 * 16, "residualWeights"); // [3*32, 16] = 1536
+  validateArray(parsedWeights.residualBias, 16, "residualBias");
+  validateArray(parsedWeights.dense1Weights, 16 * 8, "dense1Weights"); // [16, 8] = 128
+  validateArray(parsedWeights.dense1Bias, 8, "dense1Bias");
+  validateArray(parsedWeights.dense2Weights, 8 * 3, "dense2Weights"); // [8, 3] = 24
+  validateArray(parsedWeights.dense2Bias, 3, "dense2Bias");
   validateArray(parsedWeights.featureMins, 28, "featureMins");
   validateArray(parsedWeights.featureMaxs, 28, "featureMaxs");
 
+  // Load tensors
   const conv1Weights = tf.tensor3d(parsedWeights.conv1Weights, [2, 28, 64]);
   const conv1Bias = tf.tensor1d(parsedWeights.conv1Bias);
   const conv2Weights = tf.tensor3d(parsedWeights.conv2Weights, [2, 64, 32]);
   const conv2Bias = tf.tensor1d(parsedWeights.conv2Bias);
-  const conv3Weights = tf.tensor3d(parsedWeights.conv3Weights, [2, 32, 16]);
-  const conv3Bias = tf.tensor1d(parsedWeights.conv3Bias);
-  const denseWeights = tf.tensor2d(parsedWeights.denseWeights, [16, 3]);
-  const denseBias = tf.tensor1d(parsedWeights.denseBias);
+  const gru1Weights = tf.tensor2d(parsedWeights.gru1Weights, [32, 96]);
+  const gru1RecurrentWeights = tf.tensor2d(
+    parsedWeights.gru1RecurrentWeights,
+    [32, 96]
+  );
+  const gru1Bias = tf.tensor1d(parsedWeights.gru1Bias);
+  const gru2Weights = tf.tensor2d(parsedWeights.gru2Weights, [32, 48]);
+  const gru2RecurrentWeights = tf.tensor2d(
+    parsedWeights.gru2RecurrentWeights,
+    [16, 48]
+  );
+  const gru2Bias = tf.tensor1d(parsedWeights.gru2Bias);
+  const residualWeights = tf.tensor2d(parsedWeights.residualWeights, [96, 16]);
+  const residualBias = tf.tensor1d(parsedWeights.residualBias);
+  const dense1Weights = tf.tensor2d(parsedWeights.dense1Weights, [16, 8]);
+  const dense1Bias = tf.tensor1d(parsedWeights.dense1Bias);
+  const dense2Weights = tf.tensor2d(parsedWeights.dense2Weights, [8, 3]);
+  const dense2Bias = tf.tensor1d(parsedWeights.dense2Bias);
   const featureMins = tf.tensor1d(parsedWeights.featureMins);
   const featureMaxs = tf.tensor1d(parsedWeights.featureMaxs);
 
-  console.log("conv1Weights shape:", conv1Weights.shape);
-  console.log(
-    "conv1Weights sample:",
-    Array.from(await conv1Weights.data()).slice(0, 5)
-  );
-  console.log(
-    "conv1Bias sample:",
-    Array.from(await conv1Bias.data()).slice(0, 5)
-  );
-  console.log("conv2Weights shape:", conv2Weights.shape);
-  console.log("conv3Weights shape:", conv3Weights.shape);
-  console.log("denseWeights shape:", denseWeights.shape);
-
-  const obvWindow = obvValues.slice(-30);
-  const obvMin = Math.min(...obvWindow);
-  const obvMax = Math.max(...obvWindow);
-  const normalizedObv =
-    obvMax !== obvMin
-      ? (obvValues[obvValues.length - 1] - obvMin) / (obvMax - obvMin)
-      : 0;
-
+  // Feature preprocessing
   const timesteps = 7;
   const featureSequence: number[][] = [];
-
-  if (!prices || prices.length === 0) {
-    throw new Error("Prices array is empty or undefined");
-  }
-
   for (let i = Math.max(0, prices.length - timesteps); i < prices.length; i++) {
     const dayFeatures = [
       rsi || 0,
@@ -120,7 +127,7 @@ export const predictTradeADA = async ({
       signalLine,
       prices[i],
       upperBand,
-      normalizedObv,
+      obvValues[obvValues.length - 1] / 1e6,
       atr,
       atrBaseline,
       zScore,
@@ -143,120 +150,82 @@ export const predictTradeADA = async ({
   }
 
   while (featureSequence.length < timesteps) {
-    if (featureSequence.length === 0) {
-      const defaultRow = [
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        currentPrice || 0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        prices.length > 0 ? prices[0] : 0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-      ];
-      featureSequence.push(defaultRow);
-    } else {
-      featureSequence.unshift(featureSequence[0]);
-    }
+    featureSequence.unshift(featureSequence[0] || Array(28).fill(0));
   }
 
-  if (
-    featureSequence.length !== timesteps ||
-    featureSequence[0].length !== 28
-  ) {
-    throw new Error(
-      `featureSequence has invalid shape: [${featureSequence.length}, ${
-        featureSequence[0]?.length || 0
-      }] (expected [${timesteps}, 28])`
-    );
-  }
-
-  const featuresRaw = tf.tensor2d(featureSequence, [timesteps, 28]); // [7, 28]
+  const featuresRaw = tf.tensor2d(featureSequence, [timesteps, 28]);
   const featuresNormalized = featuresRaw
     .sub(featureMins)
-    .div(featureMaxs.sub(featureMins).add(1e-6));
-  const features = featuresNormalized
+    .div(featureMaxs.sub(featureMins).add(1e-6))
     .clipByValue(0, 1)
-    .reshape([1, timesteps, 28]) as tf.Tensor3D; // [1, 7, 28]
-  console.log("features shape:", features.shape);
-  console.log(
-    "features sample:",
-    Array.from(await features.data()).slice(0, 5)
-  );
+    .reshape([1, timesteps, 28]) as tf.Tensor3D;
 
+  // Model inference matching training architecture
   let conv1Output = tf
-    .conv1d(features, conv1Weights, 1, "same")
-    .add(conv1Bias) as tf.Tensor3D;
+    .conv1d(featuresNormalized, conv1Weights, 1, "same")
+    .add(conv1Bias) as tf.Tensor3D; // [1, 7, 64]
   conv1Output = tf.relu(conv1Output);
-  console.log("conv1PrePool shape:", conv1Output.shape);
-  console.log(
-    "conv1PrePool sample:",
-    Array.from(await conv1Output.data()).slice(0, 5)
-  );
-  // Reshape to 4D for maxPool: [batch, timesteps, 1, channels]
-  const conv1Reshaped = conv1Output.reshape([1, 7, 1, 64]) as tf.Tensor4D;
   conv1Output = tf
-    .maxPool(conv1Reshaped, [2, 1], [2, 1], "valid")
-    .reshape([1, 3, 64]); // [1, 3, 64]
-  if (conv1Output.shape[0] === 0) {
-    throw new Error("conv1Output batch size is 0 after pooling");
-  }
-  console.log("conv1Output shape:", conv1Output.shape);
-  console.log(
-    "conv1Output sample:",
-    Array.from(await conv1Output.data()).slice(0, 5)
-  );
+    .maxPool(
+      conv1Output.reshape([1, 7, 1, 64]) as tf.Tensor3D,
+      [2, 1],
+      [2, 1],
+      "valid"
+    )
+    .reshape([1, 3, 64]) as tf.Tensor3D; // [1, 3, 64]
 
   let conv2Output = tf
     .conv1d(conv1Output, conv2Weights, 1, "same")
-    .add(conv2Bias) as tf.Tensor3D;
+    .add(conv2Bias) as tf.Tensor3D; // [1, 3, 32]
   conv2Output = tf.relu(conv2Output);
-  const conv2Reshaped = conv2Output.reshape([1, 3, 1, 32]) as tf.Tensor4D;
-  conv2Output = tf
-    .maxPool(conv2Reshaped, [2, 1], [2, 1], "valid")
-    .reshape([1, 1, 32]); // [1, 1, 32]
-  console.log("conv2Output shape:", conv2Output.shape);
 
-  let conv3Output = tf
-    .conv1d(conv2Output, conv3Weights, 1, "same")
-    .add(conv3Bias) as tf.Tensor3D;
-  conv3Output = tf.relu(conv3Output); // [1, 1, 16]
-  console.log("conv3Output shape:", conv3Output.shape);
+  const gru1Layer = tf.layers.gru({
+    units: 32,
+    returnSequences: true,
+    weights: [gru1Weights, gru1RecurrentWeights, gru1Bias],
+  });
+  const gru1Output = gru1Layer.apply(conv2Output) as tf.Tensor3D; // [1, 3, 32]
 
-  const flatOutput = conv3Output.reshape([1, -1]) as tf.Tensor2D; // [1, 16]
-  console.log("flatOutput shape:", flatOutput.shape);
+  const gru2Layer = tf.layers.gru({
+    units: 16,
+    returnSequences: false,
+    weights: [gru2Weights, gru2RecurrentWeights, gru2Bias],
+  });
+  const gru2Output = gru2Layer.apply(gru1Output) as tf.Tensor2D; // [1, 16]
 
-  const dropoutMask = tf
-    .randomUniform([1, flatOutput.shape[1]])
-    .greater(0.4)
-    .cast("float32");
-  const droppedOutput = flatOutput.mul(dropoutMask).div(0.6); // [1, 16]
-  console.log("droppedOutput shape:", droppedOutput.shape);
+  const flattenedGru1 = tf.layers.flatten().apply(gru1Output) as tf.Tensor2D; // [1, 96]
+  const residualOutput = tf.layers
+    .dense({
+      units: 16,
+      weights: [residualWeights, residualBias],
+    })
+    .apply(flattenedGru1) as tf.Tensor2D; // [1, 16]
 
-  const logits = droppedOutput.matMul(denseWeights).add(denseBias); // [1, 16] × [16, 3] = [1, 3]
+  const combinedOutput = tf.add(gru2Output, residualOutput) as tf.Tensor2D; // [1, 16]
+  const dropoutOutput = combinedOutput
+    .mul(tf.randomUniform([1, 16]).greater(0.3).cast("float32"))
+    .div(0.7) as tf.Tensor2D; // [1, 16]
+
+  const dense1Output = tf.layers
+    .dense({
+      units: 8,
+      activation: "relu",
+      weights: [dense1Weights, dense1Bias],
+    })
+    .apply(dropoutOutput) as tf.Tensor2D; // [1, 8]
+
+  const logits = tf.layers
+    .dense({
+      units: 3,
+      weights: [dense2Weights, dense2Bias],
+    })
+    .apply(dense1Output) as tf.Tensor2D; // [1, 3]
+
   const probabilityTensor = tf.softmax(logits);
   const probabilities = await probabilityTensor.data();
   const [sellProb, holdProb, buyProb] = probabilities;
 
+  // Conditions and recommendation
   const sma20 = prices.slice(-20).reduce((a, b) => a + b, 0) / 20;
   const stdDev20 = Math.sqrt(
     prices.slice(-20).reduce((sum, p) => sum + Math.pow(p - sma20, 2), 0) / 20
@@ -374,31 +343,42 @@ export const predictTradeADA = async ({
     .map((cond) => cond.name);
 
   const maxProb = Math.max(buyProb, holdProb, sellProb);
-
   let recommendation: Recommendation = Recommendation.Hold;
   if (maxProb === buyProb && buyProb >= 0.45)
     recommendation = Recommendation.Buy;
   else if (maxProb === sellProb && sellProb >= 0.45)
     recommendation = Recommendation.Sell;
 
+  // Clean up
   conv1Weights.dispose();
   conv1Bias.dispose();
   conv2Weights.dispose();
   conv2Bias.dispose();
-  conv3Weights.dispose();
-  conv3Bias.dispose();
-  denseWeights.dispose();
-  denseBias.dispose();
+  gru1Weights.dispose();
+  gru1RecurrentWeights.dispose();
+  gru1Bias.dispose();
+  gru2Weights.dispose();
+  gru2RecurrentWeights.dispose();
+  gru2Bias.dispose();
+  residualWeights.dispose();
+  residualBias.dispose();
+  dense1Weights.dispose();
+  dense1Bias.dispose();
+  dense2Weights.dispose();
+  dense2Bias.dispose();
   featureMins.dispose();
   featureMaxs.dispose();
   featuresRaw.dispose();
-  features.dispose();
+  featuresNormalized.dispose();
   conv1Output.dispose();
   conv2Output.dispose();
-  conv3Output.dispose();
-  flatOutput.dispose();
-  dropoutMask.dispose();
-  droppedOutput.dispose();
+  gru1Output.dispose();
+  gru2Output.dispose();
+  flattenedGru1.dispose();
+  residualOutput.dispose();
+  combinedOutput.dispose();
+  dropoutOutput.dispose();
+  dense1Output.dispose();
   logits.dispose();
   probabilityTensor.dispose();
 

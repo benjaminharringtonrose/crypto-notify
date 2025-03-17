@@ -50,11 +50,11 @@ export const runTradeModel = onSchedule(EVERY_MIN, async () => {
     recommendation !== previousRecommendation
   ) {
     await sendSMS(smsMessage);
-  }
 
-  // Store the current recommendation
-  await lastRecommendationRef.set({
-    recommendation,
-    timestamp: new Date().toISOString(),
-  });
+    // Store the current recommendation
+    await lastRecommendationRef.set({
+      recommendation,
+      timestamp: new Date().toISOString(),
+    });
+  }
 });

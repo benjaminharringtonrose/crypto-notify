@@ -108,11 +108,6 @@ export const runTradeModel = onSchedule(EVERY_MIN, async () => {
         return;
       case Recommendation.Hold:
       case Recommendation.HoldBasedOnBuyPrice:
-        await recommendationRef.set({
-          recommendation,
-          probability: probabilities.hold,
-          timestamp: new Date().toISOString(),
-        });
         return;
     }
   }

@@ -10,24 +10,6 @@ export const isAboveThreshold = ({
   return prices.find((threshold) => currentPrice >= threshold);
 };
 
-export const cooldownMessage = ({
-  exceededThreshold,
-  notificationCooldown,
-  timeSinceLastNotification,
-}: {
-  exceededThreshold: number;
-  notificationCooldown: number;
-  timeSinceLastNotification: number;
-}) => {
-  return `Price threshold $${exceededThreshold} exceeded but notification cooldown active. ${Math.floor(
-    (notificationCooldown - timeSinceLastNotification) / 60000
-  )}`;
-};
-
-export const notExceededMessage = (currentPrice: number) => {
-  return `No price thresholds exceeded. Current: $${currentPrice}`;
-};
-
 export const checkCardanoPriceErrorMessage = (error: any) => {
   return `Error: ${JSON.stringify(error)}`;
 };
@@ -70,6 +52,7 @@ export const fetchCardanoPriceErrorMessage = (error: any) => {
 export const sendSmsErrorMessage = (error: any) => {
   return `Error sending SMS notification: ${JSON.stringify(error)}`;
 };
+
 export const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat("en-US", {
     style: "currency",

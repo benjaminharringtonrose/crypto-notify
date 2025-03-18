@@ -25,9 +25,6 @@ export const ANALYSIS_SCHEDULE: ScheduleOptions = {
   timeZone: TIME_ZONE,
 };
 
-export const RUNNING_SCHEDULE_CHECK_MESSAGE =
-  "Running scheduled Cardano price check";
-
 export const RUNNING_ANALYSIS_MODEL_MESSAGE = "Running analysis model...";
 
 export const MERGE_PAYLOAD: firestore.SetOptions = {

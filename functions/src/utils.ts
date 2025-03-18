@@ -10,13 +10,6 @@ export const isAboveThreshold = ({
   return prices.find((threshold) => currentPrice >= threshold);
 };
 
-export const notificationSentMessage = (
-  currentPrice: number,
-  exceededThreshold: number
-) => {
-  return `Notification sent for price $${currentPrice} exceeding threshold $${exceededThreshold}`;
-};
-
 export const cooldownMessage = ({
   exceededThreshold,
   notificationCooldown,
@@ -68,10 +61,6 @@ export const formatAnalysisResults = ({
   const conditions = metConditions.join(", ");
 
   return `${symbol}: ${price}\n\nBuy Probability: ${buyProb}\nSell Probability: ${sellProb}\nHold Probability: ${holdProb}\n\nRecommendation: ${rec}\n\nSell conditions met: ${conditions}\n\nThe probability is the model’s confidence in a near-term price drop exceeding 2% over 3 days.\n\nReply with a cryptocurrency to run the analysis again`;
-};
-
-export const currentCardanoPriceMessage = (currentPrice: number) => {
-  return `Current Cardano price: $${currentPrice}`;
 };
 
 export const fetchCardanoPriceErrorMessage = (error: any) => {

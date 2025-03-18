@@ -69,7 +69,6 @@ export interface Indicators {
   btcPrevSma21: number;
   btcMacdLine: number;
   btcSignalLine: number;
-  btcCurrentPrice: number;
   btcUpperBand: number;
   btcObvValues: number[];
   btcAtr: number;

@@ -42,7 +42,6 @@ export const predictTrade = async ({
   btcPrevSma21,
   btcMacdLine,
   btcSignalLine,
-  btcCurrentPrice,
   btcUpperBand,
   btcObvValues,
   btcAtr,

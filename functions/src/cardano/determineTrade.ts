@@ -63,7 +63,6 @@ export const determineTrade = async (): Promise<TradeDecision> => {
         btcPrevSma21: btcIndicators.prevSma21,
         btcMacdLine: btcIndicators.macdLine,
         btcSignalLine: btcIndicators.signalLine,
-        btcCurrentPrice: currentBtcPrice,
         btcUpperBand: btcIndicators.upperBand,
         btcObvValues: btcIndicators.obvValues,
         btcAtr: btcIndicators.atr,

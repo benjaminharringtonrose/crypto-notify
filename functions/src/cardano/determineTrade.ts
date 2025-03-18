@@ -1,46 +1,20 @@
 import dotenv from "dotenv";
 import * as admin from "firebase-admin";
-import axios from "axios";
-import {
-  AVERAGE_BUY_PRICE,
-  BITCOIN_30_DAY_HISTORICAL_URL,
-  CARDANO_30_DAY_HISTORICAL_URL,
-  CARDANO_BITCOIN_PRICE_URL,
-} from "../constants";
+import { AVERAGE_BUY_PRICE } from "../constants";
 import { predictTrade } from "./predictTrade";
-import {
-  CoinGeckoMarketChartResponse,
-  CoinGeckoPriceResponse,
-  Recommendation,
-  TradeDecision,
-} from "../types";
+import { Recommendation, TradeDecision } from "../types";
 import { calculateIndicators } from "../calculations/calculateIndicators";
+import { getCurrentPrices } from "../api/getCurrentPrices";
+import { getHistoricalPricesAndVolumes } from "../api/getHistoricalPricesAndVolumes";
 
 dotenv.config();
 
 export const determineTrade = async (): Promise<TradeDecision> => {
   try {
-    const priceResponse = await axios.get<CoinGeckoPriceResponse>(
-      CARDANO_BITCOIN_PRICE_URL
-    );
+    const { currentAdaPrice, currentBtcPrice } = await getCurrentPrices();
 
-    const currentAdaPrice = priceResponse.data.cardano.usd;
-    const currentBtcPrice = priceResponse.data.bitcoin.usd;
-
-    const historicalResponse = await axios.get<CoinGeckoMarketChartResponse>(
-      CARDANO_30_DAY_HISTORICAL_URL
-    );
-
-    const btcResponse = await axios.get<CoinGeckoMarketChartResponse>(
-      BITCOIN_30_DAY_HISTORICAL_URL
-    );
-
-    const adaPrices = historicalResponse.data.prices.map(([_, price]) => price);
-    const adaVolumes = historicalResponse.data.total_volumes.map(
-      ([_, vol]) => vol
-    );
-    const btcPrices = btcResponse.data.prices.map(([_, price]) => price);
-    const btcVolumes = btcResponse.data.total_volumes.map(([_, vol]) => vol);
+    const { adaPrices, adaVolumes, btcPrices, btcVolumes } =
+      await getHistoricalPricesAndVolumes();
 
     const adaIndicators = calculateIndicators({
       prices: adaPrices,

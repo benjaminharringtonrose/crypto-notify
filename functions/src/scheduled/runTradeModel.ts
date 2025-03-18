@@ -22,93 +22,100 @@ dotenv.config();
  */
 
 export const runTradeModel = onSchedule(EVERY_MIN, async () => {
-  const {
-    cryptoSymbol,
-    currentPrice,
-    probabilities,
-    recommendation,
-    metConditions,
-  } = await determineTrade(CryptoIds.Cardano);
+  try {
+    const {
+      cryptoSymbol,
+      currentPrice,
+      probabilities,
+      recommendation,
+      metConditions,
+    } = await determineTrade(CryptoIds.Cardano);
 
-  const db = getFirestore();
+    const db = getFirestore();
 
-  const recommendationRef = db
-    .collection(Collections.TradeRecommendations)
-    .doc(Docs.Cardano);
+    const recommendationRef = db
+      .collection(Collections.TradeRecommendations)
+      .doc(Docs.Cardano);
 
-  const previousDoc = await recommendationRef.get();
+    const previousDoc = await recommendationRef.get();
 
-  const previous = (previousDoc.exists ? previousDoc.data() : undefined) as
-    | TradeRecommendation
-    | undefined;
+    const previous = (previousDoc.exists ? previousDoc.data() : undefined) as
+      | TradeRecommendation
+      | undefined;
 
-  const smsMessage = formatAnalysisResults({
-    cryptoSymbol,
-    currentPrice,
-    probabilities,
-    recommendation,
-    metConditions,
-  });
+    const smsMessage = formatAnalysisResults({
+      cryptoSymbol,
+      currentPrice,
+      probabilities,
+      recommendation,
+      metConditions,
+    });
 
-  const sameRecommendation = recommendation === previous?.recommendation;
+    const sameRecommendation = recommendation === previous?.recommendation;
 
-  if (!previous || !sameRecommendation) {
-    switch (recommendation) {
-      case Recommendation.Buy:
-        await sendSMS(smsMessage);
-        await recommendationRef.set({
-          recommendation,
-          probability: probabilities.buy,
-          timestamp: new Date().toISOString(),
-        });
-        return;
-      case Recommendation.Sell:
-        await sendSMS(smsMessage);
-        await recommendationRef.set({
-          recommendation,
-          probability: probabilities.sell,
-          timestamp: new Date().toISOString(),
-        });
-        return;
-      case Recommendation.Hold:
-      case Recommendation.HoldBasedOnBuyPrice:
-        await recommendationRef.set({
-          recommendation,
-          probability: probabilities.hold,
-          timestamp: new Date().toISOString(),
-        });
-        return;
-    }
-  }
-
-  if (sameRecommendation) {
-    switch (recommendation) {
-      case Recommendation.Buy:
-        if (previous?.probability && probabilities.buy > previous.probability) {
-          await sendSMS(`Buy probability increased: ${probabilities.buy}`);
+    if (!previous || !sameRecommendation) {
+      switch (recommendation) {
+        case Recommendation.Buy:
+          await sendSMS(smsMessage);
           await recommendationRef.set({
             recommendation,
             probability: probabilities.buy,
             timestamp: new Date().toISOString(),
           });
-        }
-        return;
-      case Recommendation.Sell:
-        if (
-          previous?.probability &&
-          probabilities.sell > previous.probability
-        ) {
-          await sendSMS(`Sell probability increased: ${probabilities.sell}`);
+          return;
+        case Recommendation.Sell:
+          await sendSMS(smsMessage);
           await recommendationRef.set({
             recommendation,
             probability: probabilities.sell,
             timestamp: new Date().toISOString(),
           });
-        }
-        return;
-      case Recommendation.Hold:
-      case Recommendation.HoldBasedOnBuyPrice:
-        return;
+          return;
+        case Recommendation.Hold:
+        case Recommendation.HoldBasedOnBuyPrice:
+          await recommendationRef.set({
+            recommendation,
+            probability: probabilities.hold,
+            timestamp: new Date().toISOString(),
+          });
+          return;
+      }
     }
+
+    if (sameRecommendation) {
+      switch (recommendation) {
+        case Recommendation.Buy:
+          if (
+            previous?.probability &&
+            probabilities.buy > previous.probability
+          ) {
+            await sendSMS(`Buy probability increased: ${probabilities.buy}`);
+            await recommendationRef.set({
+              recommendation,
+              probability: probabilities.buy,
+              timestamp: new Date().toISOString(),
+            });
+          }
+          return;
+        case Recommendation.Sell:
+          if (
+            previous?.probability &&
+            probabilities.sell > previous.probability
+          ) {
+            await sendSMS(`Sell probability increased: ${probabilities.sell}`);
+            await recommendationRef.set({
+              recommendation,
+              probability: probabilities.sell,
+              timestamp: new Date().toISOString(),
+            });
+          }
+          return;
+        case Recommendation.Hold:
+        case Recommendation.HoldBasedOnBuyPrice:
+          return;
+      }
+    }
+  } catch (error) {
+    console.log("runTradeModel Error:", JSON.stringify(error));
   }
 });

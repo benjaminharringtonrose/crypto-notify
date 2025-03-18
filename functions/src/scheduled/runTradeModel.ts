@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { determineTrade } from "../cardano/determineTrade";
 import { sendSMS } from "../notifications/sendSMS";
-import { EVERY_MIN } from "../constants";
+import { RUN_TRADE_MODEL_CONFIG } from "../constants";
 import {
   Collections,
   CryptoIds,
@@ -21,7 +21,7 @@ dotenv.config();
  * when trading conditions change or probabilities increase.
  */
 
-export const runTradeModel = onSchedule(EVERY_MIN, async () => {
+export const runTradeModel = onSchedule(RUN_TRADE_MODEL_CONFIG, async () => {
   try {
     const {
       cryptoSymbol,

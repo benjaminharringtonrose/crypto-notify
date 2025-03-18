@@ -1,4 +1,5 @@
 import { firestore } from "firebase-admin";
+import { ScheduleOptions } from "firebase-functions/scheduler";
 
 export const TEXTBELT_API_URL = "https://textbelt.com";
 export const COINGECKO_API_URL = "https://api.coingecko.com/api/v3";
@@ -14,7 +15,12 @@ export const AVERAGE_BUY_PRICE = 0.72;
 
 export const FIVE_YEARS_IN_DAYS = 1826;
 
-export const ANALYSIS_SCHEDULE = {
+export const RUN_TRADE_MODEL_CONFIG: ScheduleOptions = {
+  schedule: EVERY_MIN,
+  memory: "512MiB",
+};
+
+export const ANALYSIS_SCHEDULE: ScheduleOptions = {
   schedule: EVERYDAY_AT,
   timeZone: TIME_ZONE,
 };

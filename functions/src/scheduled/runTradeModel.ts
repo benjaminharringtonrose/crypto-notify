@@ -15,8 +15,6 @@ import { getFirestore } from "firebase-admin/firestore";
 
 dotenv.config();
 
-const db = getFirestore();
-
 /**
  * Scheduled function that runs a trading model for Cardano cryptocurrency every minute.
  * Analyzes trading conditions, generates recommendations, and sends SMS notifications
@@ -31,6 +29,8 @@ export const runTradeModel = onSchedule(EVERY_MIN, async () => {
     recommendation,
     metConditions,
   } = await determineTrade(CryptoIds.Cardano);
+
+  const db = getFirestore();
 
   const recommendationRef = db
     .collection(Collections.TradeRecommendations)

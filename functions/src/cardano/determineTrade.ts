@@ -31,7 +31,6 @@ export const determineTrade = async (
     );
     const currentPrice = priceResponse.data[cryptoSymbol.toLowerCase()].usd;
     const currentBtcPrice = priceResponse.data.bitcoin.usd;
-
     const historicalResponse: AxiosResponse<CoinGeckoMarketChartResponse> =
       await axios.get(
         `${COINGECKO_API_URL}/coins/${cryptoSymbol.toLowerCase()}/market_chart?vs_currency=usd&days=30`
@@ -298,7 +297,7 @@ export const determineTrade = async (
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     };
   } catch (error: any) {
-    console.error("Error in determineTradeADA:", JSON.stringify(error));
+    console.error("Error in determineTrade:", JSON.stringify(error));
     throw error;
   }
 };

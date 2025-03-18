@@ -142,3 +142,10 @@ export interface TradeRecommendation {
   recommendation: Recommendation;
   timestamp: string;
 }
+
+export interface MarketData {
+  prices: number[];
+  volumes: number[];
+  dayIndex: number;
+  currentPrice: number;
+}

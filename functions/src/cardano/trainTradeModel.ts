@@ -55,18 +55,18 @@ export const trainTradeModelADA = async () => {
   for (let i = 34 + timesteps - 1; i < adaPrices.length; i++) {
     const sequence: number[][] = [];
     for (let j = i - timesteps + 1; j <= i; j++) {
-      const adaFeatures = computeFeatures(
-        adaPrices,
-        adaVolumes,
-        j,
-        adaPrices[j]
-      );
-      const btcFeatures = computeFeatures(
-        btcPrices,
-        btcVolumes,
-        j,
-        btcPrices[j]
-      );
+      const adaFeatures = computeFeatures({
+        prices: adaPrices,
+        volumes: adaVolumes,
+        dayIndex: j,
+        currentPrice: adaPrices[j],
+      });
+      const btcFeatures = computeFeatures({
+        prices: btcPrices,
+        volumes: btcVolumes,
+        dayIndex: j,
+        currentPrice: btcPrices[j],
+      });
       if (adaFeatures.length !== 28 || btcFeatures.length !== 28) {
         console.error(
           `Unexpected feature length at index ${j}: ADA ${adaFeatures.length}, BTC ${btcFeatures.length}`

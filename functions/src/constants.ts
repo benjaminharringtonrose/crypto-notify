@@ -30,3 +30,22 @@ export const RUNNING_ANALYSIS_MODEL_MESSAGE = "Running analysis model...";
 export const MERGE_PAYLOAD: firestore.SetOptions = {
   merge: true,
 };
+
+export const PERIODS = {
+  RSI: 14,
+  SMA_SHORT: 7,
+  SMA_MEDIUM: 20,
+  SMA_LONG: 21,
+  EMA_SHORT: 12,
+  EMA_LONG: 26,
+  MACD_SIGNAL: 9,
+  BOLLINGER: 20,
+  ATR: 14,
+  VWAP: 7,
+  STOCH_RSI: 14,
+  STOCH_SMOOTH: 3,
+  FIBONACCI: 30,
+  VOL_SMA_SHORT: 5,
+  VOL_SMA_LONG: 14,
+  MOMENTUM: 10,
+} as const;

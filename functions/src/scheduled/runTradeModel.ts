@@ -43,7 +43,7 @@ export const runTradeModel = onSchedule(EVERY_MIN, async () => {
       | TradeRecommendation
       | undefined;
 
-    const smsMessage = formatAnalysisResults({
+    const analysisResults = formatAnalysisResults({
       cryptoSymbol,
       currentPrice,
       probabilities,
@@ -51,12 +51,23 @@ export const runTradeModel = onSchedule(EVERY_MIN, async () => {
       metConditions,
     });
 
+    console.log(analysisResults);
+
     const sameRecommendation = recommendation === previous?.recommendation;
 
-    if (!previous || !sameRecommendation) {
+    if (!previous) {
+      await sendSMS(analysisResults);
+      await recommendationRef.set({
+        recommendation,
+        probability: probabilities.buy,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    if (!sameRecommendation) {
       switch (recommendation) {
         case Recommendation.Buy:
-          await sendSMS(smsMessage);
+          await sendSMS(analysisResults);
           await recommendationRef.set({
             recommendation,
             probability: probabilities.buy,
@@ -64,7 +75,7 @@ export const runTradeModel = onSchedule(EVERY_MIN, async () => {
           });
           return;
         case Recommendation.Sell:
-          await sendSMS(smsMessage);
+          await sendSMS(analysisResults);
           await recommendationRef.set({
             recommendation,
             probability: probabilities.sell,

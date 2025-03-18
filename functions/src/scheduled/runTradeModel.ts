@@ -79,6 +79,8 @@ export const runTradeModel = onSchedule(EVERY_MIN, async () => {
             timestamp: new Date().toISOString(),
           });
           return;
+        default:
+          console.log("Recommendation unexpected");
       }
     }
 
@@ -113,6 +115,8 @@ export const runTradeModel = onSchedule(EVERY_MIN, async () => {
         case Recommendation.Hold:
         case Recommendation.HoldBasedOnBuyPrice:
           return;
+        default:
+          console.log("Recommendation unexpected");
       }
     }
   } catch (error) {

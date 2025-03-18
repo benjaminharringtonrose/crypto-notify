@@ -2,7 +2,6 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { firestore } from "firebase-admin";
 import dotenv from "dotenv";
 import { getCurrentPrice } from "../api/getCurrentPrice";
-import { sendSMS } from "../notifications/sendSMS";
 import {
   MERGE_PAYLOAD,
   NOTIFICATION_COOLDOWN,
@@ -10,6 +9,7 @@ import {
   PRICES,
 } from "../constants";
 import {
+  sendSMS,
   checkCardanoPriceErrorMessage,
   isAboveThreshold,
   priceAlertTextMessage,

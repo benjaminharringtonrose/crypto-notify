@@ -1,8 +1,7 @@
 import { https } from "firebase-functions";
 import { determineTrade } from "../cardano/determineTrade";
 import { CryptoIds, RecieveSMSRequest } from "../types";
-import { formatAnalysisResults } from "../utils";
-import { sendSMS } from "./sendSMS";
+import { formatAnalysisResults, sendSMS } from "../utils";
 
 export const receiveSMS = https.onRequest(
   async (request: RecieveSMSRequest, response) => {

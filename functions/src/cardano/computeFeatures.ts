@@ -8,9 +8,9 @@ import { calculateStdDev } from "../calculations/calculateStdDev";
 import { calculateStochRSI } from "../calculations/calculateStochRSI";
 import { calculateVWAP } from "../calculations/calculateVWAP";
 import { PERIODS } from "../constants";
-import { detectDoubleTop } from "../detections/detectDoubleTop";
-import { detectHeadAndShoulders } from "../detections/detectHeadAndShoulders";
-import { detectTripleTop } from "../detections/detectTripleTop";
+import { detectDoubleTop } from "../calculations/detectDoubleTop";
+import { detectHeadAndShoulders } from "../calculations/detectHeadAndShoulders";
+import { detectTripleTop } from "../calculations/detectTripleTop";
 import { MarketData } from "../types";
 
 export const computeFeatures = ({

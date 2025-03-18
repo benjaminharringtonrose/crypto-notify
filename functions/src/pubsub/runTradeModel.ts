@@ -1,7 +1,6 @@
 import dotenv from "dotenv";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { determineTrade } from "../cardano/determineTrade";
-import { sendSMS } from "../notifications/sendSMS";
 import { RUN_TRADE_MODEL_CONFIG } from "../constants";
 import {
   Collections,
@@ -10,7 +9,7 @@ import {
   Recommendation,
   TradeRecommendation,
 } from "../types";
-import { formatAnalysisResults } from "../utils";
+import { sendSMS, formatAnalysisResults } from "../utils";
 import { getFirestore } from "firebase-admin/firestore";
 
 dotenv.config();

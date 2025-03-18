@@ -1,7 +1,7 @@
 import { PERIODS } from "../constants";
-import { detectDoubleTop } from "../detections/detectDoubleTop";
-import { detectHeadAndShoulders } from "../detections/detectHeadAndShoulders";
-import { detectTripleTop } from "../detections/detectTripleTop";
+import { detectDoubleTop } from "./detectDoubleTop";
+import { detectHeadAndShoulders } from "./detectHeadAndShoulders";
+import { detectTripleTop } from "./detectTripleTop";
 import { calculateATR } from "./calculateATR";
 import { calculateEMA } from "./calculateEMA";
 import { calculateFibonacciLevels } from "./calculateFibonacciLevels";

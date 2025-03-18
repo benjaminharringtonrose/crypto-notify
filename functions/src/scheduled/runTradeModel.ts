@@ -1,3 +1,4 @@
+import dotenv from "dotenv";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { determineTrade } from "../cardano/determineTrade";
 import { sendSMS } from "../notifications/sendSMS";
@@ -11,6 +12,8 @@ import {
 } from "../types";
 import { formatAnalysisResults } from "../utils";
 import { getFirestore } from "firebase-admin/firestore";
+
+dotenv.config();
 
 /**
  * Scheduled function that runs a trading model for Cardano cryptocurrency every minute.
@@ -35,7 +38,9 @@ export const runTradeModel = onSchedule(EVERY_MIN, async () => {
 
   const previousDoc = await recommendationRef.get();
 
-  const previous = previousDoc.data() as TradeRecommendation | undefined;
+  const previous = previousDoc.exists
+    ? previousDoc.data()
+    : (undefined as TradeRecommendation | undefined);
 
   const smsMessage = formatAnalysisResults({
     cryptoSymbol,

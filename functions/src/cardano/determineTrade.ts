@@ -1,4 +1,3 @@
-import dotenv from "dotenv";
 import * as admin from "firebase-admin";
 import { AVERAGE_BUY_PRICE } from "../constants";
 import { predictTrade } from "./predictTrade";
@@ -6,8 +5,6 @@ import { Recommendation, TradeDecision } from "../types";
 import { calculateIndicators } from "../calculations/calculateIndicators";
 import { getCurrentPrices } from "../api/getCurrentPrices";
 import { getHistoricalPricesAndVolumes } from "../api/getHistoricalPricesAndVolumes";
-
-dotenv.config();
 
 export const determineTrade = async (): Promise<TradeDecision> => {
   try {

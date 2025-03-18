@@ -10,6 +10,7 @@ import {
 import { predictTrade } from "./predictTrade";
 import {
   CoinGeckoMarketChartResponse,
+  CoinGeckoPriceResponse,
   Recommendation,
   TradeDecision,
 } from "../types";
@@ -19,7 +20,9 @@ dotenv.config();
 
 export const determineTrade = async (): Promise<TradeDecision> => {
   try {
-    const priceResponse = await axios.get(CARDANO_BITCOIN_PRICE_URL);
+    const priceResponse = await axios.get<CoinGeckoPriceResponse>(
+      CARDANO_BITCOIN_PRICE_URL
+    );
 
     const currentAdaPrice = priceResponse.data.cardano.usd;
     const currentBtcPrice = priceResponse.data.bitcoin.usd;

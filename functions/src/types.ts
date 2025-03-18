@@ -1,3 +1,12 @@
+export interface CoinGeckoPriceResponse {
+  cardano: {
+    usd: number;
+  };
+  bitcoin: {
+    usd: number;
+  };
+}
+
 export interface CoinGeckoMarketChartResponse {
   prices: [number, number][];
   market_caps: [number, number][];

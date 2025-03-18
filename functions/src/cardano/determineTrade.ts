@@ -21,6 +21,7 @@ export const determineTrade = async (): Promise<TradeDecision> => {
       volumes: adaVolumes,
       currentPrice: currentAdaPrice,
     });
+
     const btcIndicators = calculateIndicators({
       prices: btcPrices,
       volumes: btcVolumes,

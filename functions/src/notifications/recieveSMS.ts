@@ -1,6 +1,6 @@
 import { https } from "firebase-functions";
 import { determineTrade } from "../cardano/determineTrade";
-import { RecieveSMSRequest } from "../types";
+import { CryptoIds, RecieveSMSRequest } from "../types";
 import { formatAnalysisResults } from "../utils";
 import { sendSMS } from "./sendSMS";
 
@@ -9,16 +9,15 @@ export const receiveSMS = https.onRequest(
     try {
       const replyText = request.body.text || "No message";
 
-      const {
-        cryptoSymbol,
-        currentPrice,
-        probabilities,
-        recommendation,
-        metConditions,
-      } = await determineTrade(replyText.toLowerCase().trim());
+      const { currentPrice, probabilities, recommendation, metConditions } =
+        await determineTrade();
+
+      if (replyText.trim().toLowerCase() !== "cardano") {
+        return;
+      }
 
       const smsMessage = formatAnalysisResults({
-        cryptoSymbol,
+        cryptoSymbol: CryptoIds.Cardano,
         currentPrice,
         probabilities,
         recommendation,

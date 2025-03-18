@@ -6,6 +6,10 @@ export const COINGECKO_API_URL = "https://api.coingecko.com/api/v3";
 export const CRYPTOCOMPARE_API_URL =
   "https://min-api.cryptocompare.com/data/v2";
 
+export const CARDANO_BITCOIN_PRICE_URL = `${COINGECKO_API_URL}/simple/price?ids=cardano,bitcoin&vs_currencies=usd`;
+export const CARDANO_30_DAY_HISTORICAL_URL = `${COINGECKO_API_URL}/coins/cardano/market_chart?vs_currency=usd&days=30`;
+export const BITCOIN_30_DAY_HISTORICAL_URL = `${COINGECKO_API_URL}/coins/bitcoin/market_chart?vs_currency=usd&days=30`;
+
 export const PRICES = [0.8, 0.9, 1.0, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
 export const EVERY_MIN = `*/1 * * * *`; // every 1 min
 export const EVERYDAY_AT = `45 17 * * *`; // every day at 4:45 PM ET

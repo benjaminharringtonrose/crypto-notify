@@ -101,7 +101,6 @@ export interface PredictTrade {
   recommendation: Recommendation;
 }
 export interface TradeDecision {
-  cryptoSymbol: string;
   currentPrice: number;
   rsi?: string;
   sma7: string;

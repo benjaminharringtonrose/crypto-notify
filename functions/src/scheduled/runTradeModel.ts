@@ -23,13 +23,8 @@ dotenv.config();
 
 export const runTradeModel = onSchedule(RUN_TRADE_MODEL_CONFIG, async () => {
   try {
-    const {
-      cryptoSymbol,
-      currentPrice,
-      probabilities,
-      recommendation,
-      metConditions,
-    } = await determineTrade(CryptoIds.Cardano);
+    const { currentPrice, probabilities, recommendation, metConditions } =
+      await determineTrade();
 
     const db = getFirestore();
 
@@ -44,7 +39,7 @@ export const runTradeModel = onSchedule(RUN_TRADE_MODEL_CONFIG, async () => {
       | undefined;
 
     const analysisResults = formatAnalysisResults({
-      cryptoSymbol,
+      cryptoSymbol: CryptoIds.Cardano,
       currentPrice,
       probabilities,
       recommendation,

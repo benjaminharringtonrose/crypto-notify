@@ -50,15 +50,6 @@ export const runTradeModel = onSchedule(RUN_TRADE_MODEL_CONFIG, async () => {
     const sameRecommendation = recommendation === previous?.recommendation;
 
     if (!previous) {
-      await sendSMS(analysisResults);
-      await recommendationRef.set({
-        recommendation,
-        probability: probabilities.buy,
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    if (!sameRecommendation) {
       switch (recommendation) {
         case Recommendation.Buy:
           await sendSMS(analysisResults);
@@ -83,6 +74,32 @@ export const runTradeModel = onSchedule(RUN_TRADE_MODEL_CONFIG, async () => {
             probability: probabilities.hold,
             timestamp: new Date().toISOString(),
           });
+          return;
+        default:
+          console.log("Recommendation unexpected");
+      }
+    }
+
+    if (!sameRecommendation) {
+      switch (recommendation) {
+        case Recommendation.Buy:
+          await sendSMS(analysisResults);
+          await recommendationRef.set({
+            recommendation,
+            probability: probabilities.buy,
+            timestamp: new Date().toISOString(),
+          });
+          return;
+        case Recommendation.Sell:
+          await sendSMS(analysisResults);
+          await recommendationRef.set({
+            recommendation,
+            probability: probabilities.sell,
+            timestamp: new Date().toISOString(),
+          });
+          return;
+        case Recommendation.Hold:
+        case Recommendation.HoldBasedOnBuyPrice:
           return;
         default:
           console.log("Recommendation unexpected");

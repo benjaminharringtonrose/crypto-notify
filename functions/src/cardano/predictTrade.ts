@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 import * as tf from "@tensorflow/tfjs-node";
 import * as admin from "firebase-admin";
 import { Condition, Indicators, PredictTrade, Recommendation } from "../types";
+import { calculateFibonacciLevels } from "../calculations/calculateFibonacciLevels";
 
 dotenv.config();
 
@@ -61,6 +62,8 @@ export const predictTrade = async ({
   btcIsVolumeSpike,
   btcMomentum,
   btcPriceChangePct,
+  isTripleBottom,
+  btcIsTripleBottom,
 }: Indicators): Promise<PredictTrade> => {
   const bucket = admin.storage().bucket(process.env.STORAGE_BUCKET);
   const file = bucket.file("tradePredictorWeights.json");
@@ -83,7 +86,7 @@ export const predictTrade = async ({
       throw new Error(`${name} contains NaN or Infinity`);
   };
 
-  validateArray(parsedWeights.conv1Weights, 3 * 56 * 64, "conv1Weights");
+  validateArray(parsedWeights.conv1Weights, 3 * 57 * 64, "conv1Weights");
   validateArray(parsedWeights.conv1Bias, 64, "conv1Bias");
   validateArray(parsedWeights.conv2Weights, 3 * 64 * 32, "conv2Weights");
   validateArray(parsedWeights.conv2Bias, 32, "conv2Bias");
@@ -107,10 +110,10 @@ export const predictTrade = async ({
   validateArray(parsedWeights.dense1Bias, 16, "dense1Bias");
   validateArray(parsedWeights.dense2Weights, 16 * 3, "dense2Weights");
   validateArray(parsedWeights.dense2Bias, 3, "dense2Bias");
-  validateArray(parsedWeights.featureMins, 56, "featureMins");
-  validateArray(parsedWeights.featureMaxs, 56, "featureMaxs");
+  validateArray(parsedWeights.featureMins, 57, "featureMins");
+  validateArray(parsedWeights.featureMaxs, 57, "featureMaxs");
 
-  const conv1Weights = tf.tensor3d(parsedWeights.conv1Weights, [3, 56, 64]);
+  const conv1Weights = tf.tensor3d(parsedWeights.conv1Weights, [3, 57, 64]);
   const conv1Bias = tf.tensor1d(parsedWeights.conv1Bias);
   const conv2Weights = tf.tensor3d(parsedWeights.conv2Weights, [3, 64, 32]);
   const conv2Bias = tf.tensor1d(parsedWeights.conv2Bias);
@@ -174,6 +177,7 @@ export const predictTrade = async ({
       isVolumeSpike ? 1 : 0,
       momentum || 0,
       priceChangePct || 0,
+      isTripleBottom ? 1 : 0,
       btcRsi || 0,
       btcPrevRsi || 0,
       btcSma7,
@@ -206,14 +210,14 @@ export const predictTrade = async ({
     featureSequence.push(dayFeatures);
   }
   while (featureSequence.length < timesteps)
-    featureSequence.unshift(featureSequence[0] || Array(56).fill(0));
+    featureSequence.unshift(featureSequence[0] || Array(57).fill(0));
 
-  const featuresRaw = tf.tensor2d(featureSequence, [timesteps, 56]);
+  const featuresRaw = tf.tensor2d(featureSequence, [timesteps, 57]);
   const featuresNormalized = featuresRaw
     .sub(featureMins)
     .div(featureMaxs.sub(featureMins).add(1e-6))
     .clipByValue(0, 1)
-    .reshape([1, timesteps, 56]) as tf.Tensor3D;
+    .reshape([1, timesteps, 57]) as tf.Tensor3D;
 
   let conv1Output = tf
     .conv1d(featuresNormalized, conv1Weights, 1, "same")
@@ -283,6 +287,10 @@ export const predictTrade = async ({
     prices.slice(-20).reduce((sum, p) => sum + Math.pow(p - sma20, 2), 0) / 20
   );
   const lowerBand = sma20 - 2 * stdDev20;
+  const macdHistogram = macdLine - signalLine;
+  const prevMacdHistogram = prevMacdLine - signalLine;
+  const { levels } = calculateFibonacciLevels(prices.slice(-30), 30);
+  const fib236 = levels[1] || 0;
 
   const conditions: Condition[] = [
     { name: "RSI Overbought", met: !!rsi && rsi > 75, weight: 0.12 },
@@ -343,22 +351,37 @@ export const predictTrade = async ({
     { name: "Triple Top Pattern", met: isTripleTop, weight: 0.09 },
     { name: "Volume Spike", met: isVolumeSpike, weight: 0.07 },
     { name: "Negative Momentum", met: momentum < 0, weight: 0.08 },
-    { name: "RSI Oversold", met: !!rsi && rsi < 25, weight: 0.12 },
+    {
+      name: "Price Crossing Below VWAP",
+      met: currentPrice < vwap && prices[prices.length - 2] > vwap,
+      weight: 0.07,
+    },
+    {
+      name: "Bearish Engulfing",
+      met:
+        prices.length >= 2 &&
+        prices[prices.length - 2] < prices[prices.length - 1] &&
+        currentPrice < prices[prices.length - 2] &&
+        prices[prices.length - 1] - currentPrice >
+          prices[prices.length - 1] - prices[prices.length - 2],
+      weight: 0.07,
+    },
+    { name: "RSI Oversold", met: !!rsi && rsi < 25, weight: 0.128 },
     {
       name: "SMA Golden Cross",
       met: sma7 > sma21 && prevSma7 <= prevSma21,
-      weight: 0.08,
+      weight: 0.088,
     },
-    { name: "MACD Bullish", met: macdLine > signalLine, weight: 0.12 },
+    { name: "MACD Bullish", met: macdLine > signalLine, weight: 0.128 },
     {
       name: "Below Bollinger Lower",
       met: currentPrice < lowerBand,
-      weight: 0.07,
+      weight: 0.078,
     },
     {
       name: "OBV Rising",
       met: obvValues[obvValues.length - 1] > obvValues[obvValues.length - 2],
-      weight: 0.07,
+      weight: 0.078,
     },
     {
       name: "Bullish RSI Divergence",
@@ -367,27 +390,63 @@ export const predictTrade = async ({
         !!rsi &&
         !!prevRsi &&
         rsi > prevRsi,
-      weight: 0.08,
+      weight: 0.088,
     },
-    { name: "Low ATR Volatility", met: atr < atrBaseline * 0.4, weight: 0.06 },
-    { name: "Z-Score Low", met: zScore < -2.5, weight: 0.08 },
-    { name: "Below VWAP", met: currentPrice < vwap * 0.9, weight: 0.07 },
+    { name: "Low ATR Volatility", met: atr < atrBaseline * 0.4, weight: 0.068 },
+    { name: "Z-Score Low", met: zScore < -2.5, weight: 0.088 },
+    { name: "Below VWAP", met: currentPrice < vwap * 0.9, weight: 0.078 },
     {
       name: "StochRSI Oversold",
       met: stochRsi < 15 && stochRsi > prevStochRsi,
-      weight: 0.08,
+      weight: 0.088,
     },
     {
       name: "Bullish MACD Divergence",
       met: currentPrice < prices[prices.length - 2] && macdLine > prevMacdLine,
-      weight: 0.08,
+      weight: 0.088,
     },
     {
       name: "Volume Oscillator Rising",
       met: volumeOscillator > 0 && volumeOscillator > prevVolumeOscillator,
-      weight: 0.07,
+      weight: 0.078,
     },
-    { name: "Positive Momentum", met: momentum > 0, weight: 0.08 },
+    { name: "Positive Momentum", met: momentum > 0, weight: 0.088 },
+    { name: "Triple Bottom Pattern", met: isTripleBottom, weight: 0.088 },
+    {
+      name: "BTC Triple Bottom Pattern",
+      met: btcIsTripleBottom,
+      weight: 0.068,
+    },
+    {
+      name: "Volume Breakout",
+      met: isVolumeSpike && priceChangePct > 0.5,
+      weight: 0.078,
+    },
+    {
+      name: "Price Crossing Above VWAP",
+      met: currentPrice > vwap && prices[prices.length - 2] < vwap,
+      weight: 0.068,
+    },
+    {
+      name: "MACD Histogram Positive Flip",
+      met: macdHistogram > 0 && prevMacdHistogram <= 0,
+      weight: 0.078,
+    },
+    {
+      name: "Near Fibonacci 23.6%",
+      met: currentPrice >= fib236 * 0.98 && currentPrice <= fib236 * 1.02,
+      weight: 0.068,
+    },
+    {
+      name: "Bullish Engulfing",
+      met:
+        prices.length >= 2 &&
+        prices[prices.length - 2] > prices[prices.length - 1] &&
+        currentPrice > prices[prices.length - 2] &&
+        currentPrice - prices[prices.length - 1] >
+          prices[prices.length - 2] - prices[prices.length - 1],
+      weight: 0.068,
+    },
   ];
 
   const metConditions = conditions
@@ -409,9 +468,11 @@ export const predictTrade = async ({
 
   let recommendation: Recommendation;
   const isUptrend = sma7 / sma21 > 1.05;
-  if (buyProb > 0.3 || (buyProb > 0.25 && isUptrend))
+  if (buyProb > 0.34 || (buyProb > 0.31 && isUptrend))
+    // Updated thresholds
     recommendation = Recommendation.Buy;
-  else if (sellProb > 0.55 || (sellProb > 0.5 && !isUptrend))
+  else if (sellProb > 0.34 || (sellProb > 0.31 && !isUptrend))
+    // Updated thresholds
     recommendation = Recommendation.Sell;
   else recommendation = Recommendation.Hold;
 

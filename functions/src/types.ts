@@ -88,6 +88,8 @@ export interface Indicators {
   btcIsVolumeSpike: boolean;
   btcMomentum: number;
   btcPriceChangePct: number;
+  isTripleBottom: boolean;
+  btcIsTripleBottom: boolean;
 }
 
 export enum Recommendation {

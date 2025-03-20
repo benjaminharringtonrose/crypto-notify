@@ -1,7 +1,7 @@
 export const labelData = ({
   prices,
   dayIndex,
-  threshold = 0.01, // Threshold for significant price movement
+  threshold = 0.015, // Increased from 0.01
   horizon = 3,
 }: {
   prices: number[];

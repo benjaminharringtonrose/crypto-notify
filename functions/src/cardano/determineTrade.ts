@@ -54,6 +54,7 @@ export const determineTrade = async (): Promise<TradeDecision> => {
         isVolumeSpike: adaIndicators.isVolumeSpike,
         momentum: adaIndicators.momentum,
         priceChangePct: adaIndicators.priceChangePct,
+        isTripleBottom: adaIndicators.isTripleBottom,
         btcRsi: btcIndicators.rsi,
         btcPrevRsi: btcIndicators.prevRsi,
         btcSma7: btcIndicators.sma7,
@@ -81,6 +82,7 @@ export const determineTrade = async (): Promise<TradeDecision> => {
         btcIsVolumeSpike: btcIndicators.isVolumeSpike,
         btcMomentum: btcIndicators.momentum,
         btcPriceChangePct: btcIndicators.priceChangePct,
+        btcIsTripleBottom: btcIndicators.isTripleBottom,
       }
     );
 
@@ -104,7 +106,7 @@ export const determineTrade = async (): Promise<TradeDecision> => {
       volumeOscillator: adaIndicators.volumeOscillator.toFixed(2),
       metConditions,
       probabilities,
-      recommendation, // Use raw recommendation
+      recommendation,
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     };
   } catch (error: any) {

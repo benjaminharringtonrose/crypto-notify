@@ -27,13 +27,21 @@ function customRecall(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
 
 const focalLoss = (yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar => {
   const gamma = 2.0;
-  const alpha = tf.tensor1d([2.0, 0.7, 1.5]);
+  const alpha = tf.tensor1d([0.9, 1.2, 1.5]); // Sell, Hold, Buy
+  const classWeights = tf.tensor1d([1.0, 1.0, 1.2]); // Boost buy slightly
   const ce = tf.losses.softmaxCrossEntropy(yTrue, yPred);
   const pt = yTrue.mul(yPred).sum(-1);
   const focalWeight = tf.pow(tf.sub(1, pt), gamma);
-  const alphaWeighted = yTrue.mul(alpha).sum(-1);
-  const loss = ce.mul(focalWeight).mul(alphaWeighted).mean() as tf.Scalar;
+  const yTrueIndices = yTrue.argMax(-1);
+  const alphaWeighted = tf.gather(alpha, yTrueIndices);
+  const weightAdjusted = tf.gather(classWeights, yTrueIndices);
+  const loss = ce
+    .mul(focalWeight)
+    .mul(alphaWeighted)
+    .mul(weightAdjusted)
+    .mean() as tf.Scalar;
   alpha.dispose();
+  classWeights.dispose();
   return loss;
 };
 
@@ -56,6 +64,7 @@ export const trainTradeModelADA = async () => {
   const allFeatures: number[] = [];
   for (let i = 34 + timesteps - 1; i < adaPrices.length; i++) {
     const sequence: number[][] = [];
+    let validSequence = true;
     for (let j = i - timesteps + 1; j <= i; j++) {
       const adaFeatures = computeFeatures({
         prices: adaPrices,
@@ -68,8 +77,22 @@ export const trainTradeModelADA = async () => {
         volumes: btcVolumes,
         dayIndex: j,
         currentPrice: btcPrices[j],
+        isBTC: true,
       });
-      if (adaFeatures.length !== 28 || btcFeatures.length !== 28) continue;
+      if (
+        !Array.isArray(adaFeatures) ||
+        adaFeatures.length !== 29 ||
+        !Array.isArray(btcFeatures) ||
+        btcFeatures.length !== 28
+      ) {
+        console.log(
+          `Skipping index ${j}: adaFeatures = ${JSON.stringify(
+            adaFeatures
+          )}, btcFeatures = ${JSON.stringify(btcFeatures)}`
+        );
+        validSequence = false;
+        break;
+      }
       const scale = 0.85 + Math.random() * 0.3;
       const noisyAdaFeatures = adaFeatures.map(
         (f) => f * scale + (Math.random() - 0.5) * 0.01
@@ -80,13 +103,17 @@ export const trainTradeModelADA = async () => {
       sequence.push([...noisyAdaFeatures, ...noisyBtcFeatures]);
       allFeatures.push(...noisyAdaFeatures, ...noisyBtcFeatures);
     }
+    if (!validSequence || sequence.length === 0) {
+      console.log(`Skipping sequence for i=${i} due to invalid features`);
+      continue;
+    }
     while (sequence.length < timesteps)
       sequence.push(sequence[sequence.length - 1]);
     while (sequence.length > timesteps) sequence.pop();
     const label = labelData({
       prices: adaPrices,
       dayIndex: i,
-      threshold: 0.03,
+      threshold: 0.02,
       horizon: 5,
     });
     if (label === 1 && Math.random() < 0.1) continue;
@@ -158,7 +185,7 @@ export const trainTradeModelADA = async () => {
     })
     .batch(64);
 
-  const input = tf.input({ shape: [timesteps, 56] });
+  const input = tf.input({ shape: [timesteps, 57] });
   const conv1 = tf.layers
     .conv1d({
       filters: 64,
@@ -167,7 +194,7 @@ export const trainTradeModelADA = async () => {
       kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
       padding: "same",
     })
-    .apply(input) as tf.SymbolicTensor; // Increased L2
+    .apply(input) as tf.SymbolicTensor;
   const bn1 = tf.layers
     .batchNormalization({ momentum: 0.9 })
     .apply(conv1) as tf.SymbolicTensor;
@@ -265,10 +292,10 @@ export const trainTradeModelADA = async () => {
 
   console.log("Starting model training...");
   await model.fitDataset(trainDataset, {
-    epochs: 20, // Reduced to 20 to match best val_loss range
+    epochs: 30,
     validationData: valDataset,
     callbacks: [
-      tf.callbacks.earlyStopping({ monitor: "val_loss", patience: 10 }), // Reduced patience
+      tf.callbacks.earlyStopping({ monitor: "val_loss", patience: 15 }),
       new BestWeightsCallback({}),
       new ExponentialDecayLearningRateCallback({}),
     ],

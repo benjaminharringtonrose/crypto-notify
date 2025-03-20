@@ -2,6 +2,7 @@ import { PERIODS } from "../constants";
 import { detectDoubleTop } from "./detectDoubleTop";
 import { detectHeadAndShoulders } from "./detectHeadAndShoulders";
 import { detectTripleTop } from "./detectTripleTop";
+import { detectTripleBottom } from "./detectTripleBottom"; // Add this if not already present
 import { calculateATR } from "./calculateATR";
 import { calculateEMA } from "./calculateEMA";
 import { calculateFibonacciLevels } from "./calculateFibonacciLevels";
@@ -23,7 +24,6 @@ export const calculateIndicators = ({
   volumes: number[];
   currentPrice: number;
 }) => {
-  // Basic indicators
   const rsi = calculateRSI(calculateSlice(prices, PERIODS.RSI + 1));
   const prevRsi = calculateRSI(calculateSlice(prices, PERIODS.RSI + 1, 1));
   const sma7 = calculateSMA(calculateSlice(prices, PERIODS.SMA_SHORT));
@@ -31,7 +31,6 @@ export const calculateIndicators = ({
   const prevSma7 = calculateSMA(calculateSlice(prices, PERIODS.SMA_SHORT, 1));
   const prevSma21 = calculateSMA(calculateSlice(prices, PERIODS.SMA_LONG, 1));
 
-  // MACD
   const ema12 = calculateEMA(
     calculateSlice(prices, PERIODS.EMA_SHORT),
     PERIODS.EMA_SHORT
@@ -61,7 +60,6 @@ export const calculateIndicators = ({
     PERIODS.MACD_SIGNAL
   );
 
-  // Bollinger Bands
   const sma20 = calculateSMA(calculateSlice(prices, PERIODS.SMA_MEDIUM));
   const stdDev20 = calculateStdDev(
     calculateSlice(prices, PERIODS.SMA_MEDIUM),
@@ -70,7 +68,6 @@ export const calculateIndicators = ({
   const upperBand = sma20 + 2 * stdDev20;
   const lowerBand = sma20 - 2 * stdDev20;
 
-  // OBV
   const obvValues = [0];
   let obv = 0;
   for (let i = 1; i < prices.length; i++) {
@@ -79,7 +76,6 @@ export const calculateIndicators = ({
     obvValues.push(obv);
   }
 
-  // Other indicators
   const atr = calculateATR(prices, PERIODS.ATR);
   const atrBaseline = calculateATR(prices.slice(0, -1), PERIODS.ATR);
   const zScore = (currentPrice - sma20) / stdDev20;
@@ -99,7 +95,6 @@ export const calculateIndicators = ({
   const { levels } = calculateFibonacciLevels(prices, PERIODS.FIBONACCI);
   const fib61_8 = levels[3] || 0;
 
-  // Volume indicators
   const volSmaShort = calculateSMA(
     calculateSlice(volumes, PERIODS.VOL_SMA_SHORT)
   );
@@ -122,7 +117,6 @@ export const calculateIndicators = ({
   const volSma5 = calculateSMA(calculateSlice(volumes, PERIODS.VOL_SMA_SHORT));
   const isVolumeSpike = currentVolume > volSma5 * 2;
 
-  // Pattern detection
   const isDoubleTop = detectDoubleTop(prices, volumes, currentPrice);
   const isHeadAndShoulders = detectHeadAndShoulders(
     prices,
@@ -130,8 +124,8 @@ export const calculateIndicators = ({
     currentPrice
   );
   const isTripleTop = detectTripleTop(prices, volumes, currentPrice);
+  const isTripleBottom = detectTripleBottom(prices, volumes, currentPrice);
 
-  // Momentum
   const momentum =
     prices.length >= PERIODS.MOMENTUM
       ? currentPrice - prices[prices.length - PERIODS.MOMENTUM]
@@ -170,6 +164,7 @@ export const calculateIndicators = ({
     isHeadAndShoulders,
     prevMacdLine,
     isTripleTop,
+    isTripleBottom,
     isVolumeSpike,
     momentum,
     priceChangePct,

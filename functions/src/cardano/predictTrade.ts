@@ -469,9 +469,9 @@ export const predictTrade = async ({
   let recommendation: Recommendation;
   const isUptrend = sma7 / sma21 > 1.05;
   if (buyProb > 0.36 || (buyProb > 0.33 && isUptrend))
-    // Raised from 0.34 to 0.36, 0.31 to 0.33
     recommendation = Recommendation.Buy;
-  else if (sellProb > 0.34 || (sellProb > 0.31 && !isUptrend))
+  else if (sellProb > 0.37 || (sellProb > 0.34 && !isUptrend))
+    // Raised sell threshold to 0.37
     recommendation = Recommendation.Sell;
   else recommendation = Recommendation.Hold;
 

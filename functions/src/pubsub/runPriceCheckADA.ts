@@ -5,7 +5,7 @@ import { getCurrentPrice } from "../api/getCurrentPrice";
 import {
   MERGE_PAYLOAD,
   NOTIFICATION_COOLDOWN,
-  EVERY_MIN,
+  EVERY_TEN_MINS,
   PRICES,
 } from "../constants";
 import {
@@ -18,7 +18,7 @@ import { Collections, CryptoIds, Currencies, Docs } from "../types";
 
 dotenv.config();
 
-export const runPriceCheckADA = onSchedule(EVERY_MIN, async () => {
+export const runPriceCheckADA = onSchedule(EVERY_TEN_MINS, async () => {
   try {
     const currentPrice = await getCurrentPrice({
       id: CryptoIds.Cardano,

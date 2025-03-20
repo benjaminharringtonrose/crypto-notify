@@ -10,14 +10,16 @@
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
     "test": "npx ts-node src/test.ts",
-    "train:trade:model:ada": "npx ts-node src/cardano/trainTradeModel.ts",
-    "train:backtest": "npx ts-node src/cardano/backtestTradeModel.ts"
+    "train:ada": "npx ts-node src/cardano/trainTradeModel.ts",
+    "train:backtest": "npx ts-node src/cardano/backtestTradeModel.ts",
+    "train:full": "npm run train:ada && npm run train:backtest"
   },
   "engines": {
     "node": "20"
   },
   "main": "lib/functions/src/index.js",
   "dependencies": {
+    "@tensorflow/tfjs-layers": "^4.22.0",
     "@tensorflow/tfjs-node": "^4.22.0",
     "axios": "^1.8.3",
     "dotenv": "^16.4.7",

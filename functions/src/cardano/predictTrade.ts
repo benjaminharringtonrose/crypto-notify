@@ -463,17 +463,50 @@ export const predictTrade = async ({
   const sellBoost = isDeathCross
     ? Math.min(0.15 * Math.max(0, 1 - trendStrength), 0.15)
     : 0;
-  buyProb += buyBoost;
+  const momentumBoost =
+    macdHistogram > 0 && prevMacdHistogram <= 0 && currentPrice < sma20
+      ? 0.05
+      : 0;
+  buyProb += buyBoost + momentumBoost;
   sellProb += sellBoost;
 
+  // Additional logic
+  const avgBuyPrice =
+    prices.length > 5
+      ? prices.slice(-6, -1).reduce((a, b) => a + b, 0) / 5
+      : currentPrice;
+  const profitPotential = (currentPrice - avgBuyPrice) / avgBuyPrice;
+  const isHighVolatility = atr > atrBaseline * 2;
+  const strongUptrend = sma7 / sma21 > 1.1;
+  const strongDowntrend = sma7 / sma21 < 0.9;
+  const lastTradePrice =
+    prices.length > 3 ? prices[prices.length - 4] : currentPrice;
+  const lastTradeWasSell = lastTradePrice > currentPrice;
+  const rsiSafe = rsi !== undefined ? rsi : 50; // Fallback to neutral RSI
+  const isDip = currentPrice < sma7 && rsiSafe < 40;
+
+  // Dynamic thresholds
+  const buyThreshold = isDip ? 0.35 : 0.36;
+  const buyTrendThreshold = isDip ? 0.32 : 0.33;
+  const minProfitThreshold = strongDowntrend ? 0 : 0.01;
+
   let recommendation: Recommendation;
-  const isUptrend = sma7 / sma21 > 1.05;
-  if (buyProb > 0.36 || (buyProb > 0.33 && isUptrend))
+  if (
+    (buyProb > buyThreshold ||
+      (buyProb > buyTrendThreshold && strongUptrend)) &&
+    (!lastTradeWasSell || (lastTradeWasSell && isDip))
+  ) {
     recommendation = Recommendation.Buy;
-  else if (sellProb > 0.37 || (sellProb > 0.34 && !isUptrend))
-    // Raised sell threshold to 0.37
+  } else if (
+    (sellProb > 0.37 || (sellProb > 0.34 && strongDowntrend)) &&
+    (profitPotential > minProfitThreshold ||
+      (isHighVolatility && profitPotential > 0.05) ||
+      (profitPotential > 0.1 && rsiSafe > 70))
+  ) {
     recommendation = Recommendation.Sell;
-  else recommendation = Recommendation.Hold;
+  } else {
+    recommendation = Recommendation.Hold;
+  }
 
   console.log(
     `Adjusted Probabilities - Buy: ${buyProb.toFixed(
@@ -481,6 +514,17 @@ export const predictTrade = async ({
     )}, Sell: ${sellProb.toFixed(3)}, Hold: ${holdProb.toFixed(3)}`
   );
   console.log(`Recommendation: ${recommendation}`);
+  console.log(
+    `Profit Potential: ${(profitPotential * 100).toFixed(2)}%, Volatility: ${
+      isHighVolatility ? "High" : "Normal"
+    }, Trend: ${
+      strongUptrend ? "Strong Up" : strongDowntrend ? "Strong Down" : "Neutral"
+    }, Last Trade: ${
+      lastTradeWasSell ? "Sell" : "Not Sell"
+    } at ${lastTradePrice.toFixed(4)}, Dip: ${isDip}, RSI: ${rsiSafe.toFixed(
+      2
+    )}`
+  );
 
   conv1Weights.dispose();
   conv1Bias.dispose();

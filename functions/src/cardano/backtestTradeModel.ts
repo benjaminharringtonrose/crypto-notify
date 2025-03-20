@@ -33,8 +33,9 @@ const BUY_POSITION_SIZE = 0.5;
 const SELL_POSITION_SIZE = 0.5;
 
 export const backtestTradeModel = async (
-  startDaysAgo: number = 180,
-  stepDays: number = 5
+  startDaysAgo: number = 91,
+  endDaysAgo: number = 1,
+  stepDays: number = 3
 ): Promise<BacktestResult> => {
   console.log("Starting backtest...");
 
@@ -47,8 +48,15 @@ export const backtestTradeModel = async (
     Math.min(startDaysAgo, FIVE_YEARS_IN_DAYS)
   );
 
+  const startIndex = Math.max(0, adaPrices.length - startDaysAgo);
+  const endIndex = Math.max(0, adaPrices.length - endDaysAgo);
+  const slicedAdaPrices = adaPrices.slice(startIndex, endIndex);
+  const slicedAdaVolumes = adaVolumes.slice(startIndex, endIndex);
+  const slicedBtcPrices = btcPrices.slice(startIndex, endIndex);
+  const slicedBtcVolumes = btcVolumes.slice(startIndex, endIndex);
+
   console.log(
-    `ADA data points: ${adaPrices.length}, BTC data points: ${btcPrices.length}`
+    `ADA data points: ${slicedAdaPrices.length}, BTC data points: ${slicedBtcPrices.length}`
   );
 
   let usdBalance = INITIAL_USD;
@@ -60,9 +68,9 @@ export const backtestTradeModel = async (
   let wins = 0;
   let completedCycles = 0;
 
-  const initialPrice = adaPrices[34];
+  const initialPrice = slicedAdaPrices[0];
   const initialTimestamp = new Date(
-    Date.now() - (adaPrices.length - 34) * 24 * 60 * 60 * 1000
+    Date.now() - (adaPrices.length - startIndex) * 24 * 60 * 60 * 1000
   ).toISOString();
   const initialUsdToSpend =
     usdBalance * BUY_POSITION_SIZE * (1 - TRANSACTION_FEE);
@@ -85,16 +93,16 @@ export const backtestTradeModel = async (
     value: usdBalance + adaBalance * initialPrice,
   });
 
-  for (let i = 37; i < adaPrices.length - 5; i += stepDays) {
-    const currentAdaPrice = adaPrices[i];
+  for (let i = 3; i < slicedAdaPrices.length - 5; i += stepDays) {
+    const currentAdaPrice = slicedAdaPrices[i];
     const timestamp = new Date(
-      Date.now() - (adaPrices.length - i) * 24 * 60 * 60 * 1000
+      Date.now() - (adaPrices.length - startIndex - i) * 24 * 60 * 60 * 1000
     ).toISOString();
 
-    const historicalAdaPrices = adaPrices.slice(0, i + 1);
-    const historicalAdaVolumes = adaVolumes.slice(0, i + 1);
-    const historicalBtcPrices = btcPrices.slice(0, i + 1);
-    const historicalBtcVolumes = btcVolumes.slice(0, i + 1);
+    const historicalAdaPrices = slicedAdaPrices.slice(0, i + 1);
+    const historicalAdaVolumes = slicedAdaVolumes.slice(0, i + 1);
+    const historicalBtcPrices = slicedBtcPrices.slice(0, i + 1);
+    const historicalBtcVolumes = slicedBtcVolumes.slice(0, i + 1);
 
     const originalGetHistorical =
       require("../api/getHistoricalPricesAndVolumes").getHistoricalPricesAndVolumes;
@@ -113,7 +121,7 @@ export const backtestTradeModel = async (
       currentBtcPrice: btcPrices[i],
     });
 
-    const decision: TradeDecision = await determineTrade();
+    const decision: TradeDecision = await determineTrade(); // No avgBuyPrice passed
     console.log(
       `Day ${i - 34}: Price $${currentAdaPrice.toFixed(4)}, ` +
         `Probabilities - Buy: ${decision.probabilities.buy.toFixed(3)}, ` +
@@ -188,7 +196,8 @@ export const backtestTradeModel = async (
     require("../api/getCurrentPrices").getCurrentPrices = originalGetCurrent;
   }
 
-  const finalValue = usdBalance + adaBalance * adaPrices[adaPrices.length - 6];
+  const finalValue =
+    usdBalance + adaBalance * slicedAdaPrices[slicedAdaPrices.length - 6];
   const totalReturn = ((finalValue - INITIAL_USD) / INITIAL_USD) * 100;
   const totalTrades = trades.length;
   const winRate = completedCycles > 0 ? (wins / completedCycles) * 100 : 0;

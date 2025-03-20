@@ -396,7 +396,6 @@ export const predictTrade = async ({
 
   const isGoldenCross = sma7 > sma21 && prevSma7 <= prevSma21;
   const isDeathCross = sma7 < sma21 && prevSma7 >= prevSma21;
-  const isUptrend = sma7 / sma21 > 1.05;
   const trendStrength = sma7 / sma21;
 
   const buyBoost = isGoldenCross
@@ -409,6 +408,7 @@ export const predictTrade = async ({
   sellProb += sellBoost;
 
   let recommendation: Recommendation;
+  const isUptrend = sma7 / sma21 > 1.05;
   if (buyProb > 0.3 || (buyProb > 0.25 && isUptrend))
     recommendation = Recommendation.Buy;
   else if (sellProb > 0.55 || (sellProb > 0.5 && !isUptrend))

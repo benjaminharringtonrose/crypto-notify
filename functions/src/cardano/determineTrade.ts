@@ -1,7 +1,6 @@
 import * as admin from "firebase-admin";
-import { AVERAGE_BUY_PRICE } from "../constants";
 import { predictTrade } from "./predictTrade";
-import { Recommendation, TradeDecision } from "../types";
+import { TradeDecision } from "../types";
 import { calculateIndicators } from "../calculations/calculateIndicators";
 import { getCurrentPrices } from "../api/getCurrentPrices";
 import { getHistoricalPricesAndVolumes } from "../api/getHistoricalPricesAndVolumes";
@@ -85,12 +84,6 @@ export const determineTrade = async (): Promise<TradeDecision> => {
       }
     );
 
-    const recommendationBasedOnBuyPrice =
-      currentAdaPrice < AVERAGE_BUY_PRICE &&
-      recommendation === Recommendation.Sell
-        ? Recommendation.HoldBasedOnBuyPrice
-        : recommendation;
-
     return {
       currentPrice: currentAdaPrice,
       rsi: adaIndicators.rsi?.toFixed(2),
@@ -111,7 +104,7 @@ export const determineTrade = async (): Promise<TradeDecision> => {
       volumeOscillator: adaIndicators.volumeOscillator.toFixed(2),
       metConditions,
       probabilities,
-      recommendation: recommendationBasedOnBuyPrice,
+      recommendation, // Use raw recommendation
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
     };
   } catch (error: any) {

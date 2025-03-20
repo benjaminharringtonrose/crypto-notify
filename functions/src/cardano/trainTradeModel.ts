@@ -5,7 +5,6 @@ import { computeFeatures } from "./computeFeatures";
 import { labelData } from "./labelData";
 import serviceAccount from "../../../serviceAccount.json";
 import { getHistoricalData } from "../api/getHistoricalData";
-import { FIVE_YEARS_IN_DAYS } from "../constants";
 
 dotenv.config();
 
@@ -28,7 +27,7 @@ function customRecall(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
 
 const focalLoss = (yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar => {
   const gamma = 2.0;
-  const alpha = tf.tensor1d([1.5, 1.0, 1.5]); // Sell, Hold, Buy
+  const alpha = tf.tensor1d([2.0, 0.7, 1.5]);
   const ce = tf.losses.softmaxCrossEntropy(yTrue, yPred);
   const pt = yTrue.mul(yPred).sum(-1);
   const focalWeight = tf.pow(tf.sub(1, pt), gamma);
@@ -39,15 +38,18 @@ const focalLoss = (yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar => {
 };
 
 export const trainTradeModelADA = async () => {
+  const BACKTEST_START_DAYS = 180;
+  const TRAINING_PERIOD_DAYS = 180;
+  const START_DAYS_AGO = BACKTEST_START_DAYS + TRAINING_PERIOD_DAYS;
   const { prices: adaPrices, volumes: adaVolumes } = await getHistoricalData(
     "ADA",
-    FIVE_YEARS_IN_DAYS
+    START_DAYS_AGO
   );
   const { prices: btcPrices, volumes: btcVolumes } = await getHistoricalData(
     "BTC",
-    FIVE_YEARS_IN_DAYS
+    START_DAYS_AGO
   );
-  const timesteps = 7;
+  const timesteps = 14;
   const X: number[][][] = [];
   const y: number[] = [];
 
@@ -67,19 +69,13 @@ export const trainTradeModelADA = async () => {
         dayIndex: j,
         currentPrice: btcPrices[j],
       });
-      if (adaFeatures.length !== 28 || btcFeatures.length !== 28) {
-        console.error(
-          `Unexpected feature length at index ${j}: ADA ${adaFeatures.length}, BTC ${btcFeatures.length}`
-        );
-        continue;
-      }
-      if (Math.random() < 0.03) continue;
-      const scale = 0.9 + Math.random() * 0.2;
+      if (adaFeatures.length !== 28 || btcFeatures.length !== 28) continue;
+      const scale = 0.85 + Math.random() * 0.3;
       const noisyAdaFeatures = adaFeatures.map(
-        (f) => f * scale + (Math.random() - 0.5) * 0.005
+        (f) => f * scale + (Math.random() - 0.5) * 0.01
       );
       const noisyBtcFeatures = btcFeatures.map(
-        (f) => f * scale + (Math.random() - 0.5) * 0.005
+        (f) => f * scale + (Math.random() - 0.5) * 0.01
       );
       sequence.push([...noisyAdaFeatures, ...noisyBtcFeatures]);
       allFeatures.push(...noisyAdaFeatures, ...noisyBtcFeatures);
@@ -90,9 +86,11 @@ export const trainTradeModelADA = async () => {
     const label = labelData({
       prices: adaPrices,
       dayIndex: i,
-      threshold: 0.02,
-      horizon: 3,
+      threshold: 0.03,
+      horizon: 5,
     });
+    if (label === 1 && Math.random() < 0.1) continue;
+    if (label === 0 && Math.random() < 0.1) continue;
     X.push(sequence);
     y.push(label);
   }
@@ -132,7 +130,7 @@ export const trainTradeModelADA = async () => {
   const X_normalized = X_tensor.sub(X_min).div(X_max.sub(X_min).add(1e-6));
 
   const totalSamples = X.length;
-  const trainSize = Math.floor(totalSamples * 0.75);
+  const trainSize = Math.floor(totalSamples * 0.8);
   const indices = Array.from({ length: totalSamples }, (_, i) => i);
   tf.util.shuffle(indices);
 
@@ -146,30 +144,30 @@ export const trainTradeModelADA = async () => {
 
   const trainDataset = tf.data
     .zip({
-      xs: tf.data.array<number[][]>(X_train.arraySync() as number[][][]),
-      ys: tf.data.array<number[]>(y_train.arraySync() as number[][]),
+      xs: tf.data.array(X_train.arraySync() as number[][][]),
+      ys: tf.data.array(y_train.arraySync() as number[][]),
     })
     .shuffle(trainSize)
-    .batch(128)
+    .batch(64)
     .prefetch(2);
 
   const valDataset = tf.data
     .zip({
-      xs: tf.data.array<number[][]>(X_val.arraySync() as number[][][]),
-      ys: tf.data.array<number[]>(y_val.arraySync() as number[][]),
+      xs: tf.data.array(X_val.arraySync() as number[][][]),
+      ys: tf.data.array(y_val.arraySync() as number[][]),
     })
-    .batch(128);
+    .batch(64);
 
-  const input = tf.input({ shape: [timesteps, 56] }); // 28 ADA + 28 BTC features
+  const input = tf.input({ shape: [timesteps, 56] });
   const conv1 = tf.layers
     .conv1d({
       filters: 64,
-      kernelSize: 2,
+      kernelSize: 3,
       activation: "relu",
       kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
       padding: "same",
     })
-    .apply(input) as tf.SymbolicTensor;
+    .apply(input) as tf.SymbolicTensor; // Increased L2
   const bn1 = tf.layers
     .batchNormalization({ momentum: 0.9 })
     .apply(conv1) as tf.SymbolicTensor;
@@ -179,7 +177,7 @@ export const trainTradeModelADA = async () => {
   const conv2 = tf.layers
     .conv1d({
       filters: 32,
-      kernelSize: 2,
+      kernelSize: 3,
       activation: "relu",
       kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
       padding: "same",
@@ -190,7 +188,7 @@ export const trainTradeModelADA = async () => {
     .apply(conv2) as tf.SymbolicTensor;
   const gru1 = tf.layers
     .gru({
-      units: 32,
+      units: 64,
       returnSequences: true,
       kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
     })
@@ -200,7 +198,7 @@ export const trainTradeModelADA = async () => {
     .apply(gru1) as tf.SymbolicTensor;
   const gru2 = tf.layers
     .gru({
-      units: 16,
+      units: 32,
       returnSequences: false,
       kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
     })
@@ -209,18 +207,15 @@ export const trainTradeModelADA = async () => {
     .batchNormalization({ momentum: 0.9 })
     .apply(gru2) as tf.SymbolicTensor;
   const residual = tf.layers
-    .dense({
-      units: 16,
-      kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
-    })
+    .dense({ units: 32, kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }) })
     .apply(tf.layers.flatten().apply(bn3)) as tf.SymbolicTensor;
   const add = tf.layers.add().apply([bn4, residual]) as tf.SymbolicTensor;
   const dropout = tf.layers
-    .dropout({ rate: 0.25 })
+    .dropout({ rate: 0.2 })
     .apply(add) as tf.SymbolicTensor;
   const dense1 = tf.layers
     .dense({
-      units: 8,
+      units: 16,
       activation: "relu",
       kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
     })
@@ -234,11 +229,10 @@ export const trainTradeModelADA = async () => {
     .apply(dense1) as tf.SymbolicTensor;
 
   const model = tf.model({ inputs: input, outputs: dense2 });
-
   console.log("Model summary:");
   model.summary();
 
-  const initialLr = 0.0025;
+  const initialLr = 0.003;
   const optimizer = tf.train.adam(initialLr);
 
   model.compile({
@@ -251,10 +245,6 @@ export const trainTradeModelADA = async () => {
   let bestWeights: tf.Tensor[] | null = null;
 
   class BestWeightsCallback extends tf.CustomCallback {
-    constructor(args: tf.CustomCallbackArgs) {
-      super(args);
-    }
-
     async onEpochEnd(epoch: number, logs?: tf.Logs) {
       if (logs && logs.val_loss < bestValLoss) {
         bestValLoss = logs.val_loss;
@@ -265,25 +255,20 @@ export const trainTradeModelADA = async () => {
   }
 
   class ExponentialDecayLearningRateCallback extends tf.CustomCallback {
-    constructor(args: tf.CustomCallbackArgs) {
-      super(args);
-    }
-
     async onEpochBegin(epoch: number) {
-      const decayRate = 0.96;
+      const decayRate = 0.98;
       const newLr = initialLr * Math.pow(decayRate, epoch);
-      // @ts-ignore learningRate is protected
-      optimizer.learningRate = newLr;
+      (optimizer as any).learningRate = newLr;
       console.log(`Epoch ${epoch + 1}: Learning rate set to ${newLr}`);
     }
   }
 
   console.log("Starting model training...");
   await model.fitDataset(trainDataset, {
-    epochs: 150,
+    epochs: 20, // Reduced to 20 to match best val_loss range
     validationData: valDataset,
     callbacks: [
-      tf.callbacks.earlyStopping({ monitor: "val_loss", patience: 50 }),
+      tf.callbacks.earlyStopping({ monitor: "val_loss", patience: 10 }), // Reduced patience
       new BestWeightsCallback({}),
       new ExponentialDecayLearningRateCallback({}),
     ],
@@ -300,10 +285,7 @@ export const trainTradeModelADA = async () => {
   const predArray = (await preds.array()) as number[][];
   console.log("Sample predictions:", predArray.slice(0, 5));
   const yArray = Array.from(await y_tensor.argMax(-1).data());
-
-  const predictedLabels = predArray.map((p: number[]) =>
-    p.indexOf(Math.max(...p))
-  );
+  const predictedLabels = predArray.map((p) => p.indexOf(Math.max(...p)));
   console.log(
     "Predictions vs Labels (first 5):",
     predictedLabels.slice(0, 5),
@@ -342,60 +324,56 @@ export const trainTradeModelADA = async () => {
   );
   console.log("Confusion Matrix:", await confusionMatrix.array());
 
-  const conv1Weights = model.getLayer("conv1d_Conv1D1").getWeights();
-  const conv2Weights = model.getLayer("conv1d_Conv1D2").getWeights();
-  const gru1Weights = model.getLayer("gru_GRU1").getWeights();
-  const gru2Weights = model.getLayer("gru_GRU2").getWeights();
-  const residualWeights = model.getLayer("dense_Dense1").getWeights();
-  const dense1Weights = model.getLayer("dense_Dense2").getWeights();
-  const dense2Weights = model.getLayer("dense_Dense3").getWeights();
-
   const weightsJson = {
     weights: {
-      conv1Weights: conv1Weights[0]
-        ? Array.from(await conv1Weights[0].data())
-        : [],
-      conv1Bias: conv1Weights[1]
-        ? Array.from(await conv1Weights[1].data())
-        : [],
-      conv2Weights: conv2Weights[0]
-        ? Array.from(await conv2Weights[0].data())
-        : [],
-      conv2Bias: conv2Weights[1]
-        ? Array.from(await conv2Weights[1].data())
-        : [],
-      gru1Weights: gru1Weights[0]
-        ? Array.from(await gru1Weights[0].data())
-        : [],
-      gru1RecurrentWeights: gru1Weights[1]
-        ? Array.from(await gru1Weights[1].data())
-        : [],
-      gru1Bias: gru1Weights[2] ? Array.from(await gru1Weights[2].data()) : [],
-      gru2Weights: gru2Weights[0]
-        ? Array.from(await gru2Weights[0].data())
-        : [],
-      gru2RecurrentWeights: gru2Weights[1]
-        ? Array.from(await gru2Weights[1].data())
-        : [],
-      gru2Bias: gru2Weights[2] ? Array.from(await gru2Weights[2].data()) : [],
-      residualWeights: residualWeights[0]
-        ? Array.from(await residualWeights[0].data())
-        : [],
-      residualBias: residualWeights[1]
-        ? Array.from(await residualWeights[1].data())
-        : [],
-      dense1Weights: dense1Weights[0]
-        ? Array.from(await dense1Weights[0].data())
-        : [],
-      dense1Bias: dense1Weights[1]
-        ? Array.from(await dense1Weights[1].data())
-        : [],
-      dense2Weights: dense2Weights[0]
-        ? Array.from(await dense2Weights[0].data())
-        : [],
-      dense2Bias: dense2Weights[1]
-        ? Array.from(await dense2Weights[1].data())
-        : [],
+      conv1Weights: Array.from(
+        await model.getLayer("conv1d_Conv1D1").getWeights()[0].data()
+      ),
+      conv1Bias: Array.from(
+        await model.getLayer("conv1d_Conv1D1").getWeights()[1].data()
+      ),
+      conv2Weights: Array.from(
+        await model.getLayer("conv1d_Conv1D2").getWeights()[0].data()
+      ),
+      conv2Bias: Array.from(
+        await model.getLayer("conv1d_Conv1D2").getWeights()[1].data()
+      ),
+      gru1Weights: Array.from(
+        await model.getLayer("gru_GRU1").getWeights()[0].data()
+      ),
+      gru1RecurrentWeights: Array.from(
+        await model.getLayer("gru_GRU1").getWeights()[1].data()
+      ),
+      gru1Bias: Array.from(
+        await model.getLayer("gru_GRU1").getWeights()[2].data()
+      ),
+      gru2Weights: Array.from(
+        await model.getLayer("gru_GRU2").getWeights()[0].data()
+      ),
+      gru2RecurrentWeights: Array.from(
+        await model.getLayer("gru_GRU2").getWeights()[1].data()
+      ),
+      gru2Bias: Array.from(
+        await model.getLayer("gru_GRU2").getWeights()[2].data()
+      ),
+      residualWeights: Array.from(
+        await model.getLayer("dense_Dense1").getWeights()[0].data()
+      ),
+      residualBias: Array.from(
+        await model.getLayer("dense_Dense1").getWeights()[1].data()
+      ),
+      dense1Weights: Array.from(
+        await model.getLayer("dense_Dense2").getWeights()[0].data()
+      ),
+      dense1Bias: Array.from(
+        await model.getLayer("dense_Dense2").getWeights()[1].data()
+      ),
+      dense2Weights: Array.from(
+        await model.getLayer("dense_Dense3").getWeights()[0].data()
+      ),
+      dense2Bias: Array.from(
+        await model.getLayer("dense_Dense3").getWeights()[1].data()
+      ),
       featureMins: Array.from(await X_min.data()),
       featureMaxs: Array.from(await X_max.data()),
     },

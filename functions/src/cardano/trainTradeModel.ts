@@ -28,7 +28,7 @@ function customRecall(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
 const focalLoss = (yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar => {
   const gamma = 2.0;
   const alpha = tf.tensor1d([0.9, 1.2, 1.5]); // Sell, Hold, Buy
-  const classWeights = tf.tensor1d([1.0, 1.0, 1.2]); // Boost buy slightly
+  const classWeights = tf.tensor1d([1.0, 1.0, 1.0]); // Changed buy weight from 1.2 to 1.0 for balance
   const ce = tf.losses.softmaxCrossEntropy(yTrue, yPred);
   const pt = yTrue.mul(yPred).sum(-1);
   const focalWeight = tf.pow(tf.sub(1, pt), gamma);

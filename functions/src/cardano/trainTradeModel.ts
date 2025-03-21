@@ -27,27 +27,20 @@ function customRecall(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
 
 const focalLoss = (yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar => {
   const gamma = 2.0;
-  const alpha = tf.tensor1d([0.9, 1.2, 1.5]); // Sell, Hold, Buy
-  const classWeights = tf.tensor1d([1.0, 1.0, 1.0]); // Changed buy weight from 1.2 to 1.0 for balance
+  const alpha = tf.tensor1d([1.0, 1.0, 1.0]); // Balanced weights
   const ce = tf.losses.softmaxCrossEntropy(yTrue, yPred);
   const pt = yTrue.mul(yPred).sum(-1);
   const focalWeight = tf.pow(tf.sub(1, pt), gamma);
   const yTrueIndices = yTrue.argMax(-1);
   const alphaWeighted = tf.gather(alpha, yTrueIndices);
-  const weightAdjusted = tf.gather(classWeights, yTrueIndices);
-  const loss = ce
-    .mul(focalWeight)
-    .mul(alphaWeighted)
-    .mul(weightAdjusted)
-    .mean() as tf.Scalar;
+  const loss = ce.mul(focalWeight).mul(alphaWeighted).mean() as tf.Scalar;
   alpha.dispose();
-  classWeights.dispose();
   return loss;
 };
 
 export const trainTradeModelADA = async () => {
-  const BACKTEST_START_DAYS = 180;
-  const TRAINING_PERIOD_DAYS = 180;
+  const BACKTEST_START_DAYS = 365; // Extended to 1 year
+  const TRAINING_PERIOD_DAYS = 365; // Extended to 1 year
   const START_DAYS_AGO = BACKTEST_START_DAYS + TRAINING_PERIOD_DAYS;
   const { prices: adaPrices, volumes: adaVolumes } = await getHistoricalData(
     "ADA",
@@ -93,12 +86,12 @@ export const trainTradeModelADA = async () => {
         validSequence = false;
         break;
       }
-      const scale = 0.85 + Math.random() * 0.3;
+      const scale = 0.9 + Math.random() * 0.2; // Reduced noise range
       const noisyAdaFeatures = adaFeatures.map(
-        (f) => f * scale + (Math.random() - 0.5) * 0.01
+        (f) => f * scale + (Math.random() - 0.5) * 0.005 // Reduced noise magnitude
       );
       const noisyBtcFeatures = btcFeatures.map(
-        (f) => f * scale + (Math.random() - 0.5) * 0.01
+        (f) => f * scale + (Math.random() - 0.5) * 0.005
       );
       sequence.push([...noisyAdaFeatures, ...noisyBtcFeatures]);
       allFeatures.push(...noisyAdaFeatures, ...noisyBtcFeatures);
@@ -116,8 +109,9 @@ export const trainTradeModelADA = async () => {
       threshold: 0.02,
       horizon: 5,
     });
-    if (label === 1 && Math.random() < 0.1) continue;
-    if (label === 0 && Math.random() < 0.1) continue;
+    // Balance dataset by undersampling dominant classes
+    if (label === 2 && Math.random() < 0.3) continue; // Reduce Buy
+    if (label === 0 && Math.random() < 0.2) continue; // Reduce Sell
     X.push(sequence);
     y.push(label);
   }
@@ -191,7 +185,7 @@ export const trainTradeModelADA = async () => {
       filters: 64,
       kernelSize: 3,
       activation: "relu",
-      kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
+      kernelRegularizer: tf.regularizers.l2({ l2: 0.02 }), // Increased regularization
       padding: "same",
     })
     .apply(input) as tf.SymbolicTensor;
@@ -206,7 +200,7 @@ export const trainTradeModelADA = async () => {
       filters: 32,
       kernelSize: 3,
       activation: "relu",
-      kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
+      kernelRegularizer: tf.regularizers.l2({ l2: 0.02 }), // Increased regularization
       padding: "same",
     })
     .apply(pool1) as tf.SymbolicTensor;
@@ -217,7 +211,7 @@ export const trainTradeModelADA = async () => {
     .gru({
       units: 64,
       returnSequences: true,
-      kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
+      kernelRegularizer: tf.regularizers.l2({ l2: 0.02 }), // Increased regularization
     })
     .apply(bn2) as tf.SymbolicTensor;
   const bn3 = tf.layers
@@ -227,31 +221,31 @@ export const trainTradeModelADA = async () => {
     .gru({
       units: 32,
       returnSequences: false,
-      kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
+      kernelRegularizer: tf.regularizers.l2({ l2: 0.02 }), // Increased regularization
     })
     .apply(bn3) as tf.SymbolicTensor;
   const bn4 = tf.layers
     .batchNormalization({ momentum: 0.9 })
     .apply(gru2) as tf.SymbolicTensor;
   const residual = tf.layers
-    .dense({ units: 32, kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }) })
+    .dense({ units: 32, kernelRegularizer: tf.regularizers.l2({ l2: 0.02 }) })
     .apply(tf.layers.flatten().apply(bn3)) as tf.SymbolicTensor;
   const add = tf.layers.add().apply([bn4, residual]) as tf.SymbolicTensor;
   const dropout = tf.layers
-    .dropout({ rate: 0.2 })
+    .dropout({ rate: 0.3 }) // Increased dropout
     .apply(add) as tf.SymbolicTensor;
   const dense1 = tf.layers
     .dense({
       units: 16,
       activation: "relu",
-      kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
+      kernelRegularizer: tf.regularizers.l2({ l2: 0.02 }),
     })
     .apply(dropout) as tf.SymbolicTensor;
   const dense2 = tf.layers
     .dense({
       units: 3,
       activation: "softmax",
-      kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
+      kernelRegularizer: tf.regularizers.l2({ l2: 0.02 }),
     })
     .apply(dense1) as tf.SymbolicTensor;
 
@@ -259,7 +253,7 @@ export const trainTradeModelADA = async () => {
   console.log("Model summary:");
   model.summary();
 
-  const initialLr = 0.003;
+  const initialLr = 0.002; // Slightly reduced initial learning rate
   const optimizer = tf.train.adam(initialLr);
 
   model.compile({
@@ -283,7 +277,7 @@ export const trainTradeModelADA = async () => {
 
   class ExponentialDecayLearningRateCallback extends tf.CustomCallback {
     async onEpochBegin(epoch: number) {
-      const decayRate = 0.98;
+      const decayRate = 0.95; // Faster decay
       const newLr = initialLr * Math.pow(decayRate, epoch);
       (optimizer as any).learningRate = newLr;
       console.log(`Epoch ${epoch + 1}: Learning rate set to ${newLr}`);
@@ -292,10 +286,10 @@ export const trainTradeModelADA = async () => {
 
   console.log("Starting model training...");
   await model.fitDataset(trainDataset, {
-    epochs: 30,
+    epochs: 40, // Increased epochs
     validationData: valDataset,
     callbacks: [
-      tf.callbacks.earlyStopping({ monitor: "val_loss", patience: 15 }),
+      tf.callbacks.earlyStopping({ monitor: "val_loss", patience: 20 }), // Increased patience
       new BestWeightsCallback({}),
       new ExponentialDecayLearningRateCallback({}),
     ],

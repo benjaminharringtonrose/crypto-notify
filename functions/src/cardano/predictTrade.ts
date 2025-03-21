@@ -1,211 +1,245 @@
 import dotenv from "dotenv";
 import * as tf from "@tensorflow/tfjs-node";
 import * as admin from "firebase-admin";
-import { Condition, Indicators, PredictTrade, Recommendation } from "../types";
-import { calculateFibonacciLevels } from "../calculations/calculateFibonacciLevels";
+import { Indicators, PredictTrade, Recommendation } from "../types";
 
 dotenv.config();
 
-export const predictTrade = async ({
-  rsi,
-  prevRsi,
-  sma7,
-  sma21,
-  prevSma7,
-  prevSma21,
-  macdLine,
-  signalLine,
-  currentPrice,
-  upperBand,
-  obvValues,
-  atr,
-  atrBaseline,
-  zScore,
-  vwap,
-  stochRsi,
-  prevStochRsi,
-  fib61_8,
-  prices,
-  volumeOscillator,
-  prevVolumeOscillator,
-  isDoubleTop,
-  isHeadAndShoulders,
-  prevMacdLine,
-  isTripleTop,
-  isVolumeSpike,
-  momentum,
-  priceChangePct,
-  btcRsi,
-  btcPrevRsi,
-  btcSma7,
-  btcSma21,
-  btcPrevSma7,
-  btcPrevSma21,
-  btcMacdLine,
-  btcSignalLine,
-  btcUpperBand,
-  btcObvValues,
-  btcAtr,
-  btcAtrBaseline,
-  btcZScore,
-  btcVwap,
-  btcStochRsi,
-  btcPrevStochRsi,
-  btcFib61_8,
-  btcPrices,
-  btcVolumeOscillator,
-  btcPrevVolumeOscillator,
-  btcIsDoubleTop,
-  btcIsHeadAndShoulders,
-  btcPrevMacdLine,
-  btcIsTripleTop,
-  btcIsVolumeSpike,
-  btcMomentum,
-  btcPriceChangePct,
-  isTripleBottom,
-  btcIsTripleBottom,
-}: Indicators): Promise<PredictTrade> => {
-  const bucket = admin.storage().bucket(process.env.STORAGE_BUCKET);
-  const file = bucket.file("tradePredictorWeights.json");
-  const [weightsData] = await file.download();
-  const modelData = JSON.parse(weightsData.toString());
-  const parsedWeights = modelData.weights;
+interface StrategyResult {
+  buyProb: number;
+  sellProb: number;
+  holdProb: number;
+  recommendation: Recommendation;
+}
 
-  const validateArray = (
-    arr: number[],
-    expectedLength: number,
-    name: string
-  ) => {
-    if (!arr || arr.length !== expectedLength)
-      throw new Error(
-        `Invalid ${name} length: ${
-          arr?.length || 0
-        }, expected ${expectedLength}`
-      );
-    if (arr.some((v) => !Number.isFinite(v)))
-      throw new Error(`${name} contains NaN or Infinity`);
-  };
+class Strategy {
+  private name: string;
 
-  validateArray(parsedWeights.conv1Weights, 3 * 57 * 64, "conv1Weights");
-  validateArray(parsedWeights.conv1Bias, 64, "conv1Bias");
-  validateArray(parsedWeights.conv2Weights, 3 * 64 * 32, "conv2Weights");
-  validateArray(parsedWeights.conv2Bias, 32, "conv2Bias");
-  validateArray(parsedWeights.gru1Weights, 32 * 192, "gru1Weights");
-  validateArray(
-    parsedWeights.gru1RecurrentWeights,
-    64 * 192,
-    "gru1RecurrentWeights"
-  );
-  validateArray(parsedWeights.gru1Bias, 192, "gru1Bias");
-  validateArray(parsedWeights.gru2Weights, 64 * 96, "gru2Weights");
-  validateArray(
-    parsedWeights.gru2RecurrentWeights,
-    32 * 96,
-    "gru2RecurrentWeights"
-  );
-  validateArray(parsedWeights.gru2Bias, 96, "gru2Bias");
-  validateArray(parsedWeights.residualWeights, 7 * 64 * 32, "residualWeights");
-  validateArray(parsedWeights.residualBias, 32, "residualBias");
-  validateArray(parsedWeights.dense1Weights, 32 * 16, "dense1Weights");
-  validateArray(parsedWeights.dense1Bias, 16, "dense1Bias");
-  validateArray(parsedWeights.dense2Weights, 16 * 3, "dense2Weights");
-  validateArray(parsedWeights.dense2Bias, 3, "dense2Bias");
-  validateArray(parsedWeights.featureMins, 57, "featureMins");
-  validateArray(parsedWeights.featureMaxs, 57, "featureMaxs");
+  constructor(name: string) {
+    this.name = name;
+  }
 
-  const conv1Weights = tf.tensor3d(parsedWeights.conv1Weights, [3, 57, 64]);
-  const conv1Bias = tf.tensor1d(parsedWeights.conv1Bias);
-  const conv2Weights = tf.tensor3d(parsedWeights.conv2Weights, [3, 64, 32]);
-  const conv2Bias = tf.tensor1d(parsedWeights.conv2Bias);
-  const gru1Weights = tf.tensor2d(parsedWeights.gru1Weights, [32, 192]);
-  const gru1RecurrentWeights = tf.tensor2d(
-    parsedWeights.gru1RecurrentWeights,
-    [64, 192]
-  );
-  const gru1Bias = tf.tensor1d(parsedWeights.gru1Bias);
-  const gru2Weights = tf.tensor2d(parsedWeights.gru2Weights, [64, 96]);
-  const gru2RecurrentWeights = tf.tensor2d(
-    parsedWeights.gru2RecurrentWeights,
-    [32, 96]
-  );
-  const gru2Bias = tf.tensor1d(parsedWeights.gru2Bias);
-  const residualWeights = tf.tensor2d(parsedWeights.residualWeights, [
-    7 * 64,
-    32,
-  ]);
-  const residualBias = tf.tensor1d(parsedWeights.residualBias);
-  const dense1Weights = tf.tensor2d(parsedWeights.dense1Weights, [32, 16]);
-  const dense1Bias = tf.tensor1d(parsedWeights.dense1Bias);
-  const dense2Weights = tf.tensor2d(parsedWeights.dense2Weights, [16, 3]);
-  const dense2Bias = tf.tensor1d(parsedWeights.dense2Bias);
-  const featureMins = tf.tensor1d(parsedWeights.featureMins);
-  const featureMaxs = tf.tensor1d(parsedWeights.featureMaxs);
-
-  const timesteps = 14;
-  const featureSequence: number[][] = [];
-  for (
-    let i = Math.max(0, prices.length - timesteps);
-    i < prices.length && i < btcPrices.length;
-    i++
-  ) {
-    const dayFeatures = [
-      rsi || 0,
-      prevRsi || 0,
+  evaluate(indicators: Indicators): StrategyResult {
+    const {
+      rsi,
       sma7,
       sma21,
       prevSma7,
       prevSma21,
       macdLine,
       signalLine,
-      prices[i],
-      upperBand,
-      obvValues[obvValues.length - 1] / 1e6,
+      currentPrice,
+      prices,
       atr,
       atrBaseline,
-      zScore,
-      vwap,
-      stochRsi,
-      prevStochRsi,
-      fib61_8,
-      i > 0 ? prices[i - 1] : prices[0],
-      volumeOscillator,
-      prevVolumeOscillator,
-      isDoubleTop ? 1 : 0,
-      isHeadAndShoulders ? 1 : 0,
+      isVolumeSpike,
       prevMacdLine,
-      isTripleTop ? 1 : 0,
-      isVolumeSpike ? 1 : 0,
-      momentum || 0,
-      priceChangePct || 0,
-      isTripleBottom ? 1 : 0,
-      btcRsi || 0,
-      btcPrevRsi || 0,
-      btcSma7,
-      btcSma21,
-      btcPrevSma7,
-      btcPrevSma21,
-      btcMacdLine,
-      btcSignalLine,
+    } = indicators;
+    const sma20 = prices.slice(-20).reduce((a, b) => a + b, 0) / 20;
+    const sma50 =
+      prices.length >= 50
+        ? prices.slice(-50).reduce((a, b) => a + b, 0) / 50
+        : sma20;
+    const stdDev20 = Math.sqrt(
+      prices.slice(-20).reduce((sum, p) => sum + Math.pow(p - sma20, 2), 0) / 20
+    );
+    const lowerBand = sma20 - 2 * stdDev20;
+    const upperBandBB = sma20 + 2 * stdDev20;
+    const macdHistogram = macdLine - signalLine;
+    const prevMacdHistogram = prevMacdLine - signalLine;
+    const rsiSafe = rsi !== undefined ? rsi : 50;
+    const adxProxy = Math.abs((sma7 - sma50) / sma50);
+    const volatility = atr / atrBaseline;
+    const recentHigh = Math.max(...prices.slice(-10));
+    const recentLow = Math.min(...prices.slice(-10));
+
+    let buyProb = 0.3;
+    let sellProb = 0.3;
+    let holdProb = 0.3;
+
+    switch (this.name) {
+      case "TrendFollowing":
+        if (sma7 > sma21 && prevSma7 <= prevSma21 && adxProxy > 0.02)
+          buyProb += 0.3;
+        if (sma7 < sma21 && prevSma7 >= prevSma21 && adxProxy > 0.02)
+          sellProb += 0.3;
+        if (macdHistogram > 0 && prevMacdHistogram <= 0) buyProb += 0.2;
+        if (macdHistogram < 0 && prevMacdHistogram >= 0) sellProb += 0.2;
+        if (adxProxy <= 0.02) holdProb += 0.05;
+        break;
+
+      case "MeanReversion":
+        if (rsiSafe < 30 && currentPrice < lowerBand) buyProb += 0.4;
+        if (rsiSafe > 70 && currentPrice > upperBandBB) sellProb += 0.4;
+        if (rsiSafe >= 30 && rsiSafe <= 70) holdProb += 0.05;
+        break;
+
+      case "Breakout":
+        if (currentPrice > recentHigh && isVolumeSpike && volatility > 1.5)
+          buyProb += 0.4;
+        if (currentPrice < recentLow && isVolumeSpike && volatility > 1.5)
+          sellProb += 0.4;
+        if (currentPrice <= recentHigh && currentPrice >= recentLow)
+          holdProb += 0.05;
+        if (volatility <= 1.5) holdProb += 0.03;
+        break;
+    }
+
+    const total = buyProb + sellProb + holdProb;
+    buyProb /= total;
+    sellProb /= total;
+    holdProb /= total;
+
+    const recommendation =
+      rsiSafe < 30 && buyProb > 0.33
+        ? Recommendation.Buy
+        : adxProxy > 0.02 && sellProb > 0.33
+        ? Recommendation.Sell
+        : buyProb > 0.35
+        ? Recommendation.Buy
+        : sellProb > 0.35
+        ? Recommendation.Sell
+        : Recommendation.Hold;
+    return { buyProb, sellProb, holdProb, recommendation };
+  }
+}
+
+export const predictTrade = async (
+  indicators: Indicators
+): Promise<PredictTrade> => {
+  const bucket = admin.storage().bucket(process.env.STORAGE_BUCKET);
+  const file = bucket.file("tradePredictorWeights.json");
+  const [weightsData] = await file.download();
+  const { weights } = JSON.parse(weightsData.toString());
+
+  const validateArray = (
+    arr: number[],
+    expectedLength: number,
+    name: string
+  ) => {
+    if (
+      !arr ||
+      arr.length !== expectedLength ||
+      arr.some((v) => !Number.isFinite(v))
+    ) {
+      throw new Error(
+        `Invalid ${name}: length ${
+          arr?.length || 0
+        }, expected ${expectedLength}`
+      );
+    }
+  };
+
+  validateArray(weights.conv1Weights, 3 * 57 * 64, "conv1Weights");
+  validateArray(weights.conv1Bias, 64, "conv1Bias");
+  validateArray(weights.conv2Weights, 3 * 64 * 32, "conv2Weights");
+  validateArray(weights.conv2Bias, 32, "conv2Bias");
+  validateArray(weights.gru1Weights, 32 * 192, "gru1Weights");
+  validateArray(weights.gru1RecurrentWeights, 64 * 192, "gru1RecurrentWeights");
+  validateArray(weights.gru1Bias, 192, "gru1Bias");
+  validateArray(weights.gru2Weights, 64 * 96, "gru2Weights");
+  validateArray(weights.gru2RecurrentWeights, 32 * 96, "gru2RecurrentWeights");
+  validateArray(weights.gru2Bias, 96, "gru2Bias");
+  validateArray(weights.residualWeights, 7 * 64 * 32, "residualWeights");
+  validateArray(weights.residualBias, 32, "residualBias");
+  validateArray(weights.dense1Weights, 32 * 16, "dense1Weights");
+  validateArray(weights.dense1Bias, 16, "dense1Bias");
+  validateArray(weights.dense2Weights, 16 * 3, "dense2Weights");
+  validateArray(weights.dense2Bias, 3, "dense2Bias");
+  validateArray(weights.featureMins, 57, "featureMins");
+  validateArray(weights.featureMaxs, 57, "featureMaxs");
+
+  const conv1Weights = tf.tensor3d(weights.conv1Weights, [3, 57, 64]);
+  const conv1Bias = tf.tensor1d(weights.conv1Bias);
+  const conv2Weights = tf.tensor3d(weights.conv2Weights, [3, 64, 32]);
+  const conv2Bias = tf.tensor1d(weights.conv2Bias);
+  const gru1Weights = tf.tensor2d(weights.gru1Weights, [32, 192]);
+  const gru1RecurrentWeights = tf.tensor2d(
+    weights.gru1RecurrentWeights,
+    [64, 192]
+  );
+  const gru1Bias = tf.tensor1d(weights.gru1Bias);
+  const gru2Weights = tf.tensor2d(weights.gru2Weights, [64, 96]);
+  const gru2RecurrentWeights = tf.tensor2d(
+    weights.gru2RecurrentWeights,
+    [32, 96]
+  );
+  const gru2Bias = tf.tensor1d(weights.gru2Bias);
+  const residualWeights = tf.tensor2d(weights.residualWeights, [7 * 64, 32]);
+  const residualBias = tf.tensor1d(weights.residualBias);
+  const dense1Weights = tf.tensor2d(weights.dense1Weights, [32, 16]);
+  const dense1Bias = tf.tensor1d(weights.dense1Bias);
+  const dense2Weights = tf.tensor2d(weights.dense2Weights, [16, 3]);
+  const dense2Bias = tf.tensor1d(weights.dense2Bias);
+  const featureMins = tf.tensor1d(weights.featureMins);
+  const featureMaxs = tf.tensor1d(weights.featureMaxs);
+
+  const timesteps = 14;
+  const featureSequence: number[][] = [];
+  const { prices, btcPrices } = indicators;
+  for (
+    let i = Math.max(0, prices.length - timesteps);
+    i < prices.length && i < btcPrices.length;
+    i++
+  ) {
+    const dayFeatures = [
+      indicators.rsi || 0,
+      indicators.prevRsi || 0,
+      indicators.sma7,
+      indicators.sma21,
+      indicators.prevSma7,
+      indicators.prevSma21,
+      indicators.macdLine,
+      indicators.signalLine,
+      prices[i],
+      indicators.upperBand,
+      indicators.obvValues[indicators.obvValues.length - 1] / 1e6,
+      indicators.atr,
+      indicators.atrBaseline,
+      indicators.zScore,
+      indicators.vwap,
+      indicators.stochRsi,
+      indicators.prevStochRsi,
+      indicators.fib61_8,
+      i > 0 ? prices[i - 1] : prices[0],
+      indicators.volumeOscillator,
+      indicators.prevVolumeOscillator,
+      indicators.isDoubleTop ? 1 : 0,
+      indicators.isHeadAndShoulders ? 1 : 0,
+      indicators.prevMacdLine,
+      indicators.isTripleTop ? 1 : 0,
+      indicators.isVolumeSpike ? 1 : 0,
+      indicators.momentum || 0,
+      indicators.priceChangePct || 0,
+      indicators.isTripleBottom ? 1 : 0,
+      indicators.btcRsi || 0,
+      indicators.btcPrevRsi || 0,
+      indicators.btcSma7,
+      indicators.btcSma21,
+      indicators.btcPrevSma7,
+      indicators.btcPrevSma21,
+      indicators.btcMacdLine,
+      indicators.btcSignalLine,
       btcPrices[i],
-      btcUpperBand,
-      btcObvValues[btcObvValues.length - 1] / 1e6,
-      btcAtr,
-      btcAtrBaseline,
-      btcZScore,
-      btcVwap,
-      btcStochRsi,
-      btcPrevStochRsi,
-      btcFib61_8,
+      indicators.btcUpperBand,
+      indicators.btcObvValues[indicators.btcObvValues.length - 1] / 1e6,
+      indicators.btcAtr,
+      indicators.btcAtrBaseline,
+      indicators.btcZScore,
+      indicators.btcVwap,
+      indicators.btcStochRsi,
+      indicators.btcPrevStochRsi,
+      indicators.btcFib61_8,
       i > 0 ? btcPrices[i - 1] : btcPrices[0],
-      btcVolumeOscillator,
-      btcPrevVolumeOscillator,
-      btcIsDoubleTop ? 1 : 0,
-      btcIsHeadAndShoulders ? 1 : 0,
-      btcPrevMacdLine,
-      btcIsTripleTop ? 1 : 0,
-      btcIsVolumeSpike ? 1 : 0,
-      btcMomentum || 0,
-      btcPriceChangePct || 0,
+      indicators.btcVolumeOscillator,
+      indicators.btcPrevVolumeOscillator,
+      indicators.btcIsDoubleTop ? 1 : 0,
+      indicators.btcIsHeadAndShoulders ? 1 : 0,
+      indicators.btcPrevMacdLine,
+      indicators.btcIsTripleTop ? 1 : 0,
+      indicators.isVolumeSpike ? 1 : 0,
+      indicators.btcMomentum || 0,
+      indicators.btcPriceChangePct || 0,
     ];
     featureSequence.push(dayFeatures);
   }
@@ -258,8 +292,8 @@ export const predictTrade = async ({
 
   const combinedOutput = tf.add(gru2Output, residualOutput) as tf.Tensor2D;
   const dropoutOutput = combinedOutput
-    .mul(tf.randomUniform([1, 32]).greater(0.2).cast("float32"))
-    .div(0.8) as tf.Tensor2D;
+    .mul(tf.randomUniform([1, 32]).greater(0.3).cast("float32"))
+    .div(0.7) as tf.Tensor2D;
 
   const dense1Output = tf.layers
     .dense({
@@ -274,239 +308,75 @@ export const predictTrade = async ({
 
   const probabilityTensor = tf.softmax(logits);
   const probabilities = await probabilityTensor.data();
-  let [sellProb, holdProb, buyProb] = probabilities;
+  let [sellProbBase, holdProbBase, buyProbBase] = probabilities;
 
-  console.log(
-    `Raw Probabilities - Buy: ${buyProb.toFixed(3)}, Sell: ${sellProb.toFixed(
-      3
-    )}, Hold: ${holdProb.toFixed(3)}`
-  );
-
-  const sma20 = prices.slice(-20).reduce((a, b) => a + b, 0) / 20;
-  const stdDev20 = Math.sqrt(
-    prices.slice(-20).reduce((sum, p) => sum + Math.pow(p - sma20, 2), 0) / 20
-  );
-  const lowerBand = sma20 - 2 * stdDev20;
-  const macdHistogram = macdLine - signalLine;
-  const prevMacdHistogram = prevMacdLine - signalLine;
-  const { levels } = calculateFibonacciLevels(prices.slice(-30), 30);
-  const fib236 = levels[1] || 0;
-
-  const conditions: Condition[] = [
-    { name: "RSI Overbought", met: !!rsi && rsi > 75, weight: 0.12 },
-    {
-      name: "SMA Death Cross",
-      met: sma7 < sma21 && prevSma7 >= prevSma21,
-      weight: 0.08,
-    },
-    { name: "MACD Bearish", met: macdLine < signalLine, weight: 0.12 },
-    {
-      name: "Above Bollinger Upper",
-      met: currentPrice > upperBand,
-      weight: 0.07,
-    },
-    {
-      name: "OBV Dropping",
-      met: obvValues[obvValues.length - 1] < obvValues[obvValues.length - 2],
-      weight: 0.07,
-    },
-    {
-      name: "Bearish RSI Divergence",
-      met:
-        currentPrice > prices[prices.length - 2] &&
-        !!rsi &&
-        !!prevRsi &&
-        rsi < prevRsi,
-      weight: 0.08,
-    },
-    { name: "High ATR Volatility", met: atr > atrBaseline * 2.5, weight: 0.06 },
-    { name: "Z-Score High", met: zScore > 2.5, weight: 0.08 },
-    { name: "Above VWAP", met: currentPrice > vwap * 1.1, weight: 0.07 },
-    {
-      name: "StochRSI Overbought",
-      met: stochRsi > 85 && stochRsi < prevStochRsi,
-      weight: 0.08,
-    },
-    {
-      name: "Near Fibonacci 61.8%",
-      met: currentPrice >= fib61_8 * 0.98 && currentPrice <= fib61_8 * 1.02,
-      weight: 0.07,
-    },
-    {
-      name: "Bearish MACD Divergence",
-      met: currentPrice > prices[prices.length - 2] && macdLine < prevMacdLine,
-      weight: 0.08,
-    },
-    {
-      name: "Volume Oscillator Declining",
-      met: volumeOscillator < 0 && volumeOscillator < prevVolumeOscillator,
-      weight: 0.07,
-    },
-    { name: "Double Top Pattern", met: isDoubleTop, weight: 0.09 },
-    {
-      name: "Head and Shoulders Pattern",
-      met: isHeadAndShoulders,
-      weight: 0.09,
-    },
-    { name: "Triple Top Pattern", met: isTripleTop, weight: 0.09 },
-    { name: "Volume Spike", met: isVolumeSpike, weight: 0.07 },
-    { name: "Negative Momentum", met: momentum < 0, weight: 0.08 },
-    {
-      name: "Price Crossing Below VWAP",
-      met: currentPrice < vwap && prices[prices.length - 2] > vwap,
-      weight: 0.07,
-    },
-    {
-      name: "Bearish Engulfing",
-      met:
-        prices.length >= 2 &&
-        prices[prices.length - 2] < prices[prices.length - 1] &&
-        currentPrice < prices[prices.length - 2] &&
-        prices[prices.length - 1] - currentPrice >
-          prices[prices.length - 1] - prices[prices.length - 2],
-      weight: 0.07,
-    },
-    { name: "RSI Oversold", met: !!rsi && rsi < 25, weight: 0.128 },
-    {
-      name: "SMA Golden Cross",
-      met: sma7 > sma21 && prevSma7 <= prevSma21,
-      weight: 0.088,
-    },
-    { name: "MACD Bullish", met: macdLine > signalLine, weight: 0.128 },
-    {
-      name: "Below Bollinger Lower",
-      met: currentPrice < lowerBand,
-      weight: 0.078,
-    },
-    {
-      name: "OBV Rising",
-      met: obvValues[obvValues.length - 1] > obvValues[obvValues.length - 2],
-      weight: 0.078,
-    },
-    {
-      name: "Bullish RSI Divergence",
-      met:
-        currentPrice < prices[prices.length - 2] &&
-        !!rsi &&
-        !!prevRsi &&
-        rsi > prevRsi,
-      weight: 0.088,
-    },
-    { name: "Low ATR Volatility", met: atr < atrBaseline * 0.4, weight: 0.068 },
-    { name: "Z-Score Low", met: zScore < -2.5, weight: 0.088 },
-    { name: "Below VWAP", met: currentPrice < vwap * 0.9, weight: 0.078 },
-    {
-      name: "StochRSI Oversold",
-      met: stochRsi < 15 && stochRsi > prevStochRsi,
-      weight: 0.088,
-    },
-    {
-      name: "Bullish MACD Divergence",
-      met: currentPrice < prices[prices.length - 2] && macdLine > prevMacdLine,
-      weight: 0.088,
-    },
-    {
-      name: "Volume Oscillator Rising",
-      met: volumeOscillator > 0 && volumeOscillator > prevVolumeOscillator,
-      weight: 0.078,
-    },
-    { name: "Positive Momentum", met: momentum > 0, weight: 0.088 },
-    { name: "Triple Bottom Pattern", met: isTripleBottom, weight: 0.088 },
-    {
-      name: "BTC Triple Bottom Pattern",
-      met: btcIsTripleBottom,
-      weight: 0.068,
-    },
-    {
-      name: "Volume Breakout",
-      met: isVolumeSpike && priceChangePct > 0.5,
-      weight: 0.078,
-    },
-    {
-      name: "Price Crossing Above VWAP",
-      met: currentPrice > vwap && prices[prices.length - 2] < vwap,
-      weight: 0.068,
-    },
-    {
-      name: "MACD Histogram Positive Flip",
-      met: macdHistogram > 0 && prevMacdHistogram <= 0,
-      weight: 0.078,
-    },
-    {
-      name: "Near Fibonacci 23.6%",
-      met: currentPrice >= fib236 * 0.98 && currentPrice <= fib236 * 1.02,
-      weight: 0.068,
-    },
-    {
-      name: "Bullish Engulfing",
-      met:
-        prices.length >= 2 &&
-        prices[prices.length - 2] > prices[prices.length - 1] &&
-        currentPrice > prices[prices.length - 2] &&
-        currentPrice - prices[prices.length - 1] >
-          prices[prices.length - 2] - prices[prices.length - 1],
-      weight: 0.068,
-    },
-  ];
-
-  const metConditions = conditions
-    .filter((cond) => cond.met)
-    .map((cond) => cond.name);
-
-  const isGoldenCross = sma7 > sma21 && prevSma7 <= prevSma21;
-  const isDeathCross = sma7 < sma21 && prevSma7 >= prevSma21;
-  const trendStrength = sma7 / sma21;
-
-  const buyBoost = isGoldenCross
-    ? Math.min(0.15 * Math.max(0, trendStrength - 1), 0.15)
-    : 0;
-  const sellBoost = isDeathCross
-    ? Math.min(0.15 * Math.max(0, 1 - trendStrength), 0.15)
-    : 0;
-  const momentumBoost =
-    macdHistogram > 0 && prevMacdHistogram <= 0 && currentPrice < sma20
-      ? 0.05
-      : 0;
-  buyProb += buyBoost + momentumBoost;
-  sellProb += sellBoost;
-
-  // Additional logic
-  const avgBuyPrice =
-    prices.length > 5
-      ? prices.slice(-6, -1).reduce((a, b) => a + b, 0) / 5
-      : currentPrice;
-  const profitPotential = (currentPrice - avgBuyPrice) / avgBuyPrice;
-  const isHighVolatility = atr > atrBaseline * 2;
-  const strongUptrend = sma7 / sma21 > 1.1;
-  const strongDowntrend = sma7 / sma21 < 0.9;
-  const lastTradePrice =
-    prices.length > 3 ? prices[prices.length - 4] : currentPrice;
-  const lastTradeWasSell = lastTradePrice > currentPrice;
-  const rsiSafe = rsi !== undefined ? rsi : 50; // Fallback to neutral RSI
-  const isDip = currentPrice < sma7 && rsiSafe < 40;
-
-  // Dynamic thresholds
-  const buyThreshold = isDip ? 0.35 : 0.36;
-  const buyTrendThreshold = isDip ? 0.32 : 0.33;
-  const minProfitThreshold = strongDowntrend ? 0 : 0.01;
-
-  let recommendation: Recommendation;
-  if (
-    (buyProb > buyThreshold ||
-      (buyProb > buyTrendThreshold && strongUptrend)) &&
-    (!lastTradeWasSell || (lastTradeWasSell && isDip))
-  ) {
-    recommendation = Recommendation.Buy;
-  } else if (
-    (sellProb > 0.37 || (sellProb > 0.34 && strongDowntrend)) &&
-    (profitPotential > minProfitThreshold ||
-      (isHighVolatility && profitPotential > 0.05) ||
-      (profitPotential > 0.1 && rsiSafe > 70))
-  ) {
-    recommendation = Recommendation.Sell;
-  } else {
-    recommendation = Recommendation.Hold;
+  const actionSum = buyProbBase + sellProbBase;
+  const sma50 =
+    prices.length >= 50
+      ? prices.slice(-50).reduce((a, b) => a + b, 0) / 50
+      : prices.slice(-20).reduce((a, b) => a + b, 0) / 20;
+  const isBearish = indicators.sma7 < sma50;
+  if (actionSum > 0) {
+    buyProbBase = (buyProbBase / actionSum) * 0.8;
+    sellProbBase = (sellProbBase / actionSum) * 0.8;
+    holdProbBase = isBearish ? 0.15 : 0.2; // Lower in bearish conditions
   }
+
+  const adxProxy = Math.abs((indicators.sma7 - sma50) / sma50);
+  const volatility = indicators.atr / indicators.atrBaseline;
+  const rsiSafe = indicators.rsi !== undefined ? indicators.rsi : 50;
+
+  const trendStrategy = new Strategy("TrendFollowing");
+  const meanRevStrategy = new Strategy("MeanReversion");
+  const breakoutStrategy = new Strategy("Breakout");
+
+  const trendResult = trendStrategy.evaluate(indicators);
+  const meanRevResult = meanRevStrategy.evaluate(indicators);
+  const breakoutResult = breakoutStrategy.evaluate(indicators);
+
+  const trendWeight = adxProxy > 0.02 ? 0.5 : 0.2;
+  const meanRevWeight = rsiSafe < 30 || rsiSafe > 70 ? 0.5 : 0.3; // Increased from 0.4
+  const breakoutWeight =
+    volatility > 1.5 || indicators.isVolumeSpike ? 0.3 : 0.2;
+
+  let buyProb =
+    buyProbBase +
+    trendWeight * trendResult.buyProb +
+    meanRevWeight * meanRevResult.buyProb +
+    breakoutWeight * breakoutResult.buyProb;
+  let sellProb =
+    sellProbBase +
+    trendWeight * trendResult.sellProb +
+    meanRevWeight * meanRevResult.sellProb +
+    breakoutWeight * breakoutResult.sellProb;
+  let holdProb =
+    holdProbBase +
+    trendWeight * trendResult.holdProb +
+    meanRevWeight * meanRevResult.holdProb +
+    breakoutWeight * breakoutResult.holdProb;
+
+  const total = buyProb + sellProb + holdProb;
+  buyProb /= total;
+  sellProb /= total;
+  holdProb /= total;
+
+  const profitPotential =
+    (indicators.currentPrice -
+      prices.slice(-5).reduce((a, b) => a + b, 0) / 5) /
+    (prices.slice(-5).reduce((a, b) => a + b, 0) / 5);
+  const recommendation =
+    rsiSafe < 30 && buyProb > 0.33 && profitPotential > -0.03
+      ? Recommendation.Buy
+      : adxProxy > 0.02 &&
+        sellProb > 0.33 &&
+        (profitPotential > 0.05 || profitPotential < 0)
+      ? Recommendation.Sell
+      : buyProb > 0.35 && profitPotential > -0.03
+      ? Recommendation.Buy
+      : sellProb > 0.35 &&
+        (profitPotential > 0.05 || (adxProxy < 0.02 && profitPotential > -0.05))
+      ? Recommendation.Sell
+      : Recommendation.Hold;
 
   console.log(
     `Adjusted Probabilities - Buy: ${buyProb.toFixed(
@@ -516,50 +386,48 @@ export const predictTrade = async ({
   console.log(`Recommendation: ${recommendation}`);
   console.log(
     `Profit Potential: ${(profitPotential * 100).toFixed(2)}%, Volatility: ${
-      isHighVolatility ? "High" : "Normal"
-    }, Trend: ${
-      strongUptrend ? "Strong Up" : strongDowntrend ? "Strong Down" : "Neutral"
-    }, Last Trade: ${
-      lastTradeWasSell ? "Sell" : "Not Sell"
-    } at ${lastTradePrice.toFixed(4)}, Dip: ${isDip}, RSI: ${rsiSafe.toFixed(
+      volatility > 2 ? "High" : "Normal"
+    }, Trend: ${adxProxy > 0.02 ? "Strong" : "Weak"}, RSI: ${rsiSafe.toFixed(
       2
     )}`
   );
 
-  conv1Weights.dispose();
-  conv1Bias.dispose();
-  conv2Weights.dispose();
-  conv2Bias.dispose();
-  gru1Weights.dispose();
-  gru1RecurrentWeights.dispose();
-  gru1Bias.dispose();
-  gru2Weights.dispose();
-  gru2RecurrentWeights.dispose();
-  gru2Bias.dispose();
-  residualWeights.dispose();
-  residualBias.dispose();
-  dense1Weights.dispose();
-  dense1Bias.dispose();
-  dense2Weights.dispose();
-  dense2Bias.dispose();
-  featureMins.dispose();
-  featureMaxs.dispose();
-  featuresRaw.dispose();
-  featuresNormalized.dispose();
-  conv1Output.dispose();
-  conv2Output.dispose();
-  gru1Output.dispose();
-  gru2Output.dispose();
-  flattenedGru1.dispose();
-  residualOutput.dispose();
-  combinedOutput.dispose();
-  dropoutOutput.dispose();
-  dense1Output.dispose();
-  logits.dispose();
-  probabilityTensor.dispose();
+  [
+    conv1Weights,
+    conv1Bias,
+    conv2Weights,
+    conv2Bias,
+    gru1Weights,
+    gru1RecurrentWeights,
+    gru1Bias,
+    gru2Weights,
+    gru2RecurrentWeights,
+    gru2Bias,
+    residualWeights,
+    residualBias,
+    dense1Weights,
+    dense1Bias,
+    dense2Weights,
+    dense2Bias,
+    featureMins,
+    featureMaxs,
+    featuresRaw,
+    featuresNormalized,
+    conv1Output,
+    conv2Output,
+    gru1Output,
+    gru2Output,
+    flattenedGru1,
+    residualOutput,
+    combinedOutput,
+    dropoutOutput,
+    dense1Output,
+    logits,
+    probabilityTensor,
+  ].forEach((tensor) => tensor.dispose());
 
   return {
-    metConditions,
+    metConditions: [],
     probabilities: { buy: buyProb, hold: holdProb, sell: sellProb },
     recommendation,
   };

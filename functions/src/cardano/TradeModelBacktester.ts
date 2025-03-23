@@ -1,37 +1,17 @@
 import * as admin from "firebase-admin";
 import { getHistoricalData } from "../api/getHistoricalData";
 import { FIVE_YEARS_IN_DAYS } from "../constants";
-import { Recommendation } from "../types";
+import { BacktestResult, Recommendation, Trade } from "../types";
 import serviceAccount from "../../../serviceAccount.json";
 import TradePredictor from "./TradeModelPredictor";
-
-interface Trade {
-  type: "buy" | "sell";
-  price: number;
-  timestamp: string;
-  adaAmount: number;
-  usdValue: number;
-  buyPrice?: number;
-}
-
-interface BacktestResult {
-  totalReturn: number;
-  totalTrades: number;
-  winRate: number;
-  sharpeRatio: number;
-  maxDrawdown: number;
-  portfolioHistory: { timestamp: string; value: number }[];
-  trades: Trade[];
-}
 
 export class TradeModelBacktester {
   private TRANSACTION_FEE = 0.002;
   private INITIAL_USD = 1000;
-  private MIN_TRADE_USD = 100;
-  private MIN_HOLD_DAYS = 1;
-  private CASH_RESERVE = 100;
-  private STOP_LOSS_THRESHOLD = -0.05;
-  private TAKE_PROFIT_THRESHOLD = 0.1;
+  private MIN_TRADE_USD = 50;
+  private CASH_RESERVE = 50;
+  private STOP_LOSS_THRESHOLD = -0.15;
+  private TAKE_PROFIT_THRESHOLD = 0.03;
 
   private startDaysAgo: number;
   private endDaysAgo: number;
@@ -179,7 +159,6 @@ export class TradeModelBacktester {
     const dailyReturns: number[] = [];
     let wins = 0;
     let completedCycles = 0;
-    let daysSinceLastTrade = 0;
 
     for (let i = 14; i < slicedAdaPrices.length - 5; i += this.stepDays) {
       const currentAdaPrice = slicedAdaPrices[i];
@@ -213,36 +192,56 @@ export class TradeModelBacktester {
           3
         )}, Hold: ${decision.probabilities.hold.toFixed(3)}, Recommendation: ${
           decision.recommendation
-        }`
+        }, Signal Strength: ${Math.max(
+          decision.probabilities.buy,
+          decision.probabilities.sell
+        ).toFixed(3)}`
       );
 
       const confidence = Math.max(
         decision.probabilities.buy,
         decision.probabilities.sell
       );
-      const positionSizeFactor = Math.min(0.9, confidence);
+      const rsiValue = decision.rsi ? parseFloat(decision.rsi) : 50;
+      const positionSizeFactor = Math.min(0.3, confidence);
       const portfolioValue = usdBalance + adaBalance * currentAdaPrice;
       const unrealizedProfit =
         adaBalance > 0 ? (currentAdaPrice - avgBuyPrice) / avgBuyPrice : 0;
 
       const buyCondition =
         decision.recommendation === Recommendation.Buy &&
-        usdBalance > this.CASH_RESERVE + this.MIN_TRADE_USD &&
-        daysSinceLastTrade >= this.MIN_HOLD_DAYS;
+        usdBalance > this.CASH_RESERVE + this.MIN_TRADE_USD;
       const sellCondition =
-        (decision.recommendation === Recommendation.Sell &&
-          adaBalance > 0 &&
-          daysSinceLastTrade >= this.MIN_HOLD_DAYS) ||
+        (decision.recommendation === Recommendation.Sell && adaBalance > 0) ||
         (adaBalance > 0 &&
           (unrealizedProfit <= this.STOP_LOSS_THRESHOLD ||
-            unrealizedProfit >= this.TAKE_PROFIT_THRESHOLD));
+            unrealizedProfit >= this.TAKE_PROFIT_THRESHOLD ||
+            decision.isDoubleTop ||
+            decision.isTripleTop ||
+            decision.isHeadAndShoulders));
 
+      console.log(
+        `Buy Condition: ${buyCondition}, Cash: ${usdBalance.toFixed(
+          2
+        )}, Sell Condition: ${sellCondition}, Unrealized Profit: ${unrealizedProfit.toFixed(
+          4
+        )}`
+      );
+
+      let tradeReason = "";
       if (buyCondition) {
         const usdToSpend = Math.max(
           this.MIN_TRADE_USD,
           usdBalance * positionSizeFactor * (1 - this.TRANSACTION_FEE)
         );
-        if (usdBalance - usdToSpend < this.CASH_RESERVE) continue;
+        if (usdBalance - usdToSpend < this.CASH_RESERVE) {
+          console.log(
+            `Skipped Buy: Insufficient USD (${usdBalance.toFixed(2)} < ${
+              this.CASH_RESERVE + usdToSpend
+            })`
+          );
+          continue;
+        }
         const adaBought = usdToSpend / currentAdaPrice;
         adaBalance += adaBought;
         avgBuyPrice =
@@ -259,14 +258,14 @@ export class TradeModelBacktester {
           adaAmount: adaBought,
           usdValue: usdToSpend,
         });
+        tradeReason = rsiValue < 20 ? "RSI < 20" : "High Buy Probability";
         console.log(
           `Buy at $${currentAdaPrice.toFixed(4)}, ADA: ${adaBought.toFixed(
             2
           )}, USD: ${usdToSpend.toFixed(2)}, RSI: ${
-            decision.rsi
-          }, Profit Potential: ${(decision.profitPotential * 100).toFixed(2)}%`
+            decision.rsi || "50.00"
+          }, Reason: ${tradeReason}`
         );
-        daysSinceLastTrade = 0;
       } else if (sellCondition) {
         const adaToSell = adaBalance;
         const usdReceived =
@@ -281,21 +280,28 @@ export class TradeModelBacktester {
           usdValue: usdReceived,
           buyPrice: avgBuyPrice,
         });
+        tradeReason =
+          unrealizedProfit <= this.STOP_LOSS_THRESHOLD
+            ? "Stop-Loss"
+            : unrealizedProfit >= this.TAKE_PROFIT_THRESHOLD
+            ? "Take-Profit"
+            : decision.isDoubleTop ||
+              decision.isTripleTop ||
+              decision.isHeadAndShoulders
+            ? "Reversal Pattern"
+            : "High Sell Probability";
         console.log(
           `Sell at $${currentAdaPrice.toFixed(4)}, ADA: ${adaToSell.toFixed(
             2
           )}, USD: ${usdReceived.toFixed(2)}, RSI: ${
-            decision.rsi
-          }, Profit Potential: ${(decision.profitPotential * 100).toFixed(2)}%`
+            decision.rsi || "50.00"
+          }, Reason: ${tradeReason}`
         );
         if (usdReceived > adaToSell * avgBuyPrice) wins++;
         if (adaBalance === 0) {
           completedCycles++;
           avgBuyPrice = 0;
         }
-        daysSinceLastTrade = 0;
-      } else {
-        daysSinceLastTrade++;
       }
 
       portfolioHistory.push({ timestamp, value: portfolioValue });

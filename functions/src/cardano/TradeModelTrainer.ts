@@ -5,13 +5,13 @@ import { getHistoricalData } from "../api/getHistoricalData";
 import { BestWeightsCallback } from "./callbacks/BestWeightsCallback";
 import { ExponentialDecayLearningRateCallback } from "./callbacks/ExponentialDecayLearningRateCallback";
 import { PredictionLoggerCallback } from "./callbacks/PredictionLoggerCallback";
-import { FeatureCalculator } from "./FeatureCalculator";
-import { createTradeModel } from "./modelUtils";
+import FeatureCalculator from "./FeatureCalculator";
+import TradeModelFactory from "./TradeModelFactory";
 import serviceAccount from "../../../serviceAccount.json";
+import { FeatureStats, HistoricalData, ModelConfig } from "../types";
 
 dotenv.config();
 
-// Initialize Firebase at module level
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
@@ -20,21 +20,6 @@ if (!admin.apps.length) {
   });
 }
 const bucket = admin.storage().bucket();
-
-interface HistoricalData {
-  prices: number[];
-  volumes: number[];
-}
-interface ModelConfig {
-  timesteps: number;
-  epochs: number;
-  batchSize: number;
-  initialLearningRate: number;
-}
-interface FeatureStats {
-  mean: number;
-  std: number;
-}
 
 export class TradeModelTrainer {
   private readonly config: ModelConfig = {
@@ -322,7 +307,10 @@ export class TradeModelTrainer {
         })
         .batch(this.config.batchSize);
 
-      this.model = createTradeModel(this.config.timesteps, 61);
+      // Use TradeModelFactory instead of createTradeModel
+      const factory = new TradeModelFactory(this.config.timesteps, 61);
+      this.model = factory.createModel();
+
       const optimizer = tf.train.adam(this.config.initialLearningRate);
       const bestWeightsCallback = new BestWeightsCallback();
       const lrCallback = new ExponentialDecayLearningRateCallback(
@@ -330,6 +318,8 @@ export class TradeModelTrainer {
         0.98
       );
       const predictionLoggerCallback = new PredictionLoggerCallback(X_val);
+
+      if (!this.model) throw new Error("Model initialization failed");
 
       this.model.compile({
         optimizer,

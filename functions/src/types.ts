@@ -42,7 +42,7 @@ export interface Indicators {
   isVolumeSpike: boolean;
   momentum: number | undefined;
   priceChangePct: number | undefined;
-  isTripleBottom?: boolean;
+  isTripleBottom: boolean;
   volAdjustedMomentum: number;
   sma20: number;
   lowerBand: number;
@@ -115,6 +115,10 @@ export interface TradeDecision {
   recommendation: Recommendation;
   timestamp: any;
   profitPotential: number;
+  isDoubleTop: boolean; // Added
+  isTripleTop: boolean; // Added
+  isHeadAndShoulders: boolean; // Added
+  isTripleBottom: boolean; // Added
 }
 
 export interface RecieveSMSRequest {
@@ -160,4 +164,38 @@ export enum Collections {
 export enum Docs {
   PriceAlert = "priceAlert",
   Cardano = "cardano",
+}
+
+export interface HistoricalData {
+  prices: number[];
+  volumes: number[];
+}
+export interface ModelConfig {
+  timesteps: number;
+  epochs: number;
+  batchSize: number;
+  initialLearningRate: number;
+}
+export interface FeatureStats {
+  mean: number;
+  std: number;
+}
+
+export interface Trade {
+  type: "buy" | "sell";
+  price: number;
+  timestamp: string;
+  adaAmount: number;
+  usdValue: number;
+  buyPrice?: number;
+}
+
+export interface BacktestResult {
+  totalReturn: number;
+  totalTrades: number;
+  winRate: number;
+  sharpeRatio: number;
+  maxDrawdown: number;
+  portfolioHistory: { timestamp: string; value: number }[];
+  trades: Trade[];
 }

@@ -4,8 +4,8 @@ import dotenv from "dotenv";
 import { TradeDecision, Indicators, Recommendation } from "../types";
 import { getCurrentPrices } from "../api/getCurrentPrices";
 import { getHistoricalPricesAndVolumes } from "../api/getHistoricalPricesAndVolumes";
-import { FeatureCalculator } from "./FeatureCalculator";
-import { createTradeModel } from "./modelUtils";
+import FeatureCalculator from "./FeatureCalculator";
+import TradeModelFactory from "./TradeModelFactory";
 
 dotenv.config();
 
@@ -18,7 +18,7 @@ if (!admin.apps.length) {
 }
 const bucket = admin.storage().bucket();
 
-export default class TradePredictor {
+export default class TradeModelPredictor {
   private async fetchAndCalculateIndicators() {
     const { currentAdaPrice, currentBtcPrice } = await getCurrentPrices();
     const { adaPrices, adaVolumes, btcPrices, btcVolumes } =
@@ -115,9 +115,9 @@ export default class TradePredictor {
         if (adxProxy <= 0.02) holdProb += 0.05;
         break;
       case "MeanReversion":
-        if (rsiSafe < 30 && currentPrice < sma20 - 2 * atr) buyProb += 0.4;
-        if (rsiSafe > 70 && currentPrice > sma20 + 2 * atr) sellProb += 0.4;
-        if (rsiSafe >= 30 && rsiSafe <= 70) holdProb += 0.05;
+        if (rsiSafe < 20 && currentPrice < sma20 - 2 * atr) buyProb += 0.4;
+        if (rsiSafe > 85 && currentPrice > sma20 + 2 * atr) sellProb += 0.4;
+        if (rsiSafe >= 20 && rsiSafe <= 85) holdProb += 0.05;
         break;
       case "Breakout":
         if (currentPrice > recentHigh && isVolumeSpike && volatility > 1.5)
@@ -195,7 +195,8 @@ export default class TradePredictor {
       let buyProbBase = 0.5,
         sellProbBase = 0.5;
       await tf.tidy(() => {
-        const model = createTradeModel(timesteps, 61);
+        const factory = new TradeModelFactory(timesteps, 61);
+        const model = factory.createModel();
         model
           .getLayer("conv1d")
           .setWeights([
@@ -258,15 +259,21 @@ export default class TradePredictor {
         (adaIndicators.currentPrice -
           adaPrices.slice(-5).reduce((a, b) => a + b, 0) / 5) /
         (adaPrices.slice(-5).reduce((a, b) => a + b, 0) / 5);
+      const macdHistogram = adaIndicators.macdLine - adaIndicators.signalLine;
 
       let buyProb = buyProbBase,
         sellProb = sellProbBase,
         holdProb = 0;
-      const confidenceThreshold = 0.45;
+      if (rsiSafe < 20) buyProb += 0.3;
+      if (rsiSafe > 80) sellProb += 0.3;
+      const confidenceThreshold =
+        0.4 +
+        (adaIndicators.adxProxy > 0.02 ? 0.05 : 0) -
+        (volatility > 1.5 ? 0.05 : 0);
       if (buyProb < confidenceThreshold && sellProb < confidenceThreshold) {
         holdProb = 1 - (buyProb + sellProb);
-        buyProb *= 0.8;
-        sellProb *= 0.8;
+        buyProb *= 0.9;
+        sellProb *= 0.9;
       }
 
       const trendResult = this.evaluateStrategy(
@@ -289,18 +296,20 @@ export default class TradePredictor {
       );
 
       const trendWeight = adaIndicators.adxProxy > 0.02 ? 0.5 : 0.2;
-      const meanRevWeight = rsiSafe < 30 || rsiSafe > 70 ? 0.6 : 0.3;
+      const meanRevWeight = rsiSafe < 20 || rsiSafe > 85 ? 0.6 : 0.3;
       const breakoutWeight =
         volatility > 1.5 || adaIndicators.isVolumeSpike ? 0.4 : 0.2;
 
       buyProb +=
         trendWeight * trendResult.buyProb +
         meanRevWeight * meanRevResult.buyProb +
-        breakoutWeight * breakoutResult.buyProb;
+        breakoutWeight * breakoutResult.buyProb +
+        (profitPotential > 0.05 ? 0.1 : 0);
       sellProb +=
         trendWeight * trendResult.sellProb +
         meanRevWeight * meanRevResult.sellProb +
-        breakoutWeight * breakoutResult.sellProb;
+        breakoutWeight * breakoutResult.sellProb +
+        (profitPotential < -0.05 ? 0.1 : 0);
       holdProb +=
         trendWeight * trendResult.holdProb +
         meanRevWeight * meanRevResult.holdProb +
@@ -312,20 +321,22 @@ export default class TradePredictor {
       holdProb = holdProb / total || 0.33;
 
       const recommendation =
-        rsiSafe < 30 && buyProb > 0.5 && profitPotential > 0
+        rsiSafe < 20 && buyProb > 0.35
           ? Recommendation.Buy
-          : rsiSafe > 70 && sellProb > 0.5 && profitPotential < 0
+          : rsiSafe > 80 && sellProb > 0.45
           ? Recommendation.Sell
-          : buyProb > 0.5 && profitPotential > 0
+          : buyProb > confidenceThreshold
           ? Recommendation.Buy
-          : sellProb > 0.5 && profitPotential < 0
+          : sellProb > confidenceThreshold
           ? Recommendation.Sell
           : Recommendation.Hold;
 
       console.log(
         `Adjusted Probabilities - Buy: ${buyProb.toFixed(
           3
-        )}, Sell: ${sellProb.toFixed(3)}, Hold: ${holdProb.toFixed(3)}`
+        )}, Sell: ${sellProb.toFixed(3)}, Hold: ${holdProb.toFixed(
+          3
+        )}, Confidence Threshold: ${confidenceThreshold.toFixed(3)}`
       );
       console.log(`Recommendation: ${recommendation}`);
       console.log(
@@ -333,7 +344,9 @@ export default class TradePredictor {
           2
         )}%, Volatility: ${volatility > 2 ? "High" : "Normal"}, Trend: ${
           adaIndicators.adxProxy > 0.02 ? "Strong" : "Weak"
-        }, RSI: ${rsiSafe.toFixed(2)}`
+        }, RSI: ${rsiSafe.toFixed(2)}, MACD Histogram: ${macdHistogram.toFixed(
+          2
+        )}`
       );
 
       return {
@@ -358,7 +371,11 @@ export default class TradePredictor {
         probabilities: { buy: buyProb, hold: holdProb, sell: sellProb },
         recommendation,
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        profitPotential, // Added
+        profitPotential,
+        isDoubleTop: adaIndicators.isDoubleTop,
+        isTripleTop: adaIndicators.isTripleTop,
+        isHeadAndShoulders: adaIndicators.isHeadAndShoulders,
+        isTripleBottom: adaIndicators.isTripleBottom,
       };
     } catch (error: any) {
       console.error("Error in TradePredictor:", error.message, error.stack);

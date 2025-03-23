@@ -1,7 +1,7 @@
 import { Indicators, MarketData } from "../types";
 import { PERIODS } from "../constants";
 
-export class FeatureCalculator {
+export default class FeatureCalculator {
   private prices: number[];
   private volumes: number[];
   private dayIndex: number;

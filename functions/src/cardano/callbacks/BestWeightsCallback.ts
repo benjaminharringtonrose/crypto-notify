@@ -5,13 +5,14 @@ export class BestWeightsCallback extends tf.CustomCallback {
   private bestWeights: tf.Tensor[] | null = null;
   private currentModel: tf.LayersModel | null = null;
 
-  constructor(args: tf.CustomCallbackArgs) {
-    super(args);
+  constructor() {
+    super({}); // Pass empty args
   }
 
   async onEpochEnd(epoch: number, logs?: tf.Logs) {
-    if (!this.currentModel)
+    if (!this.currentModel) {
       throw new Error("Model not set in BestWeightsCallback");
+    }
     if (logs && logs.val_loss < this.bestValLoss) {
       this.bestValLoss = logs.val_loss;
       this.bestWeights = this.currentModel.getWeights();
@@ -26,6 +27,13 @@ export class BestWeightsCallback extends tf.CustomCallback {
   }
 
   applyBestWeights(model: tf.LayersModel) {
-    if (this.bestWeights) model.setWeights(this.bestWeights);
+    if (this.bestWeights) {
+      model.setWeights(this.bestWeights);
+    }
+  }
+
+  // Required by tf.CustomCallback
+  setParams(params: tf.CustomCallbackArgs) {
+    // No specific params needed
   }
 }

@@ -13,25 +13,6 @@ export interface CoinGeckoMarketChartResponse {
   total_volumes: [number, number][];
 }
 
-export enum CryptoIds {
-  Bitcoin = "bitcoin",
-  Cardano = "cardano",
-}
-
-export enum Currencies {
-  USD = "usd",
-}
-
-export enum Collections {
-  Config = "config",
-  TradeRecommendations = "tradeRecommendations",
-}
-
-export enum Docs {
-  PriceAlert = "priceAlert",
-  Cardano = "cardano",
-}
-
 export interface Indicators {
   rsi: number | undefined;
   prevRsi: number | undefined;
@@ -41,7 +22,7 @@ export interface Indicators {
   prevSma21: number;
   macdLine: number;
   signalLine: number;
-  currentPrice: number; // Changed from optional to required
+  currentPrice: number;
   upperBand: number;
   obvValues: number[];
   atr: number;
@@ -67,6 +48,7 @@ export interface Indicators {
   lowerBand: number;
   obv: number;
   stochRsiSignal: number;
+  adxProxy: number; // New field for trend strength
   btcRsi?: number | undefined;
   btcPrevRsi?: number | undefined;
   btcSma7?: number;
@@ -97,11 +79,11 @@ export interface Indicators {
   btcVolAdjustedMomentum?: number;
 }
 
-export enum Recommendation {
-  Buy = "BUY",
-  Hold = "HOLD",
-  Sell = "SELL",
-  HoldBasedOnBuyPrice = "HOLD_BASED_ON_BUY_PRICE",
+export interface StrategyResult {
+  buyProb: number;
+  sellProb: number;
+  holdProb: number;
+  recommendation: Recommendation;
 }
 
 export interface Probabilities {
@@ -110,11 +92,6 @@ export interface Probabilities {
   sell: number;
 }
 
-export interface PredictTrade {
-  metConditions: string[];
-  probabilities: Probabilities;
-  recommendation: Recommendation;
-}
 export interface TradeDecision {
   currentPrice: number;
   rsi?: string;
@@ -139,12 +116,6 @@ export interface TradeDecision {
   timestamp: any;
 }
 
-export interface Condition {
-  name: string;
-  met: boolean;
-  weight: number;
-}
-
 export interface RecieveSMSRequest {
   body: {
     text: string;
@@ -162,4 +133,30 @@ export interface MarketData {
   volumes: number[];
   dayIndex: number;
   currentPrice: number;
+}
+
+export enum Recommendation {
+  Buy = "BUY",
+  Hold = "HOLD",
+  Sell = "SELL",
+  HoldBasedOnBuyPrice = "HOLD_BASED_ON_BUY_PRICE",
+}
+
+export enum CryptoIds {
+  Bitcoin = "bitcoin",
+  Cardano = "cardano",
+}
+
+export enum Currencies {
+  USD = "usd",
+}
+
+export enum Collections {
+  Config = "config",
+  TradeRecommendations = "tradeRecommendations",
+}
+
+export enum Docs {
+  PriceAlert = "priceAlert",
+  Cardano = "cardano",
 }

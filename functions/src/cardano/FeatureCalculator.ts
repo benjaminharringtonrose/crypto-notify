@@ -49,12 +49,58 @@ export class FeatureCalculator {
     return recentRanges.reduce((sum, range) => sum + range, 0) / period;
   }
 
-  private calculateIfEnoughData<T>(
-    minDays: number,
-    dayIndex: number,
-    calculateFn: () => T
-  ): T | number {
-    return dayIndex >= minDays - 1 ? calculateFn() || 0 : 0;
+  private calculateSlice(
+    data: number[],
+    periods: number,
+    offset = 0
+  ): number[] {
+    return data.slice(-periods - offset, offset === 0 ? undefined : -offset);
+  }
+
+  private calculateRSI(prices: number[], period = 14): number | undefined {
+    if (prices.length < period + 1) return undefined;
+    let gains = 0,
+      losses = 0;
+
+    for (let i = 1; i <= period; i++) {
+      const change = prices[i] - prices[i - 1];
+      if (change > 0) gains += change;
+      else losses += Math.abs(change);
+    }
+
+    let avgGain = gains / period;
+    let avgLoss = losses / period;
+
+    for (let i = period + 1; i < prices.length; i++) {
+      const change = prices[i] - prices[i - 1];
+      const gain = change > 0 ? change : 0;
+      const loss = change < 0 ? Math.abs(change) : 0;
+      avgGain = (avgGain * (period - 1) + gain) / period;
+      avgLoss = (avgLoss * (period - 1) + loss) / period;
+    }
+
+    const rs = avgGain / avgLoss;
+    return 100 - 100 / (1 + rs);
+  }
+
+  private calculateEMA(prices: number[], period: number): number {
+    const k = 2 / (period + 1);
+    let ema = prices[0];
+    for (let i = 1; i < prices.length; i++) {
+      ema = prices[i] * k + ema * (1 - k);
+    }
+    return ema;
+  }
+
+  private calculateSMA(prices: number[]): number {
+    return prices.reduce((sum, price) => sum + price, 0) / prices.length;
+  }
+
+  private calculateStdDev(values: number[], mean: number): number {
+    const variance =
+      values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) /
+      values.length;
+    return Math.sqrt(variance);
   }
 
   private detectTripleBottom(
@@ -122,7 +168,6 @@ export class FeatureCalculator {
       low + range * 0.618,
       high,
     ];
-
     return { levels, high, low };
   }
 
@@ -203,9 +248,7 @@ export class FeatureCalculator {
     for (let i = 0; i <= prices.length - rsiPeriod; i++) {
       const slice = prices.slice(i, i + rsiPeriod + 1);
       const rsi = this.calculateRSI(slice);
-      if (rsi) {
-        rsiValues.push(rsi);
-      }
+      if (rsi) rsiValues.push(rsi);
     }
 
     const recentRsis = rsiValues.slice(-stochPeriod);
@@ -240,11 +283,11 @@ export class FeatureCalculator {
     volumes: number[],
     currentPrice: number
   ): boolean {
-    let firstTop = 0;
-    let secondTop = 0;
-    let trough = Infinity;
-    let firstTopIndex = -1;
-    let secondTopIndex = -1;
+    let firstTop = 0,
+      secondTop = 0,
+      trough = Infinity;
+    let firstTopIndex = -1,
+      secondTopIndex = -1;
 
     for (let i = 1; i < prices.length - 1; i++) {
       if (prices[i] > prices[i - 1] && prices[i] > prices[i + 1]) {
@@ -264,9 +307,7 @@ export class FeatureCalculator {
 
     if (secondTop !== 0) {
       for (let i = firstTopIndex + 1; i < secondTopIndex; i++) {
-        if (prices[i] < trough) {
-          trough = prices[i];
-        }
+        if (prices[i] < trough) trough = prices[i];
       }
     }
 
@@ -291,14 +332,14 @@ export class FeatureCalculator {
     volumes: number[],
     currentPrice: number
   ): boolean {
-    let firstTop = 0;
-    let secondTop = 0;
-    let thirdTop = 0;
-    let firstTrough = Infinity;
-    let secondTrough = Infinity;
-    let firstTopIndex = -1;
-    let secondTopIndex = -1;
-    let thirdTopIndex = -1;
+    let firstTop = 0,
+      secondTop = 0,
+      thirdTop = 0;
+    let firstTrough = Infinity,
+      secondTrough = Infinity;
+    let firstTopIndex = -1,
+      secondTopIndex = -1,
+      thirdTopIndex = -1;
 
     for (let i = 1; i < prices.length - 1; i++) {
       if (prices[i] > prices[i - 1] && prices[i] > prices[i + 1]) {
@@ -351,459 +392,6 @@ export class FeatureCalculator {
     );
   }
 
-  private calculateSlice(
-    data: number[],
-    periods: number,
-    offset = 0
-  ): number[] {
-    return data.slice(-periods - offset, offset === 0 ? undefined : -offset);
-  }
-
-  private calculateRSI(prices: number[], period = 14): number | undefined {
-    if (prices.length < period + 1) return undefined;
-    let gains = 0,
-      losses = 0;
-
-    for (let i = 1; i <= period; i++) {
-      const change = prices[i] - prices[i - 1];
-      if (change > 0) gains += change;
-      else losses += Math.abs(change);
-    }
-
-    let avgGain = gains / period;
-    let avgLoss = losses / period;
-
-    for (let i = period + 1; i < prices.length; i++) {
-      const change = prices[i] - prices[i - 1];
-      const gain = change > 0 ? change : 0;
-      const loss = change < 0 ? Math.abs(change) : 0;
-      avgGain = (avgGain * (period - 1) + gain) / period;
-      avgLoss = (avgLoss * (period - 1) + loss) / period;
-    }
-
-    const rs = avgGain / avgLoss;
-    return 100 - 100 / (1 + rs);
-  }
-
-  private calculateEMA(prices: number[], period: number): number {
-    const k = 2 / (period + 1);
-    let ema = prices[0];
-    for (let i = 1; i < prices.length; i++) {
-      ema = prices[i] * k + ema * (1 - k);
-    }
-    return ema;
-  }
-
-  private calculateSMA(prices: number[]): number {
-    return prices.reduce((sum, price) => sum + price, 0) / prices.length;
-  }
-
-  private calculateStdDev(values: number[], mean: number): number {
-    const variance =
-      values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) /
-      values.length;
-    return Math.sqrt(variance);
-  }
-
-  private calculateRSIValues(): { rsi: number; prevRsi: number } {
-    const rsi = this.calculateIfEnoughData(
-      PERIODS.RSI,
-      this.dayIndex,
-      () =>
-        this.calculateRSI(
-          this.prices.slice(this.dayIndex - PERIODS.RSI + 1, this.dayIndex + 1)
-        ) || 0
-    ) as number;
-    const prevRsi = this.calculateIfEnoughData(
-      PERIODS.RSI + 1,
-      this.dayIndex,
-      () =>
-        this.calculateRSI(
-          this.prices.slice(this.dayIndex - PERIODS.RSI, this.dayIndex)
-        ) || 0
-    ) as number;
-    return { rsi, prevRsi };
-  }
-
-  private calculateSMAValues(): {
-    smaShort: number;
-    smaLong: number;
-    prevSmaShort: number;
-    prevSmaLong: number;
-  } {
-    const smaShort =
-      (this.calculateIfEnoughData(PERIODS.SMA_SHORT, this.dayIndex, () =>
-        this.calculateSMA(
-          this.prices.slice(
-            this.dayIndex - PERIODS.SMA_SHORT + 1,
-            this.dayIndex + 1
-          )
-        )
-      ) as number) ?? this.prices[this.dayIndex];
-    const smaLong =
-      (this.calculateIfEnoughData(PERIODS.SMA_LONG, this.dayIndex, () =>
-        this.calculateSMA(
-          this.prices.slice(
-            this.dayIndex - PERIODS.SMA_LONG + 1,
-            this.dayIndex + 1
-          )
-        )
-      ) as number) ?? this.prices[this.dayIndex];
-    const prevSmaShort =
-      (this.calculateIfEnoughData(PERIODS.SMA_SHORT + 1, this.dayIndex, () =>
-        this.calculateSMA(
-          this.prices.slice(this.dayIndex - PERIODS.SMA_SHORT, this.dayIndex)
-        )
-      ) as number) ??
-      this.prices[this.dayIndex - 1] ??
-      this.prices[this.dayIndex];
-    const prevSmaLong =
-      (this.calculateIfEnoughData(PERIODS.SMA_LONG + 1, this.dayIndex, () =>
-        this.calculateSMA(
-          this.prices.slice(this.dayIndex - PERIODS.SMA_LONG, this.dayIndex)
-        )
-      ) as number) ??
-      this.prices[this.dayIndex - 1] ??
-      this.prices[this.dayIndex];
-    return { smaShort, smaLong, prevSmaShort, prevSmaLong };
-  }
-
-  private calculateMACDValues(): {
-    macdLine: number;
-    signalLine: number;
-    prevMacdLine: number;
-  } {
-    const emaShort =
-      (this.calculateIfEnoughData(PERIODS.EMA_SHORT, this.dayIndex, () =>
-        this.calculateEMA(
-          this.prices.slice(
-            this.dayIndex - PERIODS.EMA_SHORT + 1,
-            this.dayIndex + 1
-          ),
-          PERIODS.EMA_SHORT
-        )
-      ) as number) ?? this.prices[this.dayIndex];
-    const emaLong =
-      (this.calculateIfEnoughData(PERIODS.EMA_LONG, this.dayIndex, () =>
-        this.calculateEMA(
-          this.prices.slice(
-            this.dayIndex - PERIODS.EMA_LONG + 1,
-            this.dayIndex + 1
-          ),
-          PERIODS.EMA_LONG
-        )
-      ) as number) ?? this.prices[this.dayIndex];
-    const macdLine = emaShort - emaLong;
-
-    const prevEmaShort =
-      (this.calculateIfEnoughData(PERIODS.EMA_SHORT + 1, this.dayIndex, () =>
-        this.calculateEMA(
-          this.prices.slice(this.dayIndex - PERIODS.EMA_SHORT, this.dayIndex),
-          PERIODS.EMA_SHORT
-        )
-      ) as number) ??
-      this.prices[this.dayIndex - 1] ??
-      this.prices[this.dayIndex];
-    const prevEmaLong =
-      (this.calculateIfEnoughData(PERIODS.EMA_LONG + 1, this.dayIndex, () =>
-        this.calculateEMA(
-          this.prices.slice(this.dayIndex - PERIODS.EMA_LONG, this.dayIndex),
-          PERIODS.EMA_LONG
-        )
-      ) as number) ??
-      this.prices[this.dayIndex - 1] ??
-      this.prices[this.dayIndex];
-    const prevMacdLine = prevEmaShort - prevEmaLong;
-
-    const signalLine =
-      (this.calculateIfEnoughData(
-        PERIODS.EMA_LONG + PERIODS.MACD_SIGNAL,
-        this.dayIndex,
-        () => {
-          const macdValues = this.prices
-            .slice(this.dayIndex - PERIODS.MACD_SIGNAL + 1, this.dayIndex + 1)
-            .map((_, i) => {
-              const slice = this.prices.slice(
-                this.dayIndex - PERIODS.EMA_LONG - i,
-                this.dayIndex - PERIODS.EMA_SHORT - i + 1
-              );
-              return (
-                this.calculateEMA(slice, PERIODS.EMA_SHORT) -
-                this.calculateEMA(slice, PERIODS.EMA_LONG)
-              );
-            });
-          return this.calculateEMA(macdValues, PERIODS.MACD_SIGNAL);
-        }
-      ) as number) ?? 0;
-
-    return { macdLine, signalLine, prevMacdLine };
-  }
-
-  private calculateBollingerValues(): { smaMedium: number; upperBand: number } {
-    const smaMedium =
-      (this.calculateIfEnoughData(PERIODS.BOLLINGER, this.dayIndex, () =>
-        this.calculateSMA(
-          this.prices.slice(
-            this.dayIndex - PERIODS.BOLLINGER + 1,
-            this.dayIndex + 1
-          )
-        )
-      ) as number) ?? this.prices[this.dayIndex];
-    const stdDev =
-      (this.calculateIfEnoughData(PERIODS.BOLLINGER, this.dayIndex, () =>
-        this.calculateStdDev(
-          this.prices.slice(
-            this.dayIndex - PERIODS.BOLLINGER + 1,
-            this.dayIndex + 1
-          ),
-          smaMedium
-        )
-      ) as number) ?? 0;
-    const upperBand = smaMedium + 2 * stdDev;
-    return { smaMedium, upperBand };
-  }
-
-  private calculateOBV(): number {
-    if (this.dayIndex < 1) return 0;
-    let obv = 0;
-    for (let i = 1; i <= this.dayIndex; i++) {
-      const priceChange = this.prices[i] - this.prices[i - 1];
-      obv +=
-        priceChange > 0
-          ? this.volumes[i]
-          : priceChange < 0
-          ? -this.volumes[i]
-          : 0;
-    }
-    return obv / 1e6;
-  }
-
-  private calculateVolumeOscillatorValues(): {
-    volumeOscillator: number;
-    prevVolumeOscillator: number;
-  } {
-    const volumeSmaShort =
-      (this.calculateIfEnoughData(PERIODS.VOL_SMA_SHORT, this.dayIndex, () =>
-        this.calculateSMA(
-          this.volumes.slice(
-            this.dayIndex - PERIODS.VOL_SMA_SHORT + 1,
-            this.dayIndex + 1
-          )
-        )
-      ) as number) ?? this.volumes[this.dayIndex];
-    const volumeSmaLong =
-      (this.calculateIfEnoughData(PERIODS.VOL_SMA_LONG, this.dayIndex, () =>
-        this.calculateSMA(
-          this.volumes.slice(
-            this.dayIndex - PERIODS.VOL_SMA_LONG + 1,
-            this.dayIndex + 1
-          )
-        )
-      ) as number) ?? this.volumes[this.dayIndex];
-    const volumeOscillator =
-      volumeSmaLong !== 0
-        ? ((volumeSmaShort - volumeSmaLong) / volumeSmaLong) * 100
-        : 0;
-
-    const prevVolumeSmaShort =
-      (this.calculateIfEnoughData(
-        PERIODS.VOL_SMA_SHORT + 1,
-        this.dayIndex,
-        () =>
-          this.calculateSMA(
-            this.volumes.slice(
-              this.dayIndex - PERIODS.VOL_SMA_SHORT,
-              this.dayIndex
-            )
-          )
-      ) as number) ??
-      this.volumes[this.dayIndex - 1] ??
-      this.volumes[this.dayIndex];
-    const prevVolumeSmaLong =
-      (this.calculateIfEnoughData(PERIODS.VOL_SMA_LONG + 1, this.dayIndex, () =>
-        this.calculateSMA(
-          this.volumes.slice(
-            this.dayIndex - PERIODS.VOL_SMA_LONG,
-            this.dayIndex
-          )
-        )
-      ) as number) ??
-      this.volumes[this.dayIndex - 1] ??
-      this.volumes[this.dayIndex];
-    const prevVolumeOscillator =
-      prevVolumeSmaLong !== 0
-        ? ((prevVolumeSmaShort - prevVolumeSmaLong) / prevVolumeSmaLong) * 100
-        : 0;
-
-    return { volumeOscillator, prevVolumeOscillator };
-  }
-
-  private calculateTechnicalIndicators(): {
-    atr: number;
-    atrBaseline: number;
-    zScore: number;
-    vwap: number;
-  } {
-    const atr =
-      (this.calculateIfEnoughData(PERIODS.ATR, this.dayIndex, () =>
-        this.calculateATR(this.prices.slice(0, this.dayIndex + 1), PERIODS.ATR)
-      ) as number) ?? 0;
-    const atrBaseline =
-      (this.calculateIfEnoughData(PERIODS.ATR + 1, this.dayIndex, () =>
-        this.calculateATR(this.prices.slice(0, this.dayIndex), PERIODS.ATR)
-      ) as number) ?? 0;
-    const smaMedium =
-      (this.calculateIfEnoughData(PERIODS.BOLLINGER, this.dayIndex, () =>
-        this.calculateSMA(
-          this.prices.slice(
-            this.dayIndex - PERIODS.BOLLINGER + 1,
-            this.dayIndex + 1
-          )
-        )
-      ) as number) ?? this.prices[this.dayIndex];
-    const stdDev =
-      (this.calculateIfEnoughData(PERIODS.BOLLINGER, this.dayIndex, () =>
-        this.calculateStdDev(
-          this.prices.slice(
-            this.dayIndex - PERIODS.BOLLINGER + 1,
-            this.dayIndex + 1
-          ),
-          smaMedium
-        )
-      ) as number) ?? 0;
-    const zScore =
-      (this.calculateIfEnoughData(
-        PERIODS.BOLLINGER,
-        this.dayIndex,
-        () => (this.currentPrice - smaMedium) / stdDev
-      ) as number) ?? 0;
-    const vwap =
-      (this.calculateIfEnoughData(PERIODS.VWAP, this.dayIndex, () =>
-        this.calculateVWAP(
-          this.prices.slice(0, this.dayIndex + 1),
-          this.volumes.slice(0, this.dayIndex + 1),
-          PERIODS.VWAP
-        )
-      ) as number) ?? this.prices[this.dayIndex];
-    return { atr, atrBaseline, zScore, vwap };
-  }
-
-  private calculateStochRSIValues(): {
-    stochRsi: number;
-    prevStochRsi: number;
-  } {
-    const { stochRsi } = (this.calculateIfEnoughData(
-      PERIODS.STOCH_RSI,
-      this.dayIndex,
-      () =>
-        this.calculateStochRSI(
-          this.prices.slice(0, this.dayIndex + 1),
-          PERIODS.STOCH_RSI,
-          PERIODS.STOCH_RSI,
-          PERIODS.STOCH_SMOOTH
-        )
-    ) as { stochRsi: number }) ?? { stochRsi: 0 };
-    const { stochRsi: prevStochRsi } = (this.calculateIfEnoughData(
-      PERIODS.STOCH_RSI + 1,
-      this.dayIndex,
-      () =>
-        this.calculateStochRSI(
-          this.prices.slice(0, this.dayIndex),
-          PERIODS.STOCH_RSI,
-          PERIODS.STOCH_RSI,
-          PERIODS.STOCH_SMOOTH
-        )
-    ) as { stochRsi: number }) ?? { stochRsi: 0 };
-    return { stochRsi, prevStochRsi };
-  }
-
-  private calculateFibonacci(): number {
-    const { levels } = (this.calculateIfEnoughData(
-      PERIODS.FIBONACCI,
-      this.dayIndex,
-      () =>
-        this.calculateFibonacciLevels(
-          this.prices.slice(
-            this.dayIndex - PERIODS.FIBONACCI + 1,
-            this.dayIndex + 1
-          ),
-          PERIODS.FIBONACCI
-        )
-    ) as { levels: number[] }) ?? { levels: [0, 0, 0, 0] };
-    return levels[3] || 0;
-  }
-
-  private calculatePatterns(): {
-    isDoubleTop: boolean;
-    isHeadAndShoulders: boolean;
-    isTripleTop: boolean;
-    isVolumeSpike: boolean;
-    isTripleBottom?: boolean;
-  } {
-    const isDoubleTop = this.detectDoubleTop(
-      this.prices.slice(0, this.dayIndex + 1),
-      this.volumes.slice(0, this.dayIndex + 1),
-      this.currentPrice
-    );
-    const isHeadAndShoulders = this.detectHeadAndShoulders(
-      this.prices.slice(0, this.dayIndex + 1),
-      this.volumes.slice(0, this.dayIndex + 1),
-      this.currentPrice
-    );
-    const isTripleTop = this.detectTripleTop(
-      this.prices.slice(0, this.dayIndex + 1),
-      this.volumes.slice(0, this.dayIndex + 1),
-      this.currentPrice
-    );
-    const volumeSmaShort =
-      (this.calculateIfEnoughData(PERIODS.VOL_SMA_SHORT, this.dayIndex, () =>
-        this.calculateSMA(
-          this.volumes.slice(
-            this.dayIndex - PERIODS.VOL_SMA_SHORT + 1,
-            this.dayIndex + 1
-          )
-        )
-      ) as number) ?? this.volumes[this.dayIndex];
-    const currentVolume = this.volumes[this.dayIndex] ?? 0;
-    const isVolumeSpike = currentVolume > volumeSmaShort * 2;
-
-    if (this.isBTC) {
-      return { isDoubleTop, isHeadAndShoulders, isTripleTop, isVolumeSpike };
-    }
-    const isTripleBottom = this.detectTripleBottom(
-      this.prices.slice(0, this.dayIndex + 1),
-      this.volumes.slice(0, this.dayIndex + 1),
-      this.currentPrice
-    );
-    return {
-      isDoubleTop,
-      isHeadAndShoulders,
-      isTripleTop,
-      isVolumeSpike,
-      isTripleBottom,
-    };
-  }
-
-  private calculateMomentumValues(): {
-    momentum: number;
-    priceChangePct: number;
-  } {
-    const momentum =
-      (this.calculateIfEnoughData(
-        PERIODS.MOMENTUM,
-        this.dayIndex,
-        () =>
-          this.currentPrice - this.prices[this.dayIndex - PERIODS.MOMENTUM + 1]
-      ) as number) ?? 0;
-    const priceChangePct =
-      this.dayIndex >= 1
-        ? ((this.currentPrice - this.prices[this.dayIndex - 1]) /
-            this.prices[this.dayIndex - 1]) *
-          100
-        : 0;
-    return { momentum, priceChangePct };
-  }
-
   public calculateIndicators(): Indicators {
     const rsi = this.calculateRSI(
       this.calculateSlice(this.prices, PERIODS.RSI + 1)
@@ -823,7 +411,6 @@ export class FeatureCalculator {
     const prevSma21 = this.calculateSMA(
       this.calculateSlice(this.prices, PERIODS.SMA_LONG, 1)
     );
-
     const ema12 = this.calculateEMA(
       this.calculateSlice(this.prices, PERIODS.EMA_SHORT),
       PERIODS.EMA_SHORT
@@ -854,7 +441,6 @@ export class FeatureCalculator {
       }),
       PERIODS.MACD_SIGNAL
     );
-
     const sma20 = this.calculateSMA(
       this.calculateSlice(this.prices, PERIODS.SMA_MEDIUM)
     );
@@ -864,10 +450,9 @@ export class FeatureCalculator {
     );
     const upperBand = sma20 + 2 * stdDev20;
     const lowerBand = sma20 - 2 * stdDev20;
-
     const obvValues = [0];
     let obv = 0;
-    for (let i = 1; i < this.prices.length; i++) {
+    for (let i = 1; i <= this.dayIndex && i < this.prices.length; i++) {
       const priceChange = this.prices[i] - this.prices[i - 1];
       obv +=
         priceChange > 0
@@ -877,32 +462,43 @@ export class FeatureCalculator {
           : 0;
       obvValues.push(obv);
     }
-
-    const atr = this.calculateATR(this.prices, PERIODS.ATR);
-    const atrBaseline = this.calculateATR(
-      this.prices.slice(0, -1),
+    const atr = this.calculateATR(
+      this.prices.slice(0, this.dayIndex + 1),
       PERIODS.ATR
     );
-    const zScore = (this.currentPrice - sma20) / stdDev20;
-    const vwap = this.calculateVWAP(this.prices, this.volumes, PERIODS.VWAP);
+    const atrBaseline = this.calculateATR(
+      this.prices.slice(0, Math.max(0, this.dayIndex)),
+      PERIODS.ATR
+    );
+    const zScore =
+      this.dayIndex >= PERIODS.SMA_MEDIUM
+        ? (this.currentPrice - sma20) / stdDev20
+        : 0;
+    const vwap = this.calculateVWAP(
+      this.prices.slice(0, this.dayIndex + 1),
+      this.volumes.slice(0, this.dayIndex + 1),
+      PERIODS.VWAP
+    );
     const { stochRsi, signal: stochRsiSignal } = this.calculateStochRSI(
-      this.prices,
+      this.prices.slice(0, this.dayIndex + 1),
       PERIODS.STOCH_RSI,
       PERIODS.STOCH_RSI,
       PERIODS.STOCH_SMOOTH
     );
-    const prevStochRsi = this.calculateStochRSI(
-      this.prices.slice(0, -1),
-      PERIODS.STOCH_RSI,
-      PERIODS.STOCH_RSI,
-      PERIODS.STOCH_SMOOTH
-    ).stochRsi;
+    const prevStochRsi =
+      this.dayIndex > 0
+        ? this.calculateStochRSI(
+            this.prices.slice(0, this.dayIndex),
+            PERIODS.STOCH_RSI,
+            PERIODS.STOCH_RSI,
+            PERIODS.STOCH_SMOOTH
+          ).stochRsi
+        : 0;
     const { levels } = this.calculateFibonacciLevels(
-      this.prices,
+      this.prices.slice(0, this.dayIndex + 1),
       PERIODS.FIBONACCI
     );
     const fib61_8 = levels[3] || 0;
-
     const volSmaShort = this.calculateSMA(
       this.calculateSlice(this.volumes, PERIODS.VOL_SMA_SHORT)
     );
@@ -921,50 +517,53 @@ export class FeatureCalculator {
       prevVolSmaLong !== 0
         ? ((prevVolSmaShort - prevVolSmaLong) / prevVolSmaLong) * 100
         : 0;
-    const currentVolume = this.volumes[this.volumes.length - 1];
+    const currentVolume = this.dayIndex >= 0 ? this.volumes[this.dayIndex] : 0;
     const volSma5 = this.calculateSMA(
       this.calculateSlice(this.volumes, PERIODS.VOL_SMA_SHORT)
     );
     const isVolumeSpike = currentVolume > volSma5 * 2;
-
     const isDoubleTop = this.detectDoubleTop(
-      this.prices,
-      this.volumes,
+      this.prices.slice(0, this.dayIndex + 1),
+      this.volumes.slice(0, this.dayIndex + 1),
       this.currentPrice
     );
     const isHeadAndShoulders = this.detectHeadAndShoulders(
-      this.prices,
-      this.volumes,
+      this.prices.slice(0, this.dayIndex + 1),
+      this.volumes.slice(0, this.dayIndex + 1),
       this.currentPrice
     );
     const isTripleTop = this.detectTripleTop(
-      this.prices,
-      this.volumes,
+      this.prices.slice(0, this.dayIndex + 1),
+      this.volumes.slice(0, this.dayIndex + 1),
       this.currentPrice
     );
     const isTripleBottom = this.detectTripleBottom(
-      this.prices,
-      this.volumes,
+      this.prices.slice(0, this.dayIndex + 1),
+      this.volumes.slice(0, this.dayIndex + 1),
       this.currentPrice
     );
-
     const momentum =
-      this.prices.length >= PERIODS.MOMENTUM
-        ? this.currentPrice - this.prices[this.prices.length - PERIODS.MOMENTUM]
+      this.dayIndex >= PERIODS.MOMENTUM
+        ? this.currentPrice - this.prices[this.dayIndex - PERIODS.MOMENTUM]
         : 0;
     const priceChangePct =
-      this.prices.length >= 2
-        ? ((this.currentPrice - this.prices[this.prices.length - 2]) /
-            this.prices[this.prices.length - 2]) *
+      this.dayIndex >= 1
+        ? ((this.currentPrice - this.prices[this.dayIndex - 1]) /
+            this.prices[this.dayIndex - 1]) *
           100
         : 0;
-
     const volAdjustedMomentum =
-      this.prices.length >= PERIODS.MOMENTUM && atr !== 0
-        ? (this.currentPrice -
-            this.prices[this.prices.length - PERIODS.MOMENTUM]) /
+      this.dayIndex >= PERIODS.MOMENTUM && atr !== 0
+        ? (this.currentPrice - this.prices[this.dayIndex - PERIODS.MOMENTUM]) /
           atr
         : 0;
+    const sma50 =
+      this.dayIndex >= 49
+        ? this.calculateSMA(
+            this.prices.slice(this.dayIndex - 49, this.dayIndex + 1)
+          )
+        : sma20;
+    const adxProxy = sma50 !== 0 ? Math.abs((sma7 - sma50) / sma50) : 0;
 
     return {
       rsi,
@@ -975,8 +574,9 @@ export class FeatureCalculator {
       prevSma21,
       macdLine,
       signalLine,
-      currentPrice: this.currentPrice, // Added required field
+      currentPrice: this.currentPrice,
       upperBand,
+      lowerBand,
       obvValues,
       obv,
       atr,
@@ -998,9 +598,9 @@ export class FeatureCalculator {
       momentum,
       priceChangePct,
       sma20,
-      lowerBand,
-      prices: this.prices, // Added required field
-      volAdjustedMomentum, // Added required field
+      prices: this.prices,
+      volAdjustedMomentum,
+      adxProxy,
     };
   }
 
@@ -1011,71 +611,48 @@ export class FeatureCalculator {
       this.dayIndex < 0 ||
       this.dayIndex >= this.prices.length
     ) {
-      return Array(this.isBTC ? 29 : 30).fill(0);
+      return Array(this.isBTC ? 29 : 31).fill(0);
     }
 
-    const { rsi, prevRsi } = this.calculateRSIValues();
-    const { smaShort, smaLong, prevSmaShort, prevSmaLong } =
-      this.calculateSMAValues();
-    const { macdLine, signalLine, prevMacdLine } = this.calculateMACDValues();
-    const { upperBand } = this.calculateBollingerValues();
-    const normalizedOBV = this.calculateOBV();
-    const { volumeOscillator, prevVolumeOscillator } =
-      this.calculateVolumeOscillatorValues();
-    const { atr, atrBaseline, zScore, vwap } =
-      this.calculateTechnicalIndicators();
-    const { stochRsi, prevStochRsi } = this.calculateStochRSIValues();
-    const fib618 = this.calculateFibonacci();
-    const {
-      isDoubleTop,
-      isHeadAndShoulders,
-      isTripleTop,
-      isVolumeSpike,
-      isTripleBottom,
-    } = this.calculatePatterns();
-    const { momentum, priceChangePct } = this.calculateMomentumValues();
-
-    const volAdjustedMomentum =
-      this.dayIndex >= PERIODS.MOMENTUM && atr !== 0
-        ? (this.currentPrice -
-            this.prices[this.dayIndex - PERIODS.MOMENTUM + 1]) /
-          atr
-        : 0;
-
-    const baseFeatures: number[] = [
-      rsi ?? 0, // Ensure undefined is handled
-      prevRsi ?? 0,
-      smaShort,
-      smaLong,
-      prevSmaShort,
-      prevSmaLong,
-      macdLine,
-      signalLine,
-      this.currentPrice,
-      upperBand,
-      normalizedOBV,
-      atr,
-      atrBaseline,
-      zScore,
-      vwap,
-      stochRsi,
-      prevStochRsi,
-      fib618,
-      this.prices[this.dayIndex - 1] || this.prices[0],
-      volumeOscillator,
-      prevVolumeOscillator,
-      isDoubleTop ? 1 : 0,
-      isHeadAndShoulders ? 1 : 0,
-      prevMacdLine,
-      isTripleTop ? 1 : 0,
-      isVolumeSpike ? 1 : 0,
-      momentum ?? 0,
-      priceChangePct ?? 0,
-      volAdjustedMomentum,
+    const indicators = this.calculateIndicators();
+    const baseFeatures = [
+      indicators.rsi ?? 0,
+      indicators.prevRsi ?? 0,
+      indicators.sma7,
+      indicators.sma21,
+      indicators.prevSma7,
+      indicators.prevSma21,
+      indicators.macdLine,
+      indicators.signalLine,
+      indicators.currentPrice,
+      indicators.upperBand,
+      indicators.obvValues[indicators.obvValues.length - 1] / 1e6,
+      indicators.atr,
+      indicators.atrBaseline,
+      indicators.zScore,
+      indicators.vwap,
+      indicators.stochRsi,
+      indicators.prevStochRsi,
+      indicators.fib61_8,
+      this.dayIndex > 0 ? this.prices[this.dayIndex - 1] : this.prices[0],
+      indicators.volumeOscillator,
+      indicators.prevVolumeOscillator,
+      indicators.isDoubleTop ? 1 : 0,
+      indicators.isHeadAndShoulders ? 1 : 0,
+      indicators.prevMacdLine,
+      indicators.isTripleTop ? 1 : 0,
+      indicators.isVolumeSpike ? 1 : 0,
+      indicators.momentum ?? 0,
+      indicators.priceChangePct ?? 0,
+      indicators.volAdjustedMomentum,
     ];
 
     return this.isBTC
       ? baseFeatures
-      : [...baseFeatures, isTripleBottom ? 1 : 0];
+      : [
+          ...baseFeatures,
+          indicators.isTripleBottom ? 1 : 0,
+          indicators.adxProxy,
+        ];
   }
 }

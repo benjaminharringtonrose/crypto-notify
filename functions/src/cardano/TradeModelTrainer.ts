@@ -6,6 +6,7 @@ import { getHistoricalData } from "../api/getHistoricalData";
 import { BestWeightsCallback } from "./callbacks/BestWeightsCallback";
 import { ExponentialDecayLearningRateCallback } from "./callbacks/ExponentialDecayLearningRateCallback";
 import { FeatureCalculator } from "./FeatureCalculator";
+import { PredictionLoggerCallback } from "./callbacks/PredictionLoggerCallback";
 
 dotenv.config();
 
@@ -31,7 +32,7 @@ export class TradeModelTrainer {
     timesteps: 14,
     epochs: 60,
     batchSize: 64,
-    initialLearningRate: 0.003, // Lowered from 0.005
+    initialLearningRate: 0.003,
   };
 
   private readonly backtestStartDays: number = 365;
@@ -69,14 +70,20 @@ export class TradeModelTrainer {
   }
 
   private focalLoss(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
-    const gamma = 3.0;
-    const alpha = tf.tensor1d([1.2, 0.8, 1.5]); // Adjusted: Sell 1.2, Hold 0.8, Buy 1.5
-    const ce = tf.losses.softmaxCrossEntropy(yTrue, yPred);
-    const pt = yTrue.mul(yPred).sum(-1);
+    const gamma = 2.0;
+    const alpha = tf.tensor1d([1.1, 0.9]); // Favor Sell slightly
+    const ce = tf.losses.sigmoidCrossEntropy(yTrue, yPred);
+    const pt = yTrue.mul(yPred).sum(-1).clipByValue(0, 1);
     const focalWeight = tf.pow(tf.sub(1, pt), gamma);
     const yTrueIndices = yTrue.argMax(-1);
     const alphaWeighted = tf.gather(alpha, yTrueIndices);
     const loss = ce.mul(focalWeight).mul(alphaWeighted).mean() as tf.Scalar;
+    console.log(
+      `Focal Loss: ${loss.dataSync()[0].toFixed(4)}, CE: ${ce
+        .mean()
+        .dataSync()[0]
+        .toFixed(4)}`
+    );
     alpha.dispose();
     return loss;
   }
@@ -92,13 +99,8 @@ export class TradeModelTrainer {
     let btcData: HistoricalData;
 
     try {
-      // Fetch ADA data
       adaData = await getHistoricalData("ADA", startDaysAgo);
-
-      // Add a 50ms delay between ADA and BTC fetches to stay under rate limit
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      // Fetch BTC data
+      await new Promise((resolve) => setTimeout(resolve, 50)); // Rate limit delay
       btcData = await getHistoricalData("BTC", startDaysAgo);
     } catch (error) {
       console.error("Error during historical data fetch:", error);
@@ -170,9 +172,9 @@ export class TradeModelTrainer {
   ): boolean {
     const isValid =
       Array.isArray(adaFeatures) &&
-      adaFeatures.length === 30 && // Updated to 30 for ADA
+      adaFeatures.length === 31 &&
       Array.isArray(btcFeatures) &&
-      btcFeatures.length === 29; // Updated to 29 for BTC
+      btcFeatures.length === 29;
     if (!isValid) {
       console.warn(
         `Invalid features - ADA: ${adaFeatures?.length || "undefined"}, BTC: ${
@@ -201,19 +203,14 @@ export class TradeModelTrainer {
     X: number[][][],
     y: number[]
   ): { X: number[][][]; y: number[] } {
-    const buySamples = X.filter((_, i) => y[i] === 2);
-    const sellSamples = X.filter((_, i) => y[i] === 0);
-    const holdSamples = X.filter((_, i) => y[i] === 1);
+    const buySamples = X.filter((_, i) => y[i] === 1); // Buy: 1
+    const sellSamples = X.filter((_, i) => y[i] === 0); // Sell: 0
 
-    const maxSamples = Math.max(
-      buySamples.length,
-      sellSamples.length,
-      holdSamples.length
-    );
+    const maxSamples = Math.max(buySamples.length, sellSamples.length);
     const balancedX: number[][][] = [];
     const balancedY: number[] = [];
 
-    [sellSamples, holdSamples, buySamples].forEach((samples, label) => {
+    [sellSamples, buySamples].forEach((samples, label) => {
       for (let i = 0; i < maxSamples; i++) {
         const idx = i % samples.length;
         balancedX.push(samples[idx]);
@@ -236,25 +233,22 @@ export class TradeModelTrainer {
   private labelData({
     prices,
     dayIndex,
-    threshold = 0.02, // Reverted to 0.02 from 0.015
-    horizon = 5, // Reverted to 5 from 7
+    threshold = 0.02,
+    horizon = 5,
   }: {
     prices: number[];
     dayIndex: number;
     threshold: number;
     horizon: number;
   }): number {
-    if (dayIndex + horizon >= prices.length) return 1; // Default to hold if insufficient data
+    if (dayIndex + horizon >= prices.length) return 0; // Default to Sell
     const futureAvg =
       prices
         .slice(dayIndex + 1, dayIndex + horizon + 1)
         .reduce((a, b) => a + b, 0) / horizon;
     const priceChangePercent =
       (futureAvg - prices[dayIndex]) / prices[dayIndex];
-
-    if (priceChangePercent > threshold) return 2; // Buy
-    if (priceChangePercent < -threshold) return 0; // Sell
-    return 1; // Hold
+    return priceChangePercent > threshold ? 1 : 0; // Buy: 1, Sell: 0
   }
 
   private async prepareData(): Promise<{
@@ -288,116 +282,99 @@ export class TradeModelTrainer {
     }
 
     const balancedData = this.balanceDataset(X, y);
+    console.log(`Total samples: ${balancedData.X.length}`);
+    console.log(
+      `Feature sequence sample (first entry): ${JSON.stringify(
+        balancedData.X[0]
+      )}`
+    );
+    console.log(`Label sample (first 5): ${balancedData.y.slice(0, 5)}`);
+    const buyCount = balancedData.y.filter((label) => label === 1).length;
+    const sellCount = balancedData.y.filter((label) => label === 0).length;
+    console.log(
+      `Training data: ${buyCount} buy (${(
+        (buyCount / balancedData.y.length) *
+        100
+      ).toFixed(2)}%), ${sellCount} sell (${(
+        (sellCount / balancedData.y.length) *
+        100
+      ).toFixed(2)}%), total: ${balancedData.y.length}`
+    );
+
+    const featureStats = this.computeFeatureStats(allFeatures);
+
+    console.log(
+      "Feature Means:",
+      allFeatures.reduce((a, b) => a + b, 0) / allFeatures.length
+    );
+    console.log(
+      "Feature StdDev:",
+      Math.sqrt(
+        allFeatures.reduce(
+          (a, b) => a + Math.pow(b - featureStats.mean, 2),
+          0
+        ) / allFeatures.length
+      )
+    );
+
     return {
       X: balancedData.X,
       y: balancedData.y,
-      featureStats: this.computeFeatureStats(allFeatures),
+      featureStats,
     };
   }
 
   private createModel(): tf.LayersModel {
-    const input = tf.input({ shape: [this.config.timesteps, 59] }); // Updated from 57 to 59
-
+    const input = tf.input({ shape: [this.config.timesteps, 60] });
     const conv1 = tf.layers
-      .conv1d({
-        filters: 64,
-        kernelSize: 3,
-        activation: "relu",
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }),
-        padding: "same",
-      })
-      .apply(input) as tf.SymbolicTensor;
-
-    const bn1 = tf.layers
-      .batchNormalization({ momentum: 0.9 })
-      .apply(conv1) as tf.SymbolicTensor;
-    const pool1 = tf.layers
-      .maxPooling1d({ poolSize: 2, strides: 2 })
-      .apply(bn1) as tf.SymbolicTensor;
-
-    const conv2 = tf.layers
       .conv1d({
         filters: 32,
         kernelSize: 3,
         activation: "relu",
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }),
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
         padding: "same",
       })
-      .apply(pool1) as tf.SymbolicTensor;
-
-    const bn2 = tf.layers
-      .batchNormalization({ momentum: 0.9 })
-      .apply(conv2) as tf.SymbolicTensor;
-
-    const gru1 = tf.layers
-      .gru({
-        units: 64,
-        returnSequences: true,
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }),
-      })
-      .apply(bn2) as tf.SymbolicTensor;
-
-    const bn3 = tf.layers
-      .batchNormalization({ momentum: 0.9 })
-      .apply(gru1) as tf.SymbolicTensor;
-
-    const gru2 = tf.layers
-      .gru({
+      .apply(input) as tf.SymbolicTensor;
+    const pool1 = tf.layers
+      .maxPooling1d({ poolSize: 2, strides: 2 })
+      .apply(conv1) as tf.SymbolicTensor;
+    const lstm = tf.layers
+      .lstm({
         units: 64,
         returnSequences: false,
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }),
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
       })
-      .apply(bn3) as tf.SymbolicTensor;
-
-    const bn4 = tf.layers
-      .batchNormalization({ momentum: 0.9 })
-      .apply(gru2) as tf.SymbolicTensor;
-
-    const residual = tf.layers
-      .dense({
-        units: 64,
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }),
-      })
-      .apply(tf.layers.flatten().apply(bn3)) as tf.SymbolicTensor;
-
-    const add = tf.layers.add().apply([bn4, residual]) as tf.SymbolicTensor;
+      .apply(pool1) as tf.SymbolicTensor;
+    const bn = tf.layers.batchNormalization().apply(lstm) as tf.SymbolicTensor;
     const dropout = tf.layers
-      .dropout({ rate: 0.4 })
-      .apply(add) as tf.SymbolicTensor;
-
+      .dropout({ rate: 0.5 })
+      .apply(bn) as tf.SymbolicTensor;
     const dense1 = tf.layers
       .dense({
         units: 32,
         activation: "relu",
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }),
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
       })
       .apply(dropout) as tf.SymbolicTensor;
-
-    const dense2 = tf.layers
+    const output = tf.layers
       .dense({
-        units: 16,
-        activation: "relu",
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }),
+        units: 2,
+        activation: "softmax",
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
       })
       .apply(dense1) as tf.SymbolicTensor;
-
-    const dense3 = tf.layers
-      .dense({
-        units: 3,
-        activation: "softmax",
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }),
-      })
-      .apply(dense2) as tf.SymbolicTensor;
-
-    return tf.model({ inputs: input, outputs: dense3 });
+    return tf.model({ inputs: input, outputs: output });
   }
 
   private async trainModel(
     X: number[][][],
     y: number[]
   ): Promise<{ X_min: tf.Tensor; X_max: tf.Tensor }> {
-    const X_tensor = tf.tensor3d(X);
-    const y_tensor = tf.oneHot(tf.tensor1d(y, "int32"), 3);
+    const X_tensor = tf.tensor3d(X, [X.length, this.config.timesteps, 60]);
+    const y_tensor = tf.tensor2d(
+      y.map((label) => [label === 0 ? 1 : 0, label === 1 ? 1 : 0]),
+      [y.length, 2]
+    );
     const X_min = X_tensor.min([0, 1]);
     const X_max = X_tensor.max([0, 1]);
     const X_normalized = X_tensor.sub(X_min).div(X_max.sub(X_min).add(1e-6));
@@ -424,7 +401,6 @@ export class TradeModelTrainer {
         .shuffle(trainSize)
         .batch(this.config.batchSize)
         .prefetch(2);
-
       const valDataset = tf.data
         .zip({
           xs: tf.data.array(X_val.arraySync() as number[][][]),
@@ -433,19 +409,19 @@ export class TradeModelTrainer {
         .batch(this.config.batchSize);
 
       this.model = this.createModel();
-      const optimizer = tf.train.adam(0.0025); // Lowered from 0.003
-      const bestWeightsCallback = new BestWeightsCallback({});
+      const optimizer = tf.train.rmsprop(this.config.initialLearningRate);
+      const bestWeightsCallback = new BestWeightsCallback();
       const lrCallback = new ExponentialDecayLearningRateCallback(
-        {},
-        0.0025, // Lowered from 0.003
-        0.95
+        this.config.initialLearningRate,
+        0.98
       );
+      const predictionLoggerCallback = new PredictionLoggerCallback(X_val);
 
       this.model.compile({
         optimizer,
-        loss: this.focalLoss,
+        loss: this.focalLoss.bind(this),
         metrics: [
-          tf.metrics.categoricalAccuracy,
+          tf.metrics.binaryAccuracy,
           this.customPrecision,
           this.customRecall,
         ],
@@ -453,6 +429,7 @@ export class TradeModelTrainer {
 
       bestWeightsCallback.setModel(this.model);
       lrCallback.setModel(this.model);
+      predictionLoggerCallback.setModel(this.model);
 
       console.log("Model summary:");
       this.model.summary();
@@ -462,12 +439,10 @@ export class TradeModelTrainer {
         epochs: this.config.epochs,
         validationData: valDataset,
         callbacks: [
-          tf.callbacks.earlyStopping({
-            monitor: "val_categoricalAccuracy", // Changed from val_loss
-            patience: 25, // Increased from 20
-          }),
+          tf.callbacks.earlyStopping({ monitor: "val_loss", patience: 10 }),
           bestWeightsCallback,
           lrCallback,
+          predictionLoggerCallback,
         ],
       });
 
@@ -490,13 +465,17 @@ export class TradeModelTrainer {
     const preds = this.model.predict(X) as tf.Tensor;
     const predArray = (await preds.array()) as number[][];
     const yArray = Array.from(await y.argMax(-1).data());
-    const predictedLabels = predArray.map((p) => p.indexOf(Math.max(...p)));
+    const predictedLabels = predArray.map((p) => (p[1] > p[0] ? 1 : 0));
 
     console.log("Sample predictions:", predArray.slice(0, 5));
     console.log(
       "Predictions vs Labels (first 5):",
       predictedLabels.slice(0, 5),
       yArray.slice(0, 5)
+    );
+    const buyCount = predictedLabels.filter((p) => p === 1).length;
+    console.log(
+      `Predicted Buy: ${buyCount}, Sell: ${predictedLabels.length - buyCount}`
     );
 
     const metrics = this.calculateMetrics(predictedLabels, yArray);
@@ -509,7 +488,7 @@ export class TradeModelTrainer {
     const confusionMatrix = tf.math.confusionMatrix(
       tf.tensor1d(yArray, "int32"),
       tf.tensor1d(predictedLabels, "int32"),
-      3
+      2
     );
     console.log("Confusion Matrix:", await confusionMatrix.array());
 
@@ -521,7 +500,7 @@ export class TradeModelTrainer {
     yArray: number[]
   ): { precisionBuy: number; precisionSell: number } {
     const truePositivesBuy = predictedLabels.reduce(
-      (sum, p, i) => sum + (p === 2 && yArray[i] === 2 ? 1 : 0),
+      (sum, p, i) => sum + (p === 1 && yArray[i] === 1 ? 1 : 0),
       0
     );
     const truePositivesSell = predictedLabels.reduce(
@@ -529,7 +508,7 @@ export class TradeModelTrainer {
       0
     );
     const predictedBuys = predictedLabels.reduce(
-      (sum, p) => sum + (p === 2 ? 1 : 0),
+      (sum, p) => sum + (p === 1 ? 1 : 0),
       0
     );
     const predictedSells = predictedLabels.reduce(
@@ -558,53 +537,26 @@ export class TradeModelTrainer {
       conv1Bias: Array.from(
         await this.model.getLayer("conv1d_Conv1D1").getWeights()[1].data()
       ),
-      conv2Weights: Array.from(
-        await this.model.getLayer("conv1d_Conv1D2").getWeights()[0].data()
+      lstmWeights: Array.from(
+        await this.model.getLayer("lstm_LSTM1").getWeights()[0].data()
       ),
-      conv2Bias: Array.from(
-        await this.model.getLayer("conv1d_Conv1D2").getWeights()[1].data()
+      lstmRecurrentWeights: Array.from(
+        await this.model.getLayer("lstm_LSTM1").getWeights()[1].data()
       ),
-      gru1Weights: Array.from(
-        await this.model.getLayer("gru_GRU1").getWeights()[0].data()
-      ),
-      gru1RecurrentWeights: Array.from(
-        await this.model.getLayer("gru_GRU1").getWeights()[1].data()
-      ),
-      gru1Bias: Array.from(
-        await this.model.getLayer("gru_GRU1").getWeights()[2].data()
-      ),
-      gru2Weights: Array.from(
-        await this.model.getLayer("gru_GRU2").getWeights()[0].data()
-      ),
-      gru2RecurrentWeights: Array.from(
-        await this.model.getLayer("gru_GRU2").getWeights()[1].data()
-      ),
-      gru2Bias: Array.from(
-        await this.model.getLayer("gru_GRU2").getWeights()[2].data()
-      ),
-      residualWeights: Array.from(
-        await this.model.getLayer("dense_Dense1").getWeights()[0].data()
-      ),
-      residualBias: Array.from(
-        await this.model.getLayer("dense_Dense1").getWeights()[1].data()
+      lstmBias: Array.from(
+        await this.model.getLayer("lstm_LSTM1").getWeights()[2].data()
       ),
       dense1Weights: Array.from(
-        await this.model.getLayer("dense_Dense2").getWeights()[0].data()
+        await this.model.getLayer("dense_Dense1").getWeights()[0].data()
       ),
       dense1Bias: Array.from(
-        await this.model.getLayer("dense_Dense2").getWeights()[1].data()
+        await this.model.getLayer("dense_Dense1").getWeights()[1].data()
       ),
       dense2Weights: Array.from(
-        await this.model.getLayer("dense_Dense3").getWeights()[0].data()
+        await this.model.getLayer("dense_Dense2").getWeights()[0].data()
       ),
       dense2Bias: Array.from(
-        await this.model.getLayer("dense_Dense3").getWeights()[1].data()
-      ),
-      dense3Weights: Array.from(
-        await this.model.getLayer("dense_Dense4").getWeights()[0].data()
-      ),
-      dense3Bias: Array.from(
-        await this.model.getLayer("dense_Dense4").getWeights()[1].data()
+        await this.model.getLayer("dense_Dense2").getWeights()[1].data()
       ),
       featureMins: Array.from(await X_min.data()),
       featureMaxs: Array.from(await X_max.data()),
@@ -626,29 +578,6 @@ export class TradeModelTrainer {
   public async train(): Promise<void> {
     try {
       const { X, y, featureStats } = await this.prepareData();
-
-      console.log(`Total samples: ${X.length}`);
-      console.log(
-        `Feature sequence sample (first entry): ${JSON.stringify(X[0])}`
-      );
-      console.log(`Label sample (first 5): ${y.slice(0, 5)}`);
-
-      const buyCount = y.filter((label) => label === 2).length;
-      const holdCount = y.filter((label) => label === 1).length;
-      const sellCount = y.filter((label) => label === 0).length;
-      console.log(
-        `Training data: ${buyCount} buy (${(
-          (buyCount / y.length) *
-          100
-        ).toFixed(2)}%), ` +
-          `${holdCount} hold (${((holdCount / y.length) * 100).toFixed(
-            2
-          )}%), ` +
-          `${sellCount} sell (${((sellCount / y.length) * 100).toFixed(
-            2
-          )}%), total: ${y.length}`
-      );
-
       const { X_min, X_max } = await this.trainModel(X, y);
       await this.saveModelWeights(featureStats, X_min, X_max);
     } catch (error) {

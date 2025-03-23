@@ -1,19 +1,17 @@
 import * as admin from "firebase-admin";
 import * as tf from "@tensorflow/tfjs-node";
 import dotenv from "dotenv";
-import { TradeDecision, Indicators, Recommendation } from "../types";
+import {
+  TradeDecision,
+  Indicators,
+  Recommendation,
+  StrategyResult,
+} from "../types";
 import { getCurrentPrices } from "../api/getCurrentPrices";
 import { getHistoricalPricesAndVolumes } from "../api/getHistoricalPricesAndVolumes";
 import { FeatureCalculator } from "./FeatureCalculator";
 
 dotenv.config();
-
-interface StrategyResult {
-  buyProb: number;
-  sellProb: number;
-  holdProb: number;
-  recommendation: Recommendation;
-}
 
 class TradePredictor {
   private bucket = admin.storage().bucket(process.env.STORAGE_BUCKET);
@@ -151,10 +149,9 @@ class TradePredictor {
         btcPrices,
       } = await this.fetchAndCalculateIndicators();
 
-      // Cast to Indicators and fill missing fields
       const adaIndicators: Indicators = {
         ...adaIndRaw,
-        currentPrice: currentAdaPrice, // Guaranteed by fetchAndCalculateIndicators
+        currentPrice: currentAdaPrice,
         volAdjustedMomentum:
           adaIndRaw.volAdjustedMomentum ??
           (adaIndRaw.atr !== 0 && adaPrices.length >= 10
@@ -174,7 +171,7 @@ class TradePredictor {
 
       const btcIndicators: Indicators = {
         ...btcIndRaw,
-        currentPrice: btcPrices[btcPrices.length - 1], // Assuming last price is current
+        currentPrice: btcPrices[btcPrices.length - 1],
         volAdjustedMomentum:
           btcIndRaw.volAdjustedMomentum ??
           (btcIndRaw.atr !== 0 && btcPrices.length >= 10
@@ -214,60 +211,32 @@ class TradePredictor {
         }
       };
 
-      validateArray(weights.conv1Weights, 3 * 59 * 64, "conv1Weights");
+      validateArray(weights.conv1Weights, 3 * 60 * 64, "conv1Weights");
       validateArray(weights.conv1Bias, 64, "conv1Bias");
       validateArray(weights.conv2Weights, 3 * 64 * 32, "conv2Weights");
       validateArray(weights.conv2Bias, 32, "conv2Bias");
-      validateArray(weights.gru1Weights, 32 * 192, "gru1Weights");
+      validateArray(weights.gru1Weights, 32 * 288, "gru1Weights");
       validateArray(
         weights.gru1RecurrentWeights,
-        64 * 192,
+        96 * 288,
         "gru1RecurrentWeights"
       );
-      validateArray(weights.gru1Bias, 192, "gru1Bias");
-      validateArray(weights.gru2Weights, 64 * 96, "gru2Weights");
+      validateArray(weights.gru1Bias, 288, "gru1Bias");
+      validateArray(weights.gru2Weights, 96 * 192, "gru2Weights");
       validateArray(
         weights.gru2RecurrentWeights,
-        32 * 96,
+        64 * 192,
         "gru2RecurrentWeights"
       );
-      validateArray(weights.gru2Bias, 96, "gru2Bias");
-      validateArray(weights.residualWeights, 7 * 64 * 32, "residualWeights");
-      validateArray(weights.residualBias, 32, "residualBias");
-      validateArray(weights.dense1Weights, 32 * 16, "dense1Weights");
-      validateArray(weights.dense1Bias, 16, "dense1Bias");
-      validateArray(weights.dense2Weights, 16 * 3, "dense2Weights");
-      validateArray(weights.dense2Bias, 3, "dense2Bias");
-      validateArray(weights.featureMins, 59, "featureMins");
-      validateArray(weights.featureMaxs, 59, "featureMaxs");
-
-      const conv1Weights = tf.tensor3d(weights.conv1Weights, [3, 59, 64]);
-      const conv1Bias = tf.tensor1d(weights.conv1Bias);
-      const conv2Weights = tf.tensor3d(weights.conv2Weights, [3, 64, 32]);
-      const conv2Bias = tf.tensor1d(weights.conv2Bias);
-      const gru1Weights = tf.tensor2d(weights.gru1Weights, [32, 192]);
-      const gru1RecurrentWeights = tf.tensor2d(
-        weights.gru1RecurrentWeights,
-        [64, 192]
-      );
-      const gru1Bias = tf.tensor1d(weights.gru1Bias);
-      const gru2Weights = tf.tensor2d(weights.gru2Weights, [64, 96]);
-      const gru2RecurrentWeights = tf.tensor2d(
-        weights.gru2RecurrentWeights,
-        [32, 96]
-      );
-      const gru2Bias = tf.tensor1d(weights.gru2Bias);
-      const residualWeights = tf.tensor2d(weights.residualWeights, [
-        7 * 64,
-        32,
-      ]);
-      const residualBias = tf.tensor1d(weights.residualBias);
-      const dense1Weights = tf.tensor2d(weights.dense1Weights, [32, 16]);
-      const dense1Bias = tf.tensor1d(weights.dense1Bias);
-      const dense2Weights = tf.tensor2d(weights.dense2Weights, [16, 3]);
-      const dense2Bias = tf.tensor1d(weights.dense2Bias);
-      const featureMins = tf.tensor1d(weights.featureMins);
-      const featureMaxs = tf.tensor1d(weights.featureMaxs);
+      validateArray(weights.gru2Bias, 192, "gru2Bias");
+      validateArray(weights.residualWeights, 7 * 96 * 64, "residualWeights");
+      validateArray(weights.residualBias, 64, "residualBias");
+      validateArray(weights.dense1Weights, 64 * 32, "dense1Weights");
+      validateArray(weights.dense1Bias, 32, "dense1Bias");
+      validateArray(weights.dense2Weights, 32 * 16, "dense2Weights");
+      validateArray(weights.dense2Bias, 16, "dense2Bias");
+      validateArray(weights.featureMins, 60, "featureMins");
+      validateArray(weights.featureMaxs, 60, "featureMaxs");
 
       const timesteps = 14;
       const featureSequence: number[][] = [];
@@ -307,6 +276,7 @@ class TradePredictor {
           adaIndicators.priceChangePct ?? 0,
           adaIndicators.volAdjustedMomentum,
           adaIndicators.isTripleBottom ? 1 : 0,
+          adaIndicators.adxProxy,
           btcIndicators.rsi ?? 0,
           btcIndicators.prevRsi ?? 0,
           btcIndicators.sma7,
@@ -317,7 +287,7 @@ class TradePredictor {
           btcIndicators.signalLine,
           btcPrices[i],
           btcIndicators.upperBand,
-          btcIndicators.obvValues[btcIndicators.obvValues.length - 1] / 1e6,
+          btcIndicators.obvValues[btcIndRaw.obvValues.length - 1] / 1e6,
           btcIndicators.atr,
           btcIndicators.atrBaseline,
           btcIndicators.zScore,
@@ -340,93 +310,133 @@ class TradePredictor {
         featureSequence.push(dayFeatures);
       }
       while (featureSequence.length < timesteps)
-        featureSequence.unshift(featureSequence[0] || Array(59).fill(0));
+        featureSequence.unshift(featureSequence[0] || Array(60).fill(0));
 
-      const featuresRaw = tf.tensor2d(featureSequence, [timesteps, 59]);
-      const featuresNormalized = featuresRaw
-        .sub(featureMins)
-        .div(featureMaxs.sub(featureMins).add(1e-6))
-        .clipByValue(0, 1)
-        .reshape([1, timesteps, 59]) as tf.Tensor3D;
+      const [sellProbBase, buyProbBase] = await tf.tidy(() => {
+        const conv1Weights = tf.tensor3d(weights.conv1Weights, [3, 60, 64]);
+        const conv1Bias = tf.tensor1d(weights.conv1Bias);
+        const conv2Weights = tf.tensor3d(weights.conv2Weights, [3, 64, 32]);
+        const conv2Bias = tf.tensor1d(weights.conv2Bias);
+        const gru1Weights = tf.tensor2d(weights.gru1Weights, [32, 288]);
+        const gru1RecurrentWeights = tf.tensor2d(
+          weights.gru1RecurrentWeights,
+          [96, 288]
+        );
+        const gru1Bias = tf.tensor1d(weights.gru1Bias);
+        const gru2Weights = tf.tensor2d(weights.gru2Weights, [96, 192]);
+        const gru2RecurrentWeights = tf.tensor2d(
+          weights.gru2RecurrentWeights,
+          [64, 192]
+        );
+        const gru2Bias = tf.tensor1d(weights.gru2Bias);
+        const residualWeights = tf.tensor2d(weights.residualWeights, [
+          7 * 96,
+          64,
+        ]);
+        const residualBias = tf.tensor1d(weights.residualBias);
+        const dense1Weights = tf.tensor2d(weights.dense1Weights, [64, 32]);
+        const dense1Bias = tf.tensor1d(weights.dense1Bias);
+        const dense2Weights = tf.tensor2d(weights.dense2Weights, [32, 16]);
+        const dense2Bias = tf.tensor1d(weights.dense2Bias);
+        const featureMins = tf.tensor1d(weights.featureMins);
+        const featureMaxs = tf.tensor1d(weights.featureMaxs);
 
-      let conv1Output = tf
-        .conv1d(featuresNormalized, conv1Weights, 1, "same")
-        .add(conv1Bias) as tf.Tensor3D;
-      conv1Output = tf.relu(conv1Output);
-      conv1Output = tf
-        .maxPool(
-          conv1Output.reshape([1, 14, 1, 64]) as tf.Tensor3D,
-          [2, 1],
-          [2, 1],
-          "valid"
-        )
-        .reshape([1, 7, 64]) as tf.Tensor3D;
+        const featuresRaw = tf.tensor2d(featureSequence, [timesteps, 60]);
+        const featuresNormalized = featuresRaw
+          .sub(featureMins)
+          .div(featureMaxs.sub(featureMins).add(1e-6))
+          .clipByValue(0, 1)
+          .reshape([1, timesteps, 60]) as tf.Tensor3D;
 
-      let conv2Output = tf
-        .conv1d(conv1Output, conv2Weights, 1, "same")
-        .add(conv2Bias) as tf.Tensor3D;
-      conv2Output = tf.relu(conv2Output);
+        let conv1Output = tf
+          .conv1d(featuresNormalized, conv1Weights, 1, "same")
+          .add(conv1Bias) as tf.Tensor3D;
+        conv1Output = tf.relu(conv1Output);
+        conv1Output = tf
+          .maxPool(
+            conv1Output.reshape([1, 14, 1, 64]) as tf.Tensor3D,
+            [2, 1],
+            [2, 1],
+            "valid"
+          )
+          .reshape([1, 7, 64]) as tf.Tensor3D;
 
-      const gru1Layer = tf.layers.gru({
-        units: 64,
-        returnSequences: true,
-        weights: [gru1Weights, gru1RecurrentWeights, gru1Bias],
+        let conv2Output = tf
+          .conv1d(conv1Output, conv2Weights, 1, "same")
+          .add(conv2Bias) as tf.Tensor3D;
+        conv2Output = tf.relu(conv2Output);
+
+        const gru1Layer = tf.layers.gru({
+          units: 96,
+          returnSequences: true,
+          weights: [gru1Weights, gru1RecurrentWeights, gru1Bias],
+        });
+        const gru1Output = gru1Layer.apply(conv2Output) as tf.Tensor3D;
+
+        const gru2Layer = tf.layers.gru({
+          units: 64,
+          returnSequences: false,
+          weights: [gru2Weights, gru2RecurrentWeights, gru2Bias],
+        });
+        const gru2Output = gru2Layer.apply(gru1Output) as tf.Tensor2D;
+
+        const flattenedGru1 = tf.layers
+          .flatten()
+          .apply(gru1Output) as tf.Tensor2D;
+        const residualOutput = tf
+          .matMul(flattenedGru1, residualWeights)
+          .add(residualBias) as tf.Tensor2D;
+
+        const combinedOutput = tf.add(
+          gru2Output,
+          residualOutput
+        ) as tf.Tensor2D;
+        const dropoutOutput = combinedOutput
+          .mul(tf.randomUniform([1, 64]).greater(0.3).cast("float32"))
+          .div(0.7) as tf.Tensor2D;
+
+        const dense1Output = tf.layers
+          .dense({
+            units: 16,
+            activation: "relu",
+            weights: [dense1Weights, dense1Bias],
+          })
+          .apply(dropoutOutput) as tf.Tensor2D;
+
+        const dense2Output = tf.layers
+          .dense({
+            units: 2,
+            activation: "sigmoid",
+            weights: [dense2Weights, dense2Bias],
+          })
+          .apply(dense1Output) as tf.Tensor2D;
+
+        return dense2Output.dataSync() as Float32Array;
       });
-      const gru1Output = gru1Layer.apply(conv2Output) as tf.Tensor3D;
 
-      const gru2Layer = tf.layers.gru({
-        units: 32,
-        returnSequences: false,
-        weights: [gru2Weights, gru2RecurrentWeights, gru2Bias],
-      });
-      const gru2Output = gru2Layer.apply(gru1Output) as tf.Tensor2D;
-
-      const flattenedGru1 = tf.layers
-        .flatten()
-        .apply(gru1Output) as tf.Tensor2D;
-      const residualOutput = tf
-        .matMul(flattenedGru1, residualWeights)
-        .add(residualBias) as tf.Tensor2D;
-
-      const combinedOutput = tf.add(gru2Output, residualOutput) as tf.Tensor2D;
-      const dropoutOutput = combinedOutput
-        .mul(tf.randomUniform([1, 32]).greater(0.3).cast("float32"))
-        .div(0.7) as tf.Tensor2D;
-
-      const dense1Output = tf.layers
-        .dense({
-          units: 16,
-          activation: "relu",
-          weights: [dense1Weights, dense1Bias],
-        })
-        .apply(dropoutOutput) as tf.Tensor2D;
-
-      const logits = tf.layers
-        .dense({
-          units: 3,
-          weights: [dense2Weights, dense2Bias],
-        })
-        .apply(dense1Output) as tf.Tensor2D;
-
-      const probabilityTensor = tf.softmax(logits);
-      const probabilities = await probabilityTensor.data();
-      let [sellProbBase, holdProbBase, buyProbBase] = probabilities;
-
-      const actionSum = buyProbBase + sellProbBase;
       const sma50 =
         adaPrices.length >= 50
           ? adaPrices.slice(-50).reduce((a, b) => a + b, 0) / 50
           : adaPrices.slice(-20).reduce((a, b) => a + b, 0) / 20;
       const isBearish = adaIndicators.sma7 < sma50;
-      if (actionSum > 0) {
-        buyProbBase = (buyProbBase / actionSum) * 0.8;
-        sellProbBase = (sellProbBase / actionSum) * 0.8;
-        holdProbBase = isBearish ? 0.15 : 0.2;
-      }
-
-      const adxProxy = Math.abs((adaIndicators.sma7 - sma50) / sma50);
+      const adxProxy = adaIndicators.adxProxy;
       const volatility = adaIndicators.atr / adaIndicators.atrBaseline;
       const rsiSafe = adaIndicators.rsi ?? 50;
+      const profitPotential =
+        (adaIndicators.currentPrice -
+          adaPrices.slice(-5).reduce((a, b) => a + b, 0) / 5) /
+        (adaPrices.slice(-5).reduce((a, b) => a + b, 0) / 5);
+
+      let buyProb = buyProbBase;
+      let sellProb = sellProbBase;
+      let holdProb = 0;
+
+      const confidenceThreshold = 0.6;
+      if (buyProb < confidenceThreshold && sellProb < confidenceThreshold) {
+        holdProb = 1 - (buyProb + sellProb);
+        buyProb *= 0.8;
+        sellProb *= 0.8;
+      }
 
       const trendResult = this.evaluateStrategy(
         "TrendFollowing",
@@ -443,18 +453,15 @@ class TradePredictor {
       const breakoutWeight =
         volatility > 1.5 || adaIndicators.isVolumeSpike ? 0.3 : 0.2;
 
-      let buyProb =
-        buyProbBase +
+      buyProb +=
         trendWeight * trendResult.buyProb +
         meanRevWeight * meanRevResult.buyProb +
         breakoutWeight * breakoutResult.buyProb;
-      let sellProb =
-        sellProbBase +
+      sellProb +=
         trendWeight * trendResult.sellProb +
         meanRevWeight * meanRevResult.sellProb +
         breakoutWeight * breakoutResult.sellProb;
-      let holdProb =
-        holdProbBase +
+      holdProb +=
         trendWeight * trendResult.holdProb +
         meanRevWeight * meanRevResult.holdProb +
         breakoutWeight * breakoutResult.holdProb;
@@ -464,24 +471,21 @@ class TradePredictor {
       sellProb /= total;
       holdProb /= total;
 
-      const profitPotential =
-        (adaIndicators.currentPrice -
-          adaPrices.slice(-5).reduce((a, b) => a + b, 0) / 5) /
-        (adaPrices.slice(-5).reduce((a, b) => a + b, 0) / 5);
-
       const recommendation =
-        rsiSafe < 30 && buyProb > 0.33 && profitPotential > -0.03
+        rsiSafe < 30 && buyProb > 0.5 && profitPotential > -0.03
           ? Recommendation.Buy
           : adxProxy > 0.02 &&
-            sellProb > 0.33 &&
+            sellProb > 0.5 &&
             (profitPotential > 0.05 || profitPotential < 0)
           ? Recommendation.Sell
-          : buyProb > 0.35 && profitPotential > -0.03
+          : buyProb > 0.6 && profitPotential > -0.03
           ? Recommendation.Buy
-          : sellProb > 0.35 &&
+          : sellProb > 0.6 &&
             (profitPotential > 0.05 ||
               (adxProxy < 0.02 && profitPotential > -0.05))
           ? Recommendation.Sell
+          : isBearish && holdProb > 0.4
+          ? Recommendation.Hold
           : Recommendation.Hold;
 
       console.log(
@@ -497,40 +501,6 @@ class TradePredictor {
           adxProxy > 0.02 ? "Strong" : "Weak"
         }, RSI: ${rsiSafe.toFixed(2)}`
       );
-
-      [
-        conv1Weights,
-        conv1Bias,
-        conv2Weights,
-        conv2Bias,
-        gru1Weights,
-        gru1RecurrentWeights,
-        gru1Bias,
-        gru2Weights,
-        gru2RecurrentWeights,
-        gru2Bias,
-        residualWeights,
-        residualBias,
-        dense1Weights,
-        dense1Bias,
-        dense2Weights,
-        dense2Bias,
-        featureMins,
-        featureMaxs,
-        featuresRaw,
-        featuresNormalized,
-        conv1Output,
-        conv2Output,
-        gru1Output,
-        gru2Output,
-        flattenedGru1,
-        residualOutput,
-        combinedOutput,
-        dropoutOutput,
-        dense1Output,
-        logits,
-        probabilityTensor,
-      ].forEach((tensor) => tensor.dispose());
 
       return {
         currentPrice: adaIndicators.currentPrice,

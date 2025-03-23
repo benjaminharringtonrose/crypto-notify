@@ -114,6 +114,7 @@ export interface TradeDecision {
   probabilities: Probabilities;
   recommendation: Recommendation;
   timestamp: any;
+  profitPotential: number;
 }
 
 export interface RecieveSMSRequest {

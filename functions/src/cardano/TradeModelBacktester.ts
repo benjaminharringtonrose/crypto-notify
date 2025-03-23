@@ -18,6 +18,8 @@ interface BacktestResult {
   totalReturn: number;
   totalTrades: number;
   winRate: number;
+  sharpeRatio: number;
+  maxDrawdown: number;
   portfolioHistory: { timestamp: string; value: number }[];
   trades: Trade[];
 }
@@ -28,7 +30,8 @@ export class TradeModelBacktester {
   private MIN_TRADE_USD = 100;
   private MIN_HOLD_DAYS = 1;
   private CASH_RESERVE = 100;
-  private STOP_LOSS_THRESHOLD = -0.1; // -10%
+  private STOP_LOSS_THRESHOLD = -0.05;
+  private TAKE_PROFIT_THRESHOLD = 0.1;
 
   private startDaysAgo: number;
   private endDaysAgo: number;
@@ -43,7 +46,6 @@ export class TradeModelBacktester {
     this.endDaysAgo = endDaysAgo;
     this.stepDays = stepDays;
 
-    // Initialize Firebase if not already initialized
     if (!admin.apps.length) {
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount as any),
@@ -131,6 +133,27 @@ export class TradeModelBacktester {
     require("../api/getCurrentPrices").getCurrentPrices = originalGetCurrent;
   }
 
+  private calculateSharpeRatio(returns: number[]): number {
+    const meanReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
+    const stdDev =
+      Math.sqrt(
+        returns.reduce((a, b) => a + Math.pow(b - meanReturn, 2), 0) /
+          (returns.length - 1)
+      ) || 1;
+    return (meanReturn / stdDev) * Math.sqrt(365);
+  }
+
+  private calculateMaxDrawdown(portfolioValues: number[]): number {
+    let maxDD = 0;
+    let peak = portfolioValues[0];
+    for (const value of portfolioValues) {
+      if (value > peak) peak = value;
+      const dd = (peak - value) / peak;
+      if (dd > maxDD) maxDD = dd;
+    }
+    return maxDD * 100;
+  }
+
   public async run(): Promise<BacktestResult> {
     console.log("Starting backtest...");
 
@@ -153,6 +176,7 @@ export class TradeModelBacktester {
     let avgBuyPrice = 0;
     const trades: Trade[] = [];
     const portfolioHistory: { timestamp: string; value: number }[] = [];
+    const dailyReturns: number[] = [];
     let wins = 0;
     let completedCycles = 0;
     let daysSinceLastTrade = 0;
@@ -196,7 +220,7 @@ export class TradeModelBacktester {
         decision.probabilities.buy,
         decision.probabilities.sell
       );
-      const positionSizeFactor = Math.min(0.75, confidence);
+      const positionSizeFactor = Math.min(0.9, confidence);
       const portfolioValue = usdBalance + adaBalance * currentAdaPrice;
       const unrealizedProfit =
         adaBalance > 0 ? (currentAdaPrice - avgBuyPrice) / avgBuyPrice : 0;
@@ -209,7 +233,9 @@ export class TradeModelBacktester {
         (decision.recommendation === Recommendation.Sell &&
           adaBalance > 0 &&
           daysSinceLastTrade >= this.MIN_HOLD_DAYS) ||
-        (adaBalance > 0 && unrealizedProfit <= this.STOP_LOSS_THRESHOLD);
+        (adaBalance > 0 &&
+          (unrealizedProfit <= this.STOP_LOSS_THRESHOLD ||
+            unrealizedProfit >= this.TAKE_PROFIT_THRESHOLD));
 
       if (buyCondition) {
         const usdToSpend = Math.max(
@@ -236,7 +262,9 @@ export class TradeModelBacktester {
         console.log(
           `Buy at $${currentAdaPrice.toFixed(4)}, ADA: ${adaBought.toFixed(
             2
-          )}, USD: ${usdToSpend.toFixed(2)}`
+          )}, USD: ${usdToSpend.toFixed(2)}, RSI: ${
+            decision.rsi
+          }, Profit Potential: ${(decision.profitPotential * 100).toFixed(2)}%`
         );
         daysSinceLastTrade = 0;
       } else if (sellCondition) {
@@ -256,7 +284,9 @@ export class TradeModelBacktester {
         console.log(
           `Sell at $${currentAdaPrice.toFixed(4)}, ADA: ${adaToSell.toFixed(
             2
-          )}, USD: ${usdReceived.toFixed(2)}`
+          )}, USD: ${usdReceived.toFixed(2)}, RSI: ${
+            decision.rsi
+          }, Profit Potential: ${(decision.profitPotential * 100).toFixed(2)}%`
         );
         if (usdReceived > adaToSell * avgBuyPrice) wins++;
         if (adaBalance === 0) {
@@ -269,6 +299,13 @@ export class TradeModelBacktester {
       }
 
       portfolioHistory.push({ timestamp, value: portfolioValue });
+      dailyReturns.push(
+        portfolioHistory.length > 1
+          ? (portfolioValue -
+              portfolioHistory[portfolioHistory.length - 2].value) /
+              portfolioHistory[portfolioHistory.length - 2].value
+          : 0
+      );
       this.restoreMocks(originalGetHistorical, originalGetCurrent);
     }
 
@@ -278,18 +315,31 @@ export class TradeModelBacktester {
       ((finalValue - this.INITIAL_USD) / this.INITIAL_USD) * 100;
     const totalTrades = trades.length;
     const winRate = completedCycles > 0 ? (wins / completedCycles) * 100 : 0;
+    const sharpeRatio = this.calculateSharpeRatio(dailyReturns);
+    const maxDrawdown = this.calculateMaxDrawdown(
+      portfolioHistory.map((h) => h.value)
+    );
 
     console.log(`Backtest completed:
       Initial USD: $${this.INITIAL_USD}
       Final Value: $${finalValue.toFixed(2)}
       Total Return: ${totalReturn.toFixed(2)}%
       Total Trades: ${totalTrades}
-      Win Rate: ${winRate.toFixed(2)}%`);
+      Win Rate: ${winRate.toFixed(2)}%
+      Sharpe Ratio: ${sharpeRatio.toFixed(2)}
+      Max Drawdown: ${maxDrawdown.toFixed(2)}%`);
 
-    return { totalReturn, totalTrades, winRate, portfolioHistory, trades };
+    return {
+      totalReturn,
+      totalTrades,
+      winRate,
+      sharpeRatio,
+      maxDrawdown,
+      portfolioHistory,
+      trades,
+    };
   }
 
-  // Optional: Method to run backtest with default timeout
   public static async runWithTimeout(
     startDaysAgo?: number,
     endDaysAgo?: number,

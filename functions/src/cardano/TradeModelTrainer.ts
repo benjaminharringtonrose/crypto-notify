@@ -69,8 +69,8 @@ export class TradeModelTrainer {
   }
 
   private focalLoss(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
-    const gamma = 3.0; // Reverted to 3.0 from 2.0
-    const alpha = tf.tensor1d([1.0, 1.0, 1.5]); // Class weights: Buy (2) weighted higher
+    const gamma = 3.0;
+    const alpha = tf.tensor1d([1.2, 0.8, 1.5]); // Adjusted: Sell 1.2, Hold 0.8, Buy 1.5
     const ce = tf.losses.softmaxCrossEntropy(yTrue, yPred);
     const pt = yTrue.mul(yPred).sum(-1);
     const focalWeight = tf.pow(tf.sub(1, pt), gamma);
@@ -170,9 +170,9 @@ export class TradeModelTrainer {
   ): boolean {
     const isValid =
       Array.isArray(adaFeatures) &&
-      adaFeatures.length === 29 &&
+      adaFeatures.length === 30 && // Updated to 30 for ADA
       Array.isArray(btcFeatures) &&
-      btcFeatures.length === 28;
+      btcFeatures.length === 29; // Updated to 29 for BTC
     if (!isValid) {
       console.warn(
         `Invalid features - ADA: ${adaFeatures?.length || "undefined"}, BTC: ${
@@ -296,14 +296,14 @@ export class TradeModelTrainer {
   }
 
   private createModel(): tf.LayersModel {
-    const input = tf.input({ shape: [this.config.timesteps, 57] });
+    const input = tf.input({ shape: [this.config.timesteps, 59] }); // Updated from 57 to 59
 
     const conv1 = tf.layers
       .conv1d({
         filters: 64,
         kernelSize: 3,
         activation: "relu",
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }), // Adjusted to 0.03
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }),
         padding: "same",
       })
       .apply(input) as tf.SymbolicTensor;
@@ -320,7 +320,7 @@ export class TradeModelTrainer {
         filters: 32,
         kernelSize: 3,
         activation: "relu",
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }), // Adjusted to 0.03
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }),
         padding: "same",
       })
       .apply(pool1) as tf.SymbolicTensor;
@@ -333,7 +333,7 @@ export class TradeModelTrainer {
       .gru({
         units: 64,
         returnSequences: true,
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }), // Adjusted to 0.03
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }),
       })
       .apply(bn2) as tf.SymbolicTensor;
 
@@ -345,7 +345,7 @@ export class TradeModelTrainer {
       .gru({
         units: 64,
         returnSequences: false,
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }), // Adjusted to 0.03
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }),
       })
       .apply(bn3) as tf.SymbolicTensor;
 
@@ -356,20 +356,20 @@ export class TradeModelTrainer {
     const residual = tf.layers
       .dense({
         units: 64,
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }), // Adjusted to 0.03
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }),
       })
       .apply(tf.layers.flatten().apply(bn3)) as tf.SymbolicTensor;
 
     const add = tf.layers.add().apply([bn4, residual]) as tf.SymbolicTensor;
     const dropout = tf.layers
-      .dropout({ rate: 0.4 }) // Adjusted to 0.4 from 0.5
+      .dropout({ rate: 0.4 })
       .apply(add) as tf.SymbolicTensor;
 
     const dense1 = tf.layers
       .dense({
-        units: 32, // Added intermediate dense layer
+        units: 32,
         activation: "relu",
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }), // Adjusted to 0.03
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }),
       })
       .apply(dropout) as tf.SymbolicTensor;
 
@@ -377,7 +377,7 @@ export class TradeModelTrainer {
       .dense({
         units: 16,
         activation: "relu",
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }), // Adjusted to 0.03
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }),
       })
       .apply(dense1) as tf.SymbolicTensor;
 
@@ -385,7 +385,7 @@ export class TradeModelTrainer {
       .dense({
         units: 3,
         activation: "softmax",
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }), // Adjusted to 0.03
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }),
       })
       .apply(dense2) as tf.SymbolicTensor;
 
@@ -433,11 +433,11 @@ export class TradeModelTrainer {
         .batch(this.config.batchSize);
 
       this.model = this.createModel();
-      const optimizer = tf.train.adam(this.config.initialLearningRate);
+      const optimizer = tf.train.adam(0.0025); // Lowered from 0.003
       const bestWeightsCallback = new BestWeightsCallback({});
       const lrCallback = new ExponentialDecayLearningRateCallback(
         {},
-        this.config.initialLearningRate,
+        0.0025, // Lowered from 0.003
         0.95
       );
 
@@ -462,7 +462,10 @@ export class TradeModelTrainer {
         epochs: this.config.epochs,
         validationData: valDataset,
         callbacks: [
-          tf.callbacks.earlyStopping({ monitor: "val_loss", patience: 20 }), // Increased to 20
+          tf.callbacks.earlyStopping({
+            monitor: "val_categoricalAccuracy", // Changed from val_loss
+            patience: 25, // Increased from 20
+          }),
           bestWeightsCallback,
           lrCallback,
         ],

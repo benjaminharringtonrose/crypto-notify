@@ -33,15 +33,15 @@ export enum Docs {
 }
 
 export interface Indicators {
-  rsi?: number;
-  prevRsi?: number;
+  rsi: number | undefined;
+  prevRsi: number | undefined;
   sma7: number;
   sma21: number;
   prevSma7: number;
   prevSma21: number;
   macdLine: number;
   signalLine: number;
-  currentPrice: number;
+  currentPrice: number; // Changed from optional to required
   upperBand: number;
   obvValues: number[];
   atr: number;
@@ -59,37 +59,42 @@ export interface Indicators {
   prevMacdLine: number;
   isTripleTop: boolean;
   isVolumeSpike: boolean;
-  momentum: number;
-  priceChangePct: number;
-  btcRsi?: number;
-  btcPrevRsi?: number;
-  btcSma7: number;
-  btcSma21: number;
-  btcPrevSma7: number;
-  btcPrevSma21: number;
-  btcMacdLine: number;
-  btcSignalLine: number;
-  btcUpperBand: number;
-  btcObvValues: number[];
-  btcAtr: number;
-  btcAtrBaseline: number;
-  btcZScore: number;
-  btcVwap: number;
-  btcStochRsi: number;
-  btcPrevStochRsi: number;
-  btcFib61_8: number;
-  btcPrices: number[];
-  btcVolumeOscillator: number;
-  btcPrevVolumeOscillator: number;
-  btcIsDoubleTop: boolean;
-  btcIsHeadAndShoulders: boolean;
-  btcPrevMacdLine: number;
-  btcIsTripleTop: boolean;
-  btcIsVolumeSpike: boolean;
-  btcMomentum: number;
-  btcPriceChangePct: number;
-  isTripleBottom: boolean;
-  btcIsTripleBottom: boolean;
+  momentum: number | undefined;
+  priceChangePct: number | undefined;
+  isTripleBottom?: boolean;
+  volAdjustedMomentum: number;
+  sma20: number;
+  lowerBand: number;
+  obv: number;
+  stochRsiSignal: number;
+  btcRsi?: number | undefined;
+  btcPrevRsi?: number | undefined;
+  btcSma7?: number;
+  btcSma21?: number;
+  btcPrevSma7?: number;
+  btcPrevSma21?: number;
+  btcMacdLine?: number;
+  btcSignalLine?: number;
+  btcUpperBand?: number;
+  btcObvValues?: number[];
+  btcAtr?: number;
+  btcAtrBaseline?: number;
+  btcZScore?: number;
+  btcVwap?: number;
+  btcStochRsi?: number;
+  btcPrevStochRsi?: number;
+  btcFib61_8?: number;
+  btcPrices?: number[];
+  btcVolumeOscillator?: number;
+  btcPrevVolumeOscillator?: number;
+  btcIsDoubleTop?: boolean;
+  btcIsHeadAndShoulders?: boolean;
+  btcPrevMacdLine?: number;
+  btcIsTripleTop?: boolean;
+  btcIsVolumeSpike?: boolean;
+  btcMomentum?: number | undefined;
+  btcPriceChangePct?: number | undefined;
+  btcVolAdjustedMomentum?: number;
 }
 
 export enum Recommendation {

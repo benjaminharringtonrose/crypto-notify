@@ -143,21 +143,59 @@ class TradePredictor {
 
   public async predict(): Promise<TradeDecision> {
     try {
-      // Fetch data and calculate indicators
       const {
         currentAdaPrice,
-        adaIndicators,
-        btcIndicators,
+        adaIndicators: adaIndRaw,
+        btcIndicators: btcIndRaw,
         adaPrices,
         btcPrices,
       } = await this.fetchAndCalculateIndicators();
 
-      // Load model weights
+      // Cast to Indicators and fill missing fields
+      const adaIndicators: Indicators = {
+        ...adaIndRaw,
+        currentPrice: currentAdaPrice, // Guaranteed by fetchAndCalculateIndicators
+        volAdjustedMomentum:
+          adaIndRaw.volAdjustedMomentum ??
+          (adaIndRaw.atr !== 0 && adaPrices.length >= 10
+            ? (adaPrices[adaPrices.length - 1] -
+                adaPrices[adaPrices.length - 10]) /
+              adaIndRaw.atr
+            : 0),
+        sma20:
+          adaPrices.length >= 20
+            ? adaPrices.slice(-20).reduce((a, b) => a + b, 0) / 20
+            : adaIndRaw.sma21,
+        lowerBand: adaIndRaw.lowerBand ?? 0,
+        obv: adaIndRaw.obvValues[adaIndRaw.obvValues.length - 1],
+        stochRsiSignal: adaIndRaw.stochRsi,
+        prices: adaPrices,
+      };
+
+      const btcIndicators: Indicators = {
+        ...btcIndRaw,
+        currentPrice: btcPrices[btcPrices.length - 1], // Assuming last price is current
+        volAdjustedMomentum:
+          btcIndRaw.volAdjustedMomentum ??
+          (btcIndRaw.atr !== 0 && btcPrices.length >= 10
+            ? (btcPrices[btcPrices.length - 1] -
+                btcPrices[btcPrices.length - 10]) /
+              btcIndRaw.atr
+            : 0),
+        sma20:
+          btcPrices.length >= 20
+            ? btcPrices.slice(-20).reduce((a, b) => a + b, 0) / 20
+            : btcIndRaw.sma21,
+        lowerBand: btcIndRaw.lowerBand ?? 0,
+        obv: btcIndRaw.obvValues[btcIndRaw.obvValues.length - 1],
+        stochRsiSignal: btcIndRaw.stochRsi,
+        prices: btcPrices,
+      };
+
       const file = this.bucket.file("tradePredictorWeights.json");
       const [weightsData] = await file.download();
       const { weights } = JSON.parse(weightsData.toString());
 
-      // Validate weights
       const validateArray = (
         arr: number[],
         expectedLength: number,
@@ -176,7 +214,7 @@ class TradePredictor {
         }
       };
 
-      validateArray(weights.conv1Weights, 3 * 57 * 64, "conv1Weights");
+      validateArray(weights.conv1Weights, 3 * 59 * 64, "conv1Weights");
       validateArray(weights.conv1Bias, 64, "conv1Bias");
       validateArray(weights.conv2Weights, 3 * 64 * 32, "conv2Weights");
       validateArray(weights.conv2Bias, 32, "conv2Bias");
@@ -200,11 +238,10 @@ class TradePredictor {
       validateArray(weights.dense1Bias, 16, "dense1Bias");
       validateArray(weights.dense2Weights, 16 * 3, "dense2Weights");
       validateArray(weights.dense2Bias, 3, "dense2Bias");
-      validateArray(weights.featureMins, 57, "featureMins");
-      validateArray(weights.featureMaxs, 57, "featureMaxs");
+      validateArray(weights.featureMins, 59, "featureMins");
+      validateArray(weights.featureMaxs, 59, "featureMaxs");
 
-      // Initialize tensors
-      const conv1Weights = tf.tensor3d(weights.conv1Weights, [3, 57, 64]);
+      const conv1Weights = tf.tensor3d(weights.conv1Weights, [3, 59, 64]);
       const conv1Bias = tf.tensor1d(weights.conv1Bias);
       const conv2Weights = tf.tensor3d(weights.conv2Weights, [3, 64, 32]);
       const conv2Bias = tf.tensor1d(weights.conv2Bias);
@@ -232,7 +269,6 @@ class TradePredictor {
       const featureMins = tf.tensor1d(weights.featureMins);
       const featureMaxs = tf.tensor1d(weights.featureMaxs);
 
-      // Prepare feature sequence
       const timesteps = 14;
       const featureSequence: number[][] = [];
       for (
@@ -240,9 +276,9 @@ class TradePredictor {
         i < adaPrices.length && i < btcPrices.length;
         i++
       ) {
-        const dayFeatures = [
-          adaIndicators.rsi || 0,
-          adaIndicators.prevRsi || 0,
+        const dayFeatures: number[] = [
+          adaIndicators.rsi ?? 0,
+          adaIndicators.prevRsi ?? 0,
           adaIndicators.sma7,
           adaIndicators.sma21,
           adaIndicators.prevSma7,
@@ -267,11 +303,12 @@ class TradePredictor {
           adaIndicators.prevMacdLine,
           adaIndicators.isTripleTop ? 1 : 0,
           adaIndicators.isVolumeSpike ? 1 : 0,
-          adaIndicators.momentum || 0,
-          adaIndicators.priceChangePct || 0,
+          adaIndicators.momentum ?? 0,
+          adaIndicators.priceChangePct ?? 0,
+          adaIndicators.volAdjustedMomentum,
           adaIndicators.isTripleBottom ? 1 : 0,
-          btcIndicators.rsi || 0,
-          btcIndicators.prevRsi || 0,
+          btcIndicators.rsi ?? 0,
+          btcIndicators.prevRsi ?? 0,
           btcIndicators.sma7,
           btcIndicators.sma21,
           btcIndicators.prevSma7,
@@ -295,22 +332,22 @@ class TradePredictor {
           btcIndicators.isHeadAndShoulders ? 1 : 0,
           btcIndicators.prevMacdLine,
           btcIndicators.isTripleTop ? 1 : 0,
-          adaIndicators.isVolumeSpike ? 1 : 0,
-          btcIndicators.momentum || 0,
-          btcIndicators.priceChangePct || 0,
+          btcIndicators.isVolumeSpike ? 1 : 0,
+          btcIndicators.momentum ?? 0,
+          btcIndicators.priceChangePct ?? 0,
+          btcIndicators.volAdjustedMomentum,
         ];
         featureSequence.push(dayFeatures);
       }
       while (featureSequence.length < timesteps)
-        featureSequence.unshift(featureSequence[0] || Array(57).fill(0));
+        featureSequence.unshift(featureSequence[0] || Array(59).fill(0));
 
-      // Neural network prediction
-      const featuresRaw = tf.tensor2d(featureSequence, [timesteps, 57]);
+      const featuresRaw = tf.tensor2d(featureSequence, [timesteps, 59]);
       const featuresNormalized = featuresRaw
         .sub(featureMins)
         .div(featureMaxs.sub(featureMins).add(1e-6))
         .clipByValue(0, 1)
-        .reshape([1, timesteps, 57]) as tf.Tensor3D;
+        .reshape([1, timesteps, 59]) as tf.Tensor3D;
 
       let conv1Output = tf
         .conv1d(featuresNormalized, conv1Weights, 1, "same")
@@ -389,72 +426,17 @@ class TradePredictor {
 
       const adxProxy = Math.abs((adaIndicators.sma7 - sma50) / sma50);
       const volatility = adaIndicators.atr / adaIndicators.atrBaseline;
-      const rsiSafe = adaIndicators.rsi !== undefined ? adaIndicators.rsi : 50;
+      const rsiSafe = adaIndicators.rsi ?? 50;
 
-      // Strategy evaluation with complete indicators
-      const indicators: Indicators = {
-        rsi: adaIndicators.rsi,
-        prevRsi: adaIndicators.prevRsi,
-        sma7: adaIndicators.sma7,
-        sma21: adaIndicators.sma21,
-        prevSma7: adaIndicators.prevSma7,
-        prevSma21: adaIndicators.prevSma21,
-        macdLine: adaIndicators.macdLine,
-        signalLine: adaIndicators.signalLine,
-        currentPrice: currentAdaPrice,
-        upperBand: adaIndicators.upperBand,
-        obvValues: adaIndicators.obvValues,
-        atr: adaIndicators.atr,
-        atrBaseline: adaIndicators.atrBaseline,
-        zScore: adaIndicators.zScore,
-        vwap: adaIndicators.vwap,
-        stochRsi: adaIndicators.stochRsi,
-        prevStochRsi: adaIndicators.prevStochRsi,
-        fib61_8: adaIndicators.fib61_8,
-        prices: adaPrices,
-        volumeOscillator: adaIndicators.volumeOscillator,
-        prevVolumeOscillator: adaIndicators.prevVolumeOscillator,
-        isDoubleTop: adaIndicators.isDoubleTop,
-        isHeadAndShoulders: adaIndicators.isHeadAndShoulders,
-        prevMacdLine: adaIndicators.prevMacdLine,
-        isTripleTop: adaIndicators.isTripleTop,
-        isVolumeSpike: adaIndicators.isVolumeSpike,
-        momentum: adaIndicators.momentum,
-        priceChangePct: adaIndicators.priceChangePct,
-        isTripleBottom: adaIndicators.isTripleBottom,
-        btcRsi: btcIndicators.rsi,
-        btcPrevRsi: btcIndicators.prevRsi,
-        btcSma7: btcIndicators.sma7,
-        btcSma21: btcIndicators.sma21,
-        btcPrevSma7: btcIndicators.prevSma7,
-        btcPrevSma21: btcIndicators.prevSma21,
-        btcMacdLine: btcIndicators.macdLine,
-        btcSignalLine: btcIndicators.signalLine,
-        btcUpperBand: btcIndicators.upperBand,
-        btcObvValues: btcIndicators.obvValues,
-        btcAtr: btcIndicators.atr,
-        btcAtrBaseline: btcIndicators.atrBaseline,
-        btcZScore: btcIndicators.zScore,
-        btcVwap: btcIndicators.vwap,
-        btcStochRsi: btcIndicators.stochRsi,
-        btcPrevStochRsi: btcIndicators.prevStochRsi,
-        btcFib61_8: btcIndicators.fib61_8,
-        btcPrices: btcPrices,
-        btcVolumeOscillator: btcIndicators.volumeOscillator,
-        btcPrevVolumeOscillator: btcIndicators.prevVolumeOscillator,
-        btcIsDoubleTop: btcIndicators.isDoubleTop,
-        btcIsHeadAndShoulders: btcIndicators.isHeadAndShoulders,
-        btcPrevMacdLine: btcIndicators.prevMacdLine,
-        btcIsTripleTop: btcIndicators.isTripleTop,
-        btcIsVolumeSpike: btcIndicators.isVolumeSpike,
-        btcMomentum: btcIndicators.momentum,
-        btcPriceChangePct: btcIndicators.priceChangePct,
-        btcIsTripleBottom: btcIndicators.isTripleBottom,
-      };
-
-      const trendResult = this.evaluateStrategy("TrendFollowing", indicators);
-      const meanRevResult = this.evaluateStrategy("MeanReversion", indicators);
-      const breakoutResult = this.evaluateStrategy("Breakout", indicators);
+      const trendResult = this.evaluateStrategy(
+        "TrendFollowing",
+        adaIndicators
+      );
+      const meanRevResult = this.evaluateStrategy(
+        "MeanReversion",
+        adaIndicators
+      );
+      const breakoutResult = this.evaluateStrategy("Breakout", adaIndicators);
 
       const trendWeight = adxProxy > 0.02 ? 0.5 : 0.2;
       const meanRevWeight = rsiSafe < 30 || rsiSafe > 70 ? 0.5 : 0.3;
@@ -483,7 +465,8 @@ class TradePredictor {
       holdProb /= total;
 
       const profitPotential =
-        (currentAdaPrice - adaPrices.slice(-5).reduce((a, b) => a + b, 0) / 5) /
+        (adaIndicators.currentPrice -
+          adaPrices.slice(-5).reduce((a, b) => a + b, 0) / 5) /
         (adaPrices.slice(-5).reduce((a, b) => a + b, 0) / 5);
 
       const recommendation =
@@ -515,7 +498,6 @@ class TradePredictor {
         }, RSI: ${rsiSafe.toFixed(2)}`
       );
 
-      // Clean up tensors
       [
         conv1Weights,
         conv1Bias,
@@ -551,7 +533,7 @@ class TradePredictor {
       ].forEach((tensor) => tensor.dispose());
 
       return {
-        currentPrice: currentAdaPrice,
+        currentPrice: adaIndicators.currentPrice,
         rsi: adaIndicators.rsi?.toFixed(2),
         sma7: adaIndicators.sma7.toFixed(2),
         sma21: adaIndicators.sma21.toFixed(2),

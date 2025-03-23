@@ -2,7 +2,6 @@ import * as admin from "firebase-admin";
 import * as tf from "@tensorflow/tfjs-node";
 import dotenv from "dotenv";
 import { TradeDecision, Indicators, Recommendation } from "../types";
-// import { calculateIndicators } from "../calculations/calculateIndicators";
 import { getCurrentPrices } from "../api/getCurrentPrices";
 import { getHistoricalPricesAndVolumes } from "../api/getHistoricalPricesAndVolumes";
 import { FeatureCalculator } from "./FeatureCalculator";

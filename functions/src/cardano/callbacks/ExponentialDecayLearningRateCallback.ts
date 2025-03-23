@@ -2,12 +2,18 @@ import * as tf from "@tensorflow/tfjs-node";
 
 export class ExponentialDecayLearningRateCallback extends tf.CustomCallback {
   private initialLr: number;
-  private decayRate: number = 0.98;
+  private decayRate: number;
   private currentModel: tf.LayersModel | null = null;
 
-  constructor(args: tf.CustomCallbackArgs, initialLr: number) {
+  constructor(
+    args: tf.CustomCallbackArgs,
+    initialLr: number,
+    decayRate: number = 0.95
+  ) {
+    // Added decayRate parameter
     super(args);
     this.initialLr = initialLr;
+    this.decayRate = decayRate;
   }
 
   async onEpochBegin(epoch: number) {

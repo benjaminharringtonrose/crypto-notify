@@ -15,6 +15,10 @@ export const getHistoricalData = async (
 
   const numChunks = Math.ceil(totalDays / chunkDays);
 
+  // Throttle function to delay requests
+  const delay = (ms: number) =>
+    new Promise((resolve) => setTimeout(resolve, ms));
+
   try {
     for (let i = 0; i < numChunks; i++) {
       const chunkEnd = new Date(endDate.getTime() - i * chunkMilliseconds);
@@ -36,13 +40,17 @@ export const getHistoricalData = async (
       console.log(
         `Fetching ${cryptoSymbol} data chunk ${i + 1}/${numChunks}...`
       );
+
+      // Add delay before each request (50ms ensures < 20 calls/second)
+      if (i > 0) await delay(50);
+
       const response = await axios.get(`${CRYPTOCOMPARE_API_URL}/histoday`, {
         params: {
           fsym: cryptoSymbol.toUpperCase(),
           tsym: "USD",
           limit: limit,
           toTs: toTimestamp,
-          api_key: process.env.CRYPTOCOMPARE_API_KEY, // Add API key if required
+          api_key: process.env.CRYPTOCOMPARE_API_KEY,
         },
       });
 

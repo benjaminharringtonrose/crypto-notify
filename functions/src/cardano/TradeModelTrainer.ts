@@ -31,7 +31,7 @@ export class TradeModelTrainer {
     timesteps: 14,
     epochs: 60,
     batchSize: 64,
-    initialLearningRate: 0.005,
+    initialLearningRate: 0.003, // Lowered from 0.005
   };
 
   private readonly backtestStartDays: number = 365;
@@ -69,8 +69,8 @@ export class TradeModelTrainer {
   }
 
   private focalLoss(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
-    const gamma = 3.0;
-    const alpha = tf.tensor1d([1.0, 1.0, 1.0]);
+    const gamma = 3.0; // Reverted to 3.0 from 2.0
+    const alpha = tf.tensor1d([1.0, 1.0, 1.5]); // Class weights: Buy (2) weighted higher
     const ce = tf.losses.softmaxCrossEntropy(yTrue, yPred);
     const pt = yTrue.mul(yPred).sum(-1);
     const focalWeight = tf.pow(tf.sub(1, pt), gamma);
@@ -88,14 +88,26 @@ export class TradeModelTrainer {
     const startDaysAgo = this.backtestStartDays + this.trainingPeriodDays;
     console.log("Fetching historical data...");
 
-    const [adaData, btcData] = await Promise.all([
-      getHistoricalData("ADA", startDaysAgo).catch((err) => {
-        throw new Error(`Failed to fetch ADA data: ${err.message}`);
-      }),
-      getHistoricalData("BTC", startDaysAgo).catch((err) => {
-        throw new Error(`Failed to fetch BTC data: ${err.message}`);
-      }),
-    ]);
+    let adaData: HistoricalData;
+    let btcData: HistoricalData;
+
+    try {
+      // Fetch ADA data
+      adaData = await getHistoricalData("ADA", startDaysAgo);
+
+      // Add a 50ms delay between ADA and BTC fetches to stay under rate limit
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Fetch BTC data
+      btcData = await getHistoricalData("BTC", startDaysAgo);
+    } catch (error) {
+      console.error("Error during historical data fetch:", error);
+      throw new Error(
+        `Failed to fetch historical data: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
 
     console.log(
       `ADA data length: ${adaData.prices.length}, BTC data length: ${btcData.prices.length}`
@@ -172,7 +184,7 @@ export class TradeModelTrainer {
   }
 
   private addNoise(features: number[], scale: number): number[] {
-    return features.map((f) => f * scale + (Math.random() - 0.5) * 0.01);
+    return features.map((f) => f * scale + (Math.random() - 0.5) * 0.02);
   }
 
   private adjustSequenceLength(sequence: number[][]): number[][] {
@@ -224,8 +236,8 @@ export class TradeModelTrainer {
   private labelData({
     prices,
     dayIndex,
-    threshold = 0.015, // Increased from 0.01
-    horizon = 3,
+    threshold = 0.02, // Reverted to 0.02 from 0.015
+    horizon = 5, // Reverted to 5 from 7
   }: {
     prices: number[];
     dayIndex: number;
@@ -291,7 +303,7 @@ export class TradeModelTrainer {
         filters: 64,
         kernelSize: 3,
         activation: "relu",
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.02 }),
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }), // Adjusted to 0.03
         padding: "same",
       })
       .apply(input) as tf.SymbolicTensor;
@@ -308,7 +320,7 @@ export class TradeModelTrainer {
         filters: 32,
         kernelSize: 3,
         activation: "relu",
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.02 }),
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }), // Adjusted to 0.03
         padding: "same",
       })
       .apply(pool1) as tf.SymbolicTensor;
@@ -321,7 +333,7 @@ export class TradeModelTrainer {
       .gru({
         units: 64,
         returnSequences: true,
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.02 }),
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }), // Adjusted to 0.03
       })
       .apply(bn2) as tf.SymbolicTensor;
 
@@ -331,9 +343,9 @@ export class TradeModelTrainer {
 
     const gru2 = tf.layers
       .gru({
-        units: 32,
+        units: 64,
         returnSequences: false,
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.02 }),
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }), // Adjusted to 0.03
       })
       .apply(bn3) as tf.SymbolicTensor;
 
@@ -343,33 +355,41 @@ export class TradeModelTrainer {
 
     const residual = tf.layers
       .dense({
-        units: 32,
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.02 }),
+        units: 64,
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }), // Adjusted to 0.03
       })
       .apply(tf.layers.flatten().apply(bn3)) as tf.SymbolicTensor;
 
     const add = tf.layers.add().apply([bn4, residual]) as tf.SymbolicTensor;
     const dropout = tf.layers
-      .dropout({ rate: 0.3 })
+      .dropout({ rate: 0.4 }) // Adjusted to 0.4 from 0.5
       .apply(add) as tf.SymbolicTensor;
 
     const dense1 = tf.layers
       .dense({
-        units: 16,
+        units: 32, // Added intermediate dense layer
         activation: "relu",
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.02 }),
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }), // Adjusted to 0.03
       })
       .apply(dropout) as tf.SymbolicTensor;
 
     const dense2 = tf.layers
       .dense({
-        units: 3,
-        activation: "softmax",
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.02 }),
+        units: 16,
+        activation: "relu",
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }), // Adjusted to 0.03
       })
       .apply(dense1) as tf.SymbolicTensor;
 
-    return tf.model({ inputs: input, outputs: dense2 });
+    const dense3 = tf.layers
+      .dense({
+        units: 3,
+        activation: "softmax",
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.03 }), // Adjusted to 0.03
+      })
+      .apply(dense2) as tf.SymbolicTensor;
+
+    return tf.model({ inputs: input, outputs: dense3 });
   }
 
   private async trainModel(
@@ -417,7 +437,8 @@ export class TradeModelTrainer {
       const bestWeightsCallback = new BestWeightsCallback({});
       const lrCallback = new ExponentialDecayLearningRateCallback(
         {},
-        this.config.initialLearningRate
+        this.config.initialLearningRate,
+        0.95
       );
 
       this.model.compile({
@@ -441,7 +462,7 @@ export class TradeModelTrainer {
         epochs: this.config.epochs,
         validationData: valDataset,
         callbacks: [
-          tf.callbacks.earlyStopping({ monitor: "val_loss", patience: 30 }),
+          tf.callbacks.earlyStopping({ monitor: "val_loss", patience: 20 }), // Increased to 20
           bestWeightsCallback,
           lrCallback,
         ],
@@ -575,6 +596,12 @@ export class TradeModelTrainer {
       ),
       dense2Bias: Array.from(
         await this.model.getLayer("dense_Dense3").getWeights()[1].data()
+      ),
+      dense3Weights: Array.from(
+        await this.model.getLayer("dense_Dense4").getWeights()[0].data()
+      ),
+      dense3Bias: Array.from(
+        await this.model.getLayer("dense_Dense4").getWeights()[1].data()
       ),
       featureMins: Array.from(await X_min.data()),
       featureMaxs: Array.from(await X_max.data()),

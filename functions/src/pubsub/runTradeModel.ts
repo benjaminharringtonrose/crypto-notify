@@ -1,6 +1,5 @@
 import dotenv from "dotenv";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { determineTrade } from "../cardano/determineTrade";
 import { RUN_TRADE_MODEL_CONFIG } from "../constants";
 import {
   Collections,
@@ -11,6 +10,7 @@ import {
 } from "../types";
 import { sendSMS, formatAnalysisResults } from "../utils";
 import { getFirestore } from "firebase-admin/firestore";
+import TradePredictor from "../cardano/TradeModelPredictor";
 
 dotenv.config();
 
@@ -22,8 +22,10 @@ dotenv.config();
 
 export const runTradeModel = onSchedule(RUN_TRADE_MODEL_CONFIG, async () => {
   try {
+    const predictor = new TradePredictor();
+
     const { currentPrice, probabilities, recommendation, metConditions } =
-      await determineTrade();
+      await predictor.predict();
 
     const db = getFirestore();
 

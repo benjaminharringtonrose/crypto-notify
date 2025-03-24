@@ -14,8 +14,8 @@ export interface CoinGeckoMarketChartResponse {
 }
 
 export interface Indicators {
-  rsi: number | undefined;
-  prevRsi: number | undefined;
+  rsi?: number;
+  prevRsi?: number;
   sma7: number;
   sma21: number;
   prevSma7: number;
@@ -40,17 +40,17 @@ export interface Indicators {
   prevMacdLine: number;
   isTripleTop: boolean;
   isVolumeSpike: boolean;
-  momentum: number | undefined;
-  priceChangePct: number | undefined;
+  momentum: number;
+  priceChangePct?: number;
   isTripleBottom: boolean;
   volAdjustedMomentum: number;
   sma20: number;
   lowerBand: number;
   obv: number;
   stochRsiSignal: number;
-  adxProxy: number; // New field for trend strength
-  btcRsi?: number | undefined;
-  btcPrevRsi?: number | undefined;
+  adxProxy: number;
+  btcRsi?: number;
+  btcPrevRsi?: number;
   btcSma7?: number;
   btcSma21?: number;
   btcPrevSma7?: number;
@@ -74,8 +74,8 @@ export interface Indicators {
   btcPrevMacdLine?: number;
   btcIsTripleTop?: boolean;
   btcIsVolumeSpike?: boolean;
-  btcMomentum?: number | undefined;
-  btcPriceChangePct?: number | undefined;
+  btcMomentum?: number;
+  btcPriceChangePct?: number;
   btcVolAdjustedMomentum?: number;
 }
 
@@ -115,10 +115,11 @@ export interface TradeDecision {
   recommendation: Recommendation;
   timestamp: any;
   profitPotential: number;
-  isDoubleTop: boolean; // Added
-  isTripleTop: boolean; // Added
-  isHeadAndShoulders: boolean; // Added
-  isTripleBottom: boolean; // Added
+  isDoubleTop: boolean;
+  isTripleTop: boolean;
+  isHeadAndShoulders: boolean;
+  isTripleBottom: boolean;
+  momentum: number;
 }
 
 export interface RecieveSMSRequest {

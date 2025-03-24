@@ -73,6 +73,7 @@ export default class TradeModelPredictor {
       isVolumeSpike,
       prevMacdLine,
       adxProxy,
+      momentum,
     } = adaIndicators;
     const {
       sma7: btcSma7,
@@ -87,6 +88,7 @@ export default class TradeModelPredictor {
     const volatility = atr / atrBaseline;
     const recentHigh = Math.max(...prices.slice(-10));
     const recentLow = Math.min(...prices.slice(-10));
+    const momentumSafe = momentum ?? 0;
 
     let buyProb = 0.3,
       sellProb = 0.3,
@@ -113,6 +115,8 @@ export default class TradeModelPredictor {
         if (macdHistogram > 0 && prevMacdHistogram <= 0) buyProb += 0.2;
         if (macdHistogram < 0 && prevMacdHistogram >= 0) sellProb += 0.2;
         if (adxProxy <= 0.02) holdProb += 0.05;
+        if (momentumSafe < 0) sellProb += 0.4;
+        if (momentumSafe > 0) buyProb += 0.25;
         break;
       case "MeanReversion":
         if (rsiSafe < 20 && currentPrice < sma20 - 2 * atr) buyProb += 0.4;
@@ -259,17 +263,25 @@ export default class TradeModelPredictor {
         (adaIndicators.currentPrice -
           adaPrices.slice(-5).reduce((a, b) => a + b, 0) / 5) /
         (adaPrices.slice(-5).reduce((a, b) => a + b, 0) / 5);
+      const momentumSafe = adaIndicators.momentum ?? 0;
       const macdHistogram = adaIndicators.macdLine - adaIndicators.signalLine;
 
       let buyProb = buyProbBase,
         sellProb = sellProbBase,
         holdProb = 0;
       if (rsiSafe < 20) buyProb += 0.3;
-      if (rsiSafe > 80) sellProb += 0.3;
+      if (rsiSafe > 55) sellProb += 0.35;
       const confidenceThreshold =
-        0.4 +
-        (adaIndicators.adxProxy > 0.02 ? 0.05 : 0) -
-        (volatility > 1.5 ? 0.05 : 0);
+        volatility > 1.5
+          ? 0.4
+          : 0.35 + // Dynamic based on volatility
+            (adaIndicators.adxProxy > 0.02 ? 0.05 : 0) -
+            ((adaIndicators.isDoubleTop ||
+              adaIndicators.isTripleTop ||
+              adaIndicators.isHeadAndShoulders) &&
+            rsiSafe > 55
+              ? 0.3
+              : 0);
       if (buyProb < confidenceThreshold && sellProb < confidenceThreshold) {
         holdProb = 1 - (buyProb + sellProb);
         buyProb *= 0.9;
@@ -304,12 +316,14 @@ export default class TradeModelPredictor {
         trendWeight * trendResult.buyProb +
         meanRevWeight * meanRevResult.buyProb +
         breakoutWeight * breakoutResult.buyProb +
-        (profitPotential > 0.05 ? 0.1 : 0);
+        (profitPotential > 0.1 ? 0.1 : profitPotential > 0.05 ? 0.05 : 0) + // Reverted to 0.1/0.05
+        (momentumSafe > 0 ? 0.25 : -0.2); // Tightened to >0
       sellProb +=
         trendWeight * trendResult.sellProb +
         meanRevWeight * meanRevResult.sellProb +
         breakoutWeight * breakoutResult.sellProb +
-        (profitPotential < -0.05 ? 0.1 : 0);
+        (profitPotential < -0.1 ? 0.1 : profitPotential < -0.05 ? 0.05 : 0) + // Reverted to 0.1/0.05
+        (momentumSafe < -0.2 ? 0.4 : 0); // Tightened to <-0.2
       holdProb +=
         trendWeight * trendResult.holdProb +
         meanRevWeight * meanRevResult.holdProb +
@@ -323,9 +337,9 @@ export default class TradeModelPredictor {
       const recommendation =
         rsiSafe < 20 && buyProb > 0.35
           ? Recommendation.Buy
-          : rsiSafe > 80 && sellProb > 0.45
+          : rsiSafe > 55 && sellProb > 0.35
           ? Recommendation.Sell
-          : buyProb > confidenceThreshold
+          : buyProb > confidenceThreshold && momentumSafe > 0 // Stricter momentum
           ? Recommendation.Buy
           : sellProb > confidenceThreshold
           ? Recommendation.Sell
@@ -346,7 +360,7 @@ export default class TradeModelPredictor {
           adaIndicators.adxProxy > 0.02 ? "Strong" : "Weak"
         }, RSI: ${rsiSafe.toFixed(2)}, MACD Histogram: ${macdHistogram.toFixed(
           2
-        )}`
+        )}, Momentum: ${momentumSafe.toFixed(4)}`
       );
 
       return {
@@ -376,6 +390,7 @@ export default class TradeModelPredictor {
         isTripleTop: adaIndicators.isTripleTop,
         isHeadAndShoulders: adaIndicators.isHeadAndShoulders,
         isTripleBottom: adaIndicators.isTripleBottom,
+        momentum: adaIndicators.momentum,
       };
     } catch (error: any) {
       console.error("Error in TradePredictor:", error.message, error.stack);

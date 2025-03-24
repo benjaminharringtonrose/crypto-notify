@@ -24,7 +24,7 @@ const bucket = admin.storage().bucket();
 export class TradeModelTrainer {
   private readonly config: ModelConfig = {
     timesteps: 14,
-    epochs: 60,
+    epochs: 40,
     batchSize: 64,
     initialLearningRate: 0.001,
   };
@@ -280,7 +280,7 @@ export class TradeModelTrainer {
 
     try {
       const totalSamples = X.length;
-      const trainSize = Math.floor(totalSamples * 0.8);
+      const trainSize = Math.floor(totalSamples * 0.75);
       const indices = Array.from({ length: totalSamples }, (_, i) => i);
       tf.util.shuffle(indices);
 
@@ -307,7 +307,6 @@ export class TradeModelTrainer {
         })
         .batch(this.config.batchSize);
 
-      // Use TradeModelFactory instead of createTradeModel
       const factory = new TradeModelFactory(this.config.timesteps, 61);
       this.model = factory.createModel();
 
@@ -315,7 +314,7 @@ export class TradeModelTrainer {
       const bestWeightsCallback = new BestWeightsCallback();
       const lrCallback = new ExponentialDecayLearningRateCallback(
         this.config.initialLearningRate,
-        0.98
+        0.96
       );
       const predictionLoggerCallback = new PredictionLoggerCallback(X_val);
 
@@ -343,7 +342,7 @@ export class TradeModelTrainer {
         epochs: this.config.epochs,
         validationData: valDataset,
         callbacks: [
-          tf.callbacks.earlyStopping({ monitor: "val_loss", patience: 5 }),
+          tf.callbacks.earlyStopping({ monitor: "val_loss", patience: 10 }),
           bestWeightsCallback,
           lrCallback,
           predictionLoggerCallback,

@@ -11,7 +11,7 @@ export class TradeModelBacktester {
   private MIN_TRADE_USD = 50;
   private CASH_RESERVE = 50;
   private STOP_LOSS_THRESHOLD = -0.15;
-  private TAKE_PROFIT_THRESHOLD = 0.03;
+  private TAKE_PROFIT_THRESHOLD = 0.02;
 
   private startDaysAgo: number;
   private endDaysAgo: number;
@@ -154,6 +154,9 @@ export class TradeModelBacktester {
     let usdBalance = this.INITIAL_USD;
     let adaBalance = 0;
     let avgBuyPrice = 0;
+    let peakPrice = 0;
+    let cooldown = 0;
+    let lastTradeProfit = 0;
     const trades: Trade[] = [];
     const portfolioHistory: { timestamp: string; value: number }[] = [];
     const dailyReturns: number[] = [];
@@ -166,22 +169,25 @@ export class TradeModelBacktester {
         Date.now() - (adaPrices.length - startIndex - i) * 24 * 60 * 60 * 1000
       ).toISOString();
 
-      const historicalAdaPrices = slicedAdaPrices.slice(0, i + 1);
-      const historicalAdaVolumes = slicedAdaVolumes.slice(0, i + 1);
-      const historicalBtcPrices = slicedBtcPrices.slice(0, i + 1);
-      const historicalBtcVolumes = slicedBtcVolumes.slice(0, i + 1);
-
       const { originalGetHistorical, originalGetCurrent } = this.setupMocks(
-        historicalAdaPrices,
-        historicalAdaVolumes,
-        historicalBtcPrices,
-        historicalBtcVolumes,
+        slicedAdaPrices.slice(0, i + 1),
+        slicedAdaVolumes.slice(0, i + 1),
+        slicedBtcPrices.slice(0, i + 1),
+        slicedBtcVolumes.slice(0, i + 1),
         currentAdaPrice,
         btcPrices[i]
       );
 
       const predictor = new TradePredictor();
       const decision = await predictor.predict();
+
+      const atr = parseFloat(decision.atr);
+      const trailingStopPercent = (1.25 * atr) / currentAdaPrice;
+      const trailingStopPrice =
+        adaBalance > 0 ? peakPrice * (1 - trailingStopPercent) : 0;
+      const trailingStopTriggered =
+        adaBalance > 0 && currentAdaPrice <= trailingStopPrice;
+      const momentumSafe = decision.momentum ?? 0;
 
       console.log(
         `Day ${i - 13}: Price ${currentAdaPrice.toFixed(
@@ -195,7 +201,9 @@ export class TradeModelBacktester {
         }, Signal Strength: ${Math.max(
           decision.probabilities.buy,
           decision.probabilities.sell
-        ).toFixed(3)}`
+        ).toFixed(3)}, Momentum: ${momentumSafe.toFixed(4)}, Patterns: DT:${
+          decision.isDoubleTop
+        }, TT:${decision.isTripleTop}, HS:${decision.isHeadAndShoulders}`
       );
 
       const confidence = Math.max(
@@ -203,14 +211,17 @@ export class TradeModelBacktester {
         decision.probabilities.sell
       );
       const rsiValue = decision.rsi ? parseFloat(decision.rsi) : 50;
-      const positionSizeFactor = Math.min(0.3, confidence);
+      const positionSizeFactor = Math.min(0.2, confidence);
       const portfolioValue = usdBalance + adaBalance * currentAdaPrice;
       const unrealizedProfit =
         adaBalance > 0 ? (currentAdaPrice - avgBuyPrice) / avgBuyPrice : 0;
+      if (adaBalance > 0 && currentAdaPrice > peakPrice)
+        peakPrice = currentAdaPrice;
 
       const buyCondition =
         decision.recommendation === Recommendation.Buy &&
-        usdBalance > this.CASH_RESERVE + this.MIN_TRADE_USD;
+        usdBalance > this.CASH_RESERVE + this.MIN_TRADE_USD &&
+        (cooldown === 0 || decision.probabilities.buy > 0.5);
       const sellCondition =
         (decision.recommendation === Recommendation.Sell && adaBalance > 0) ||
         (adaBalance > 0 &&
@@ -218,14 +229,18 @@ export class TradeModelBacktester {
             unrealizedProfit >= this.TAKE_PROFIT_THRESHOLD ||
             decision.isDoubleTop ||
             decision.isTripleTop ||
-            decision.isHeadAndShoulders));
+            decision.isHeadAndShoulders ||
+            trailingStopTriggered ||
+            momentumSafe < -0.2));
 
       console.log(
         `Buy Condition: ${buyCondition}, Cash: ${usdBalance.toFixed(
           2
         )}, Sell Condition: ${sellCondition}, Unrealized Profit: ${unrealizedProfit.toFixed(
           4
-        )}`
+        )}, Trailing Stop: ${
+          trailingStopTriggered ? trailingStopPrice.toFixed(4) : "N/A"
+        }, Cooldown: ${cooldown}`
       );
 
       let tradeReason = "";
@@ -251,6 +266,7 @@ export class TradeModelBacktester {
               adaBalance
             : currentAdaPrice;
         usdBalance -= usdToSpend / (1 - this.TRANSACTION_FEE);
+        peakPrice = currentAdaPrice;
         trades.push({
           type: "buy",
           price: currentAdaPrice,
@@ -272,6 +288,11 @@ export class TradeModelBacktester {
           adaToSell * currentAdaPrice * (1 - this.TRANSACTION_FEE);
         usdBalance += usdReceived;
         adaBalance -= adaToSell;
+        lastTradeProfit =
+          adaBalance > 0
+            ? 0
+            : (usdReceived - adaToSell * avgBuyPrice) /
+              (adaToSell * avgBuyPrice);
         trades.push({
           type: "sell",
           price: currentAdaPrice,
@@ -285,6 +306,10 @@ export class TradeModelBacktester {
             ? "Stop-Loss"
             : unrealizedProfit >= this.TAKE_PROFIT_THRESHOLD
             ? "Take-Profit"
+            : trailingStopTriggered
+            ? "Trailing Stop"
+            : momentumSafe < -0.2
+            ? "Negative Momentum"
             : decision.isDoubleTop ||
               decision.isTripleTop ||
               decision.isHeadAndShoulders
@@ -301,6 +326,8 @@ export class TradeModelBacktester {
         if (adaBalance === 0) {
           completedCycles++;
           avgBuyPrice = 0;
+          peakPrice = 0;
+          cooldown = lastTradeProfit > 0.03 ? 2 : 3;
         }
       }
 
@@ -312,6 +339,7 @@ export class TradeModelBacktester {
               portfolioHistory[portfolioHistory.length - 2].value
           : 0
       );
+      if (cooldown > 0) cooldown--;
       this.restoreMocks(originalGetHistorical, originalGetCurrent);
     }
 

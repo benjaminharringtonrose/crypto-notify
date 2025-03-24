@@ -11,15 +11,15 @@ import { Bucket } from "@google-cloud/storage";
 export class TradeModelBacktester {
   private TRANSACTION_FEE = 0.002;
   private INITIAL_USD = 1000;
-  private MIN_TRADE_USD = 50;
+  private MIN_TRADE_USD = 100; // Increased
   private CASH_RESERVE = 25;
-  private STOP_LOSS_THRESHOLD = -0.1;
-  private TAKE_PROFIT_THRESHOLD = 0.05;
+  private STOP_LOSS_THRESHOLD = -0.05; // Tightened
+  private TAKE_PROFIT_THRESHOLD = 0.1; // Increased
 
   private startDaysAgo: number;
   private endDaysAgo: number;
   private stepDays: number;
-  private bucket: Bucket; // Added as class property
+  private bucket: Bucket;
 
   constructor(
     startDaysAgo: number = 450,
@@ -38,7 +38,7 @@ export class TradeModelBacktester {
           "crypto-notify-ee5bc.firebasestorage.app",
       });
     }
-    this.bucket = admin.storage().bucket(); // Initialized in constructor
+    this.bucket = admin.storage().bucket();
   }
 
   private async fetchHistoricalData(): Promise<{
@@ -66,7 +66,7 @@ export class TradeModelBacktester {
     startIndex: number,
     endIndex: number
   ): Promise<number[][]> {
-    const file = this.bucket.file("tradePredictorWeights.json"); // Use class property
+    const file = this.bucket.file("tradePredictorWeights.json");
     const [weightsData] = await file.download();
     const { weights } = JSON.parse(weightsData.toString("utf8"));
 
@@ -129,13 +129,6 @@ export class TradeModelBacktester {
           tf.tensor1d(weights.lstm2Bias),
         ]);
       model
-        .getLayer("lstm3")
-        .setWeights([
-          tf.tensor2d(weights.lstm3Weights, [32, 64]),
-          tf.tensor2d(weights.lstm3RecurrentWeights, [16, 64]),
-          tf.tensor1d(weights.lstm3Bias),
-        ]);
-      model
         .getLayer("batchNormalization")
         .setWeights([
           tf.tensor1d(weights.bnGamma),
@@ -196,7 +189,7 @@ export class TradeModelBacktester {
 
     const startIndex = Math.max(0, adaPrices.length - this.startDaysAgo);
     const endIndex = Math.max(0, adaPrices.length - this.endDaysAgo);
-    const backtestStart = 53; // Align with training
+    const backtestStart = 53;
     const backtestEnd = endIndex - 5;
 
     const predictions = await this.batchPredict(
@@ -240,18 +233,18 @@ export class TradeModelBacktester {
             0
           ) / 14;
       const trailingStopPrice =
-        adaBalance > 0 ? peakPrice * (1 - (2 * atr) / currentAdaPrice) : 0;
+        adaBalance > 0 ? peakPrice * (1 - (1.5 * atr) / currentAdaPrice) : 0; // Adjusted
       const trailingStopTriggered =
         adaBalance > 0 && currentAdaPrice <= trailingStopPrice;
       if (adaBalance > 0 && currentAdaPrice > peakPrice)
         peakPrice = currentAdaPrice;
 
       const buyCondition =
-        buyProb > 0.45 &&
+        buyProb > 0.5 &&
         usdBalance > this.CASH_RESERVE + this.MIN_TRADE_USD &&
-        cooldown === 0;
+        cooldown === 0; // Raised threshold
       const sellCondition =
-        (sellProb > 0.45 && adaBalance > 0) ||
+        (sellProb > 0.5 && adaBalance > 0) ||
         (adaBalance > 0 &&
           (unrealizedProfit <= this.STOP_LOSS_THRESHOLD ||
             unrealizedProfit >= this.TAKE_PROFIT_THRESHOLD ||
@@ -269,9 +262,9 @@ export class TradeModelBacktester {
         const usdToSpend = Math.max(
           this.MIN_TRADE_USD,
           usdBalance *
-            Math.min(0.3, confidence * 1.5) *
+            Math.min(0.5, confidence * 1.5) *
             (1 - this.TRANSACTION_FEE)
-        );
+        ); // Increased max size
         if (usdBalance - usdToSpend < this.CASH_RESERVE) continue;
         const adaBought = usdToSpend / currentAdaPrice;
         adaBalance += adaBought;

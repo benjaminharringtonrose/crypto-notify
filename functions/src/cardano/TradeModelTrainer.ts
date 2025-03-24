@@ -26,9 +26,9 @@ const bucket = admin.storage().bucket();
 export class TradeModelTrainer {
   private readonly config: ModelConfig = {
     timesteps: 20,
-    epochs: 60, // Extended from 50
+    epochs: 80, // Extended
     batchSize: 128,
-    initialLearningRate: 0.0004, // Adjusted max LR
+    initialLearningRate: 0.0008, // Increased max LR
   };
   private readonly backtestStartDays: number = 450;
   private readonly trainingPeriodDays: number = 365;
@@ -68,7 +68,7 @@ export class TradeModelTrainer {
 
   private focalLoss(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
     const gamma = 2.0;
-    const alpha = tf.tensor1d([0.5, 0.5]); // Balanced alpha
+    const alpha = tf.tensor1d([0.5, 0.5]);
     const ce = tf.losses.sigmoidCrossEntropy(yTrue, yPred);
     const pt = yTrue.mul(yPred).sum(-1).clipByValue(0, 1);
     const focalWeight = tf.pow(tf.sub(1, pt), gamma);
@@ -333,8 +333,8 @@ export class TradeModelTrainer {
       const cyclicLRCallback = new CyclicLearningRateCallback(
         0.00005,
         this.config.initialLearningRate,
-        10
-      ); // Adjusted min LR
+        8
+      ); // Shortened cycle
 
       if (!this.model) throw new Error("Model initialization failed");
 
@@ -361,7 +361,7 @@ export class TradeModelTrainer {
         epochs: this.config.epochs,
         validationData: valDataset,
         callbacks: [
-          tf.callbacks.earlyStopping({ monitor: "val_loss", patience: 15 }), // Extended patience
+          tf.callbacks.earlyStopping({ monitor: "val_loss", patience: 20 }), // Extended patience
           bestWeightsCallback,
           predictionLoggerCallback,
           cyclicLRCallback,
@@ -532,15 +532,6 @@ export class TradeModelTrainer {
       ),
       lstm2Bias: Array.from(
         await this.model.getLayer("lstm2").getWeights()[2].data()
-      ),
-      lstm3Weights: Array.from(
-        await this.model.getLayer("lstm3").getWeights()[0].data()
-      ),
-      lstm3RecurrentWeights: Array.from(
-        await this.model.getLayer("lstm3").getWeights()[1].data()
-      ),
-      lstm3Bias: Array.from(
-        await this.model.getLayer("lstm3").getWeights()[2].data()
       ),
       timeDistributedWeights: Array.from(
         await this.model.getLayer("time_distributed").getWeights()[0].data()

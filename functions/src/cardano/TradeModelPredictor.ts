@@ -103,7 +103,7 @@ export default class TradeModelPredictor {
           btcSma7 > btcSma21 &&
           btcPrevSma7 <= btcPrevSma21
         )
-          buyProb += 0.45;
+          buyProb += 0.5;
         if (
           sma7 < sma21 &&
           prevSma7 >= prevSma21 &&
@@ -111,26 +111,26 @@ export default class TradeModelPredictor {
           btcSma7 < btcSma21 &&
           btcPrevSma7 >= btcPrevSma21
         )
-          sellProb += 0.45;
-        if (macdHistogram > 0 && prevMacdHistogram <= 0) buyProb += 0.3;
-        if (macdHistogram < 0 && prevMacdHistogram >= 0) sellProb += 0.3;
-        if (adxProxy <= 0.02) holdProb += 0.15;
-        if (momentumSafe < -0.15) sellProb += 0.25;
-        if (momentumSafe > 0.15) buyProb += 0.25;
+          sellProb += 0.5;
+        if (macdHistogram > 0 && prevMacdHistogram <= 0) buyProb += 0.35;
+        if (macdHistogram < 0 && prevMacdHistogram >= 0) sellProb += 0.35;
+        if (adxProxy <= 0.02) holdProb += 0.2;
+        if (momentumSafe < -0.2) sellProb += 0.3;
+        if (momentumSafe > 0.2) buyProb += 0.3;
         break;
       case "MeanReversion":
-        if (rsiSafe < 20 && currentPrice < sma20 - 2.5 * atr) buyProb += 0.45; // Tightened RSI and range
-        if (rsiSafe > 80 && currentPrice > sma20 + 2.5 * atr) sellProb += 0.45;
-        if (rsiSafe >= 25 && rsiSafe <= 75) holdProb += 0.15;
+        if (rsiSafe < 20 && currentPrice < sma20 - 2.5 * atr) buyProb += 0.5;
+        if (rsiSafe > 80 && currentPrice > sma20 + 2.5 * atr) sellProb += 0.5;
+        if (rsiSafe >= 25 && rsiSafe <= 75) holdProb += 0.2;
         break;
       case "Breakout":
         if (currentPrice > recentHigh && isVolumeSpike && volatility > 1.8)
-          buyProb += 0.45;
+          buyProb += 0.5;
         if (currentPrice < recentLow && isVolumeSpike && volatility > 1.8)
-          sellProb += 0.45;
+          sellProb += 0.5;
         if (currentPrice <= recentHigh && currentPrice >= recentLow)
-          holdProb += 0.15;
-        if (volatility <= 1.8) holdProb += 0.1;
+          holdProb += 0.2;
+        if (volatility <= 1.8) holdProb += 0.15;
         break;
     }
 
@@ -140,11 +140,11 @@ export default class TradeModelPredictor {
     holdProb /= total;
 
     const recommendation =
-      buyProb > 0.45
+      buyProb > 0.5
         ? Recommendation.Buy
-        : sellProb > 0.45
+        : sellProb > 0.5
         ? Recommendation.Sell
-        : Recommendation.Hold; // Raised threshold
+        : Recommendation.Hold;
     return { buyProb, sellProb, holdProb, recommendation };
   }
 
@@ -228,13 +228,6 @@ export default class TradeModelPredictor {
             tf.tensor1d(weights.lstm2Bias),
           ]);
         model
-          .getLayer("lstm3")
-          .setWeights([
-            tf.tensor2d(weights.lstm3Weights, [32, 64]),
-            tf.tensor2d(weights.lstm3RecurrentWeights, [16, 64]),
-            tf.tensor1d(weights.lstm3Bias),
-          ]);
-        model
           .getLayer("batchNormalization")
           .setWeights([
             tf.tensor1d(weights.bnGamma),
@@ -275,16 +268,17 @@ export default class TradeModelPredictor {
       let buyProb = buyProbBase,
         sellProb = sellProbBase,
         holdProb = 0;
-      if (rsiSafe < 20) buyProb += 0.3; // Tightened from 25
-      if (rsiSafe > 80) sellProb += 0.3; // Tightened from 75
+      if (rsiSafe < 20) buyProb += 0.35;
+      if (rsiSafe > 80) sellProb += 0.35;
       const confidenceThreshold =
         volatility > 1.8
-          ? 0.4
-          : 0.35 + (adaIndicators.adxProxy > 0.02 ? 0.05 : 0); // Adjusted for backtesting
-      if (buyProb < confidenceThreshold && sellProb < confidenceThreshold) {
+          ? 0.5
+          : 0.45 + (adaIndicators.adxProxy > 0.02 ? 0.05 : 0); // Raised
+      if (buyProb < 0.4 || sellProb < 0.4) {
+        // Hold buffer
         holdProb = 1 - (buyProb + sellProb);
-        buyProb *= 0.85;
-        sellProb *= 0.85;
+        buyProb *= 0.8;
+        sellProb *= 0.8;
       }
 
       const trendResult = this.evaluateStrategy(
@@ -306,23 +300,23 @@ export default class TradeModelPredictor {
         sma50
       );
 
-      const trendWeight = adaIndicators.adxProxy > 0.02 ? 0.45 : 0.25;
-      const meanRevWeight = rsiSafe < 20 || rsiSafe > 80 ? 0.4 : 0.2;
+      const trendWeight = adaIndicators.adxProxy > 0.02 ? 0.5 : 0.3;
+      const meanRevWeight = rsiSafe < 20 || rsiSafe > 80 ? 0.45 : 0.25;
       const breakoutWeight =
-        volatility > 1.8 || adaIndicators.isVolumeSpike ? 0.4 : 0.2;
+        volatility > 1.8 || adaIndicators.isVolumeSpike ? 0.45 : 0.25;
 
       buyProb +=
         trendWeight * trendResult.buyProb +
         meanRevWeight * meanRevResult.buyProb +
         breakoutWeight * breakoutResult.buyProb +
-        (profitPotential > 0.15 ? 0.25 : profitPotential > 0.07 ? 0.15 : 0) +
-        (momentumSafe > 0.15 ? 0.3 : -0.1);
+        (profitPotential > 0.2 ? 0.3 : profitPotential > 0.1 ? 0.15 : 0) +
+        (momentumSafe > 0.2 ? 0.35 : -0.1);
       sellProb +=
         trendWeight * trendResult.sellProb +
         meanRevWeight * meanRevResult.sellProb +
         breakoutWeight * breakoutResult.sellProb +
-        (profitPotential < -0.15 ? 0.25 : profitPotential < -0.07 ? 0.15 : 0) +
-        (momentumSafe < -0.25 ? 0.35 : momentumSafe < -0.15 ? 0.2 : 0);
+        (profitPotential < -0.2 ? 0.3 : profitPotential < -0.1 ? 0.15 : 0) +
+        (momentumSafe < -0.3 ? 0.4 : momentumSafe < -0.2 ? 0.25 : 0);
 
       const total = buyProb + sellProb + holdProb;
       buyProb = buyProb / total || 0.33;
@@ -330,9 +324,9 @@ export default class TradeModelPredictor {
       holdProb = holdProb / total || 0.33;
 
       const recommendation =
-        rsiSafe < 20 && buyProb > 0.45
+        rsiSafe < 20 && buyProb > 0.5
           ? Recommendation.Buy
-          : rsiSafe > 80 && sellProb > 0.45
+          : rsiSafe > 80 && sellProb > 0.5
           ? Recommendation.Sell
           : buyProb > confidenceThreshold && momentumSafe > 0
           ? Recommendation.Buy

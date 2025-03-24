@@ -15,7 +15,7 @@ export default class TradeModelFactory {
     model.add(
       tf.layers.conv1d({
         inputShape: [this.timesteps, this.features],
-        filters: 12, // Increased from 8
+        filters: 12,
         kernelSize: 5,
         activation: "relu",
         kernelInitializer: "orthogonal",
@@ -25,7 +25,7 @@ export default class TradeModelFactory {
 
     model.add(
       tf.layers.conv1d({
-        filters: 24, // Increased from 16
+        filters: 24,
         kernelSize: 3,
         activation: "relu",
         kernelInitializer: "orthogonal",
@@ -38,11 +38,11 @@ export default class TradeModelFactory {
         units: 64,
         returnSequences: true,
         kernelInitializer: "orthogonal",
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }), // Reduced from 0.03
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
         name: "lstm1",
       })
     );
-    model.add(tf.layers.dropout({ rate: 0.2 })); // Reduced from 0.3
+    model.add(tf.layers.dropout({ rate: 0.25 })); // Increased
 
     model.add(
       tf.layers.lstm({
@@ -53,18 +53,7 @@ export default class TradeModelFactory {
         name: "lstm2",
       })
     );
-    model.add(tf.layers.dropout({ rate: 0.2 }));
-
-    model.add(
-      tf.layers.lstm({
-        units: 16, // Added small third layer
-        returnSequences: true,
-        kernelInitializer: "orthogonal",
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
-        name: "lstm3",
-      })
-    );
-    model.add(tf.layers.dropout({ rate: 0.2 }));
+    model.add(tf.layers.dropout({ rate: 0.25 }));
 
     model.add(
       tf.layers.timeDistributed({
@@ -89,7 +78,7 @@ export default class TradeModelFactory {
         name: "dense",
       })
     );
-    model.add(tf.layers.dropout({ rate: 0.2 }));
+    model.add(tf.layers.dropout({ rate: 0.25 }));
 
     model.add(
       tf.layers.dense({

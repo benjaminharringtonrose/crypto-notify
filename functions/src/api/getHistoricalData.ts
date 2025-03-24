@@ -37,10 +37,6 @@ export const getHistoricalData = async (
         )
       );
 
-      console.log(
-        `Fetching ${cryptoSymbol} data chunk ${i + 1}/${numChunks}...`
-      );
-
       // Add delay before each request (50ms ensures < 20 calls/second)
       if (i > 0) await delay(50);
 
@@ -53,12 +49,6 @@ export const getHistoricalData = async (
           api_key: process.env.CRYPTOCOMPARE_API_KEY,
         },
       });
-
-      console.log(`Response status for ${cryptoSymbol}: ${response.status}`);
-      console.log(
-        `Response data for ${cryptoSymbol}:`,
-        JSON.stringify(response.data).slice(0, 200) + "..."
-      );
 
       if (
         !response.data ||
@@ -104,9 +94,6 @@ export const getHistoricalData = async (
       throw new Error(`No valid data retrieved for ${cryptoSymbol}`);
     }
 
-    console.log(
-      `${cryptoSymbol} data retrieved - prices: ${prices.length}, volumes: ${volumes.length}`
-    );
     return { prices, volumes };
   } catch (error) {
     console.error(`Error fetching historical data for ${cryptoSymbol}:`, error);

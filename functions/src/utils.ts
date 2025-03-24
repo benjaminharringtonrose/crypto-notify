@@ -44,7 +44,7 @@ export const formatAnalysisResults = ({
   const rec = recommendation.charAt(0).toUpperCase() + recommendation.slice(1);
   const conditions = metConditions.join(", ");
 
-  return `${symbol}: ${price}\n\nBuy Probability: ${buyProb}\nSell Probability: ${sellProb}\nHold Probability: ${holdProb}\n\nRecommendation: ${rec}\n\nSell conditions met: ${conditions}\n\nThe probability is the model’s confidence in a near-term price drop exceeding 2% over 3 days.\n\nReply with a cryptocurrency to run the analysis again`;
+  return `${symbol}: ${price}\n\nBuy Probability: ${buyProb}\nSell Probability: ${sellProb}\nHold Probability: ${holdProb}\n\nRecommendation: ${rec}\n\nConditions met: ${conditions}\n\nThe probability is the model’s confidence in a near-term price drop exceeding 2% over 3 days.\n\nReply with a cryptocurrency to run the analysis again`;
 };
 
 export const fetchCardanoPriceErrorMessage = (error: any) => {

@@ -12,51 +12,85 @@ export default class TradeModelFactory {
   public createModel(): tf.LayersModel {
     const model = tf.sequential();
 
-    // Convolutional Layer
     model.add(
       tf.layers.conv1d({
         inputShape: [this.timesteps, this.features],
-        filters: 32,
-        kernelSize: 3,
+        filters: 12, // Increased from 8
+        kernelSize: 5,
         activation: "relu",
         kernelInitializer: "orthogonal",
         name: "conv1d",
       })
     );
 
-    // LSTM Layers
+    model.add(
+      tf.layers.conv1d({
+        filters: 24, // Increased from 16
+        kernelSize: 3,
+        activation: "relu",
+        kernelInitializer: "orthogonal",
+        name: "conv1d_2",
+      })
+    );
+
     model.add(
       tf.layers.lstm({
-        units: 128,
+        units: 64,
         returnSequences: true,
         kernelInitializer: "orthogonal",
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }), // Reduced from 0.03
         name: "lstm1",
       })
     );
+    model.add(tf.layers.dropout({ rate: 0.2 })); // Reduced from 0.3
+
     model.add(
       tf.layers.lstm({
         units: 32,
+        returnSequences: true,
         kernelInitializer: "orthogonal",
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
         name: "lstm2",
       })
     );
+    model.add(tf.layers.dropout({ rate: 0.2 }));
 
-    // Batch Normalization
     model.add(
-      tf.layers.batchNormalization({
-        name: "batchNormalization",
+      tf.layers.lstm({
+        units: 16, // Added small third layer
+        returnSequences: true,
+        kernelInitializer: "orthogonal",
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
+        name: "lstm3",
       })
     );
+    model.add(tf.layers.dropout({ rate: 0.2 }));
 
-    // Dense Layers
+    model.add(
+      tf.layers.timeDistributed({
+        layer: tf.layers.dense({
+          units: 16,
+          activation: "relu",
+          name: "time_distributed_dense",
+        }),
+        name: "time_distributed",
+      })
+    );
+    model.add(tf.layers.flatten());
+
+    model.add(tf.layers.batchNormalization({ name: "batchNormalization" }));
+
     model.add(
       tf.layers.dense({
-        units: 32,
+        units: 24,
         activation: "relu",
         kernelInitializer: "heNormal",
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
         name: "dense",
       })
     );
+    model.add(tf.layers.dropout({ rate: 0.2 }));
+
     model.add(
       tf.layers.dense({
         units: 2,

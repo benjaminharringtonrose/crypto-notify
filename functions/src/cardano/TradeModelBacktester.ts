@@ -1,24 +1,28 @@
 import * as admin from "firebase-admin";
+import * as tf from "@tensorflow/tfjs-node";
 import { getHistoricalData } from "../api/getHistoricalData";
 import { FIVE_YEARS_IN_DAYS } from "../constants";
-import { BacktestResult, Recommendation, Trade } from "../types";
+import { BacktestResult, Trade } from "../types";
 import serviceAccount from "../../../serviceAccount.json";
-import TradePredictor from "./TradeModelPredictor";
+import TradeModelFactory from "./TradeModelFactory";
+import FeatureCalculator from "./FeatureCalculator";
+import { Bucket } from "@google-cloud/storage";
 
 export class TradeModelBacktester {
   private TRANSACTION_FEE = 0.002;
   private INITIAL_USD = 1000;
   private MIN_TRADE_USD = 50;
-  private CASH_RESERVE = 25; // Reduced from 50
+  private CASH_RESERVE = 25;
   private STOP_LOSS_THRESHOLD = -0.1;
-  private TAKE_PROFIT_THRESHOLD = 0.05; // Raised to 5%
+  private TAKE_PROFIT_THRESHOLD = 0.05;
 
   private startDaysAgo: number;
   private endDaysAgo: number;
   private stepDays: number;
+  private bucket: Bucket; // Added as class property
 
   constructor(
-    startDaysAgo: number = 91,
+    startDaysAgo: number = 450,
     endDaysAgo: number = 1,
     stepDays: number = 1
   ) {
@@ -34,6 +38,7 @@ export class TradeModelBacktester {
           "crypto-notify-ee5bc.firebasestorage.app",
       });
     }
+    this.bucket = admin.storage().bucket(); // Initialized in constructor
   }
 
   private async fetchHistoricalData(): Promise<{
@@ -53,64 +58,110 @@ export class TradeModelBacktester {
     return { adaPrices, adaVolumes, btcPrices, btcVolumes };
   }
 
-  private sliceData(
+  private async batchPredict(
     adaPrices: number[],
     adaVolumes: number[],
     btcPrices: number[],
-    btcVolumes: number[]
-  ): {
-    slicedAdaPrices: number[];
-    slicedAdaVolumes: number[];
-    slicedBtcPrices: number[];
-    slicedBtcVolumes: number[];
-    startIndex: number;
-  } {
-    const startIndex = Math.max(0, adaPrices.length - this.startDaysAgo);
-    const endIndex = Math.max(0, adaPrices.length - this.endDaysAgo);
-    return {
-      slicedAdaPrices: adaPrices.slice(startIndex, endIndex),
-      slicedAdaVolumes: adaVolumes.slice(startIndex, endIndex),
-      slicedBtcPrices: btcPrices.slice(startIndex, endIndex),
-      slicedBtcVolumes: btcVolumes.slice(startIndex, endIndex),
-      startIndex,
-    };
-  }
+    btcVolumes: number[],
+    startIndex: number,
+    endIndex: number
+  ): Promise<number[][]> {
+    const file = this.bucket.file("tradePredictorWeights.json"); // Use class property
+    const [weightsData] = await file.download();
+    const { weights } = JSON.parse(weightsData.toString("utf8"));
 
-  private setupMocks(
-    historicalAdaPrices: number[],
-    historicalAdaVolumes: number[],
-    historicalBtcPrices: number[],
-    historicalBtcVolumes: number[],
-    currentAdaPrice: number,
-    currentBtcPrice: number
-  ): { originalGetHistorical: any; originalGetCurrent: any } {
-    const originalGetHistorical =
-      require("../api/getHistoricalPricesAndVolumes").getHistoricalPricesAndVolumes;
-    const originalGetCurrent =
-      require("../api/getCurrentPrices").getCurrentPrices;
+    const timesteps = 20;
+    const sequences: number[][][] = [];
+    const indices: number[] = [];
 
-    require("../api/getHistoricalPricesAndVolumes").getHistoricalPricesAndVolumes =
-      async () => ({
-        adaPrices: historicalAdaPrices,
-        adaVolumes: historicalAdaVolumes,
-        btcPrices: historicalBtcPrices,
-        btcVolumes: historicalBtcVolumes,
-      });
-    require("../api/getCurrentPrices").getCurrentPrices = async () => ({
-      currentAdaPrice,
-      currentBtcPrice,
+    for (let i = startIndex; i < endIndex; i += this.stepDays) {
+      const sequence: number[][] = [];
+      for (let j = Math.max(0, i - timesteps + 1); j <= i; j++) {
+        const adaFeatures = new FeatureCalculator({
+          prices: adaPrices,
+          volumes: adaVolumes,
+          dayIndex: j,
+          currentPrice: adaPrices[j],
+          isBTC: false,
+        }).compute();
+        const btcFeatures = new FeatureCalculator({
+          prices: btcPrices,
+          volumes: btcVolumes,
+          dayIndex: j,
+          currentPrice: btcPrices[j],
+          isBTC: true,
+        }).compute();
+        const adaBtcRatio = adaPrices[j] / btcPrices[j];
+        sequence.push([...adaFeatures, ...btcFeatures, adaBtcRatio]);
+      }
+      while (sequence.length < timesteps) sequence.unshift(sequence[0]);
+      sequences.push(sequence);
+      indices.push(i);
+    }
+
+    return tf.tidy(() => {
+      const factory = new TradeModelFactory(timesteps, 61);
+      const model = factory.createModel();
+      model
+        .getLayer("conv1d")
+        .setWeights([
+          tf.tensor3d(weights.conv1Weights, [5, 61, 12]),
+          tf.tensor1d(weights.conv1Bias),
+        ]);
+      model
+        .getLayer("conv1d_2")
+        .setWeights([
+          tf.tensor3d(weights.conv2Weights, [3, 12, 24]),
+          tf.tensor1d(weights.conv2Bias),
+        ]);
+      model
+        .getLayer("lstm1")
+        .setWeights([
+          tf.tensor2d(weights.lstm1Weights, [24, 256]),
+          tf.tensor2d(weights.lstm1RecurrentWeights, [64, 256]),
+          tf.tensor1d(weights.lstm1Bias),
+        ]);
+      model
+        .getLayer("lstm2")
+        .setWeights([
+          tf.tensor2d(weights.lstm2Weights, [64, 128]),
+          tf.tensor2d(weights.lstm2RecurrentWeights, [32, 128]),
+          tf.tensor1d(weights.lstm2Bias),
+        ]);
+      model
+        .getLayer("lstm3")
+        .setWeights([
+          tf.tensor2d(weights.lstm3Weights, [32, 64]),
+          tf.tensor2d(weights.lstm3RecurrentWeights, [16, 64]),
+          tf.tensor1d(weights.lstm3Bias),
+        ]);
+      model
+        .getLayer("batchNormalization")
+        .setWeights([
+          tf.tensor1d(weights.bnGamma),
+          tf.tensor1d(weights.bnBeta),
+          tf.tensor1d(weights.bnMovingMean),
+          tf.tensor1d(weights.bnMovingVariance),
+        ]);
+      model
+        .getLayer("dense")
+        .setWeights([
+          tf.tensor2d(weights.dense1Weights, [224, 24]),
+          tf.tensor1d(weights.dense1Bias),
+        ]);
+      model
+        .getLayer("dense_1")
+        .setWeights([
+          tf.tensor2d(weights.dense2Weights, [24, 2]),
+          tf.tensor1d(weights.dense2Bias),
+        ]);
+      const featuresNormalized = tf
+        .tensor3d(sequences, [sequences.length, timesteps, 61])
+        .sub(tf.tensor1d(weights.featureMeans))
+        .div(tf.tensor1d(weights.featureStds));
+      const predictions = model.predict(featuresNormalized) as tf.Tensor2D;
+      return predictions.arraySync() as number[][];
     });
-
-    return { originalGetHistorical, originalGetCurrent };
-  }
-
-  private restoreMocks(
-    originalGetHistorical: any,
-    originalGetCurrent: any
-  ): void {
-    require("../api/getHistoricalPricesAndVolumes").getHistoricalPricesAndVolumes =
-      originalGetHistorical;
-    require("../api/getCurrentPrices").getCurrentPrices = originalGetCurrent;
   }
 
   private calculateSharpeRatio(returns: number[]): number {
@@ -143,13 +194,19 @@ export class TradeModelBacktester {
       `ADA data points: ${adaPrices.length}, BTC data points: ${btcPrices.length}`
     );
 
-    const {
-      slicedAdaPrices,
-      slicedAdaVolumes,
-      slicedBtcPrices,
-      slicedBtcVolumes,
-      startIndex,
-    } = this.sliceData(adaPrices, adaVolumes, btcPrices, btcVolumes);
+    const startIndex = Math.max(0, adaPrices.length - this.startDaysAgo);
+    const endIndex = Math.max(0, adaPrices.length - this.endDaysAgo);
+    const backtestStart = 53; // Align with training
+    const backtestEnd = endIndex - 5;
+
+    const predictions = await this.batchPredict(
+      adaPrices,
+      adaVolumes,
+      btcPrices,
+      btcVolumes,
+      backtestStart,
+      backtestEnd
+    );
 
     let usdBalance = this.INITIAL_USD;
     let adaBalance = 0;
@@ -163,106 +220,59 @@ export class TradeModelBacktester {
     let wins = 0;
     let completedCycles = 0;
 
-    for (let i = 14; i < slicedAdaPrices.length - 5; i += this.stepDays) {
-      const currentAdaPrice = slicedAdaPrices[i];
+    let predIndex = 0;
+    for (let i = backtestStart; i < backtestEnd; i += this.stepDays) {
+      const currentAdaPrice = adaPrices[i];
       const timestamp = new Date(
         Date.now() - (adaPrices.length - startIndex - i) * 24 * 60 * 60 * 1000
       ).toISOString();
+      const [sellProb, buyProb] = predictions[predIndex++];
 
-      const { originalGetHistorical, originalGetCurrent } = this.setupMocks(
-        slicedAdaPrices.slice(0, i + 1),
-        slicedAdaVolumes.slice(0, i + 1),
-        slicedBtcPrices.slice(0, i + 1),
-        slicedBtcVolumes.slice(0, i + 1),
-        currentAdaPrice,
-        btcPrices[i]
-      );
-
-      const predictor = new TradePredictor();
-      const decision = await predictor.predict();
-
-      const atr = parseFloat(decision.atr);
-      const trailingStopPercent = (1.5 * atr) / currentAdaPrice;
-      const trailingStopPrice =
-        adaBalance > 0 ? peakPrice * (1 - trailingStopPercent) : 0;
-      const trailingStopTriggered =
-        adaBalance > 0 && currentAdaPrice <= trailingStopPrice;
-      const momentumSafe = decision.momentum ?? 0;
-
-      console.log(
-        `Day ${i - 13}: Price ${currentAdaPrice.toFixed(
-          4
-        )}, Probabilities - Buy: ${decision.probabilities.buy.toFixed(
-          3
-        )}, Sell: ${decision.probabilities.sell.toFixed(
-          3
-        )}, Hold: ${decision.probabilities.hold.toFixed(3)}, Recommendation: ${
-          decision.recommendation
-        }, Signal Strength: ${Math.max(
-          decision.probabilities.buy,
-          decision.probabilities.sell
-        ).toFixed(3)}, Momentum: ${momentumSafe.toFixed(4)}, Patterns: DT:${
-          decision.isDoubleTop
-        }, TT:${decision.isTripleTop}, HS:${
-          decision.isHeadAndShoulders
-        }, Unrealized Profit: ${
-          adaBalance > 0
-            ? ((currentAdaPrice - avgBuyPrice) / avgBuyPrice).toFixed(4)
-            : "N/A"
-        }`
-      );
-
-      const confidence = Math.max(
-        decision.probabilities.buy,
-        decision.probabilities.sell
-      );
-      const rsiValue = decision.rsi ? parseFloat(decision.rsi) : 50;
-      const positionSizeFactor = Math.min(0.2, confidence);
+      const confidence = Math.max(buyProb, sellProb);
       const portfolioValue = usdBalance + adaBalance * currentAdaPrice;
       const unrealizedProfit =
         adaBalance > 0 ? (currentAdaPrice - avgBuyPrice) / avgBuyPrice : 0;
+      const atr =
+        adaPrices
+          .slice(Math.max(0, i - 14), i + 1)
+          .reduce(
+            (a, b, idx, arr) => a + (idx > 0 ? Math.abs(b - arr[idx - 1]) : 0),
+            0
+          ) / 14;
+      const trailingStopPrice =
+        adaBalance > 0 ? peakPrice * (1 - (2 * atr) / currentAdaPrice) : 0;
+      const trailingStopTriggered =
+        adaBalance > 0 && currentAdaPrice <= trailingStopPrice;
       if (adaBalance > 0 && currentAdaPrice > peakPrice)
         peakPrice = currentAdaPrice;
 
       const buyCondition =
-        decision.recommendation === Recommendation.Buy &&
+        buyProb > 0.45 &&
         usdBalance > this.CASH_RESERVE + this.MIN_TRADE_USD &&
-        cooldown === 0; // Removed >0.5 restriction
+        cooldown === 0;
       const sellCondition =
-        (decision.recommendation === Recommendation.Sell && adaBalance > 0) ||
+        (sellProb > 0.45 && adaBalance > 0) ||
         (adaBalance > 0 &&
           (unrealizedProfit <= this.STOP_LOSS_THRESHOLD ||
             unrealizedProfit >= this.TAKE_PROFIT_THRESHOLD ||
-            decision.isDoubleTop ||
-            decision.isTripleTop ||
-            decision.isHeadAndShoulders ||
-            trailingStopTriggered ||
-            momentumSafe < -0.2));
+            trailingStopTriggered));
 
       console.log(
-        `Buy Condition: ${buyCondition}, Cash: ${usdBalance.toFixed(
-          2
-        )}, Sell Condition: ${sellCondition}, Unrealized Profit: ${unrealizedProfit.toFixed(
+        `Day ${i - 52}: Price ${currentAdaPrice.toFixed(
           4
-        )}, Trailing Stop: ${
-          trailingStopTriggered ? trailingStopPrice.toFixed(4) : "N/A"
-        }, Cooldown: ${cooldown}`
+        )}, Buy Prob: ${buyProb.toFixed(3)}, Sell Prob: ${sellProb.toFixed(
+          3
+        )}, Confidence: ${confidence.toFixed(3)}`
       );
 
-      let tradeReason = "";
       if (buyCondition) {
         const usdToSpend = Math.max(
           this.MIN_TRADE_USD,
-          usdBalance * positionSizeFactor * (1 - this.TRANSACTION_FEE)
+          usdBalance *
+            Math.min(0.3, confidence * 1.5) *
+            (1 - this.TRANSACTION_FEE)
         );
-        if (usdBalance - usdToSpend < this.CASH_RESERVE) {
-          console.log(
-            `Skipped Buy: Insufficient USD (${usdBalance.toFixed(2)} < ${
-              this.CASH_RESERVE + usdToSpend
-            })`
-          );
-          continue;
-        }
+        if (usdBalance - usdToSpend < this.CASH_RESERVE) continue;
         const adaBought = usdToSpend / currentAdaPrice;
         adaBalance += adaBought;
         avgBuyPrice =
@@ -280,13 +290,10 @@ export class TradeModelBacktester {
           adaAmount: adaBought,
           usdValue: usdToSpend,
         });
-        tradeReason = rsiValue < 30 ? "RSI < 30" : "High Buy Probability";
         console.log(
           `Buy at $${currentAdaPrice.toFixed(4)}, ADA: ${adaBought.toFixed(
             2
-          )}, USD: ${usdToSpend.toFixed(2)}, RSI: ${
-            decision.rsi || "50.00"
-          }, Reason: ${tradeReason}`
+          )}, USD: ${usdToSpend.toFixed(2)}`
         );
       } else if (sellCondition) {
         const adaToSell = adaBalance;
@@ -302,26 +309,10 @@ export class TradeModelBacktester {
           usdValue: usdReceived,
           buyPrice: avgBuyPrice,
         });
-        tradeReason =
-          unrealizedProfit <= this.STOP_LOSS_THRESHOLD
-            ? "Stop-Loss"
-            : unrealizedProfit >= this.TAKE_PROFIT_THRESHOLD
-            ? "Take-Profit"
-            : trailingStopTriggered
-            ? "Trailing Stop"
-            : momentumSafe < -0.2
-            ? "Negative Momentum"
-            : decision.isDoubleTop ||
-              decision.isTripleTop ||
-              decision.isHeadAndShoulders
-            ? "Reversal Pattern"
-            : "High Sell Probability";
         console.log(
           `Sell at $${currentAdaPrice.toFixed(4)}, ADA: ${adaToSell.toFixed(
             2
-          )}, USD: ${usdReceived.toFixed(2)}, RSI: ${
-            decision.rsi || "50.00"
-          }, Reason: ${tradeReason}`
+          )}, USD: ${usdReceived.toFixed(2)}`
         );
         if (usdReceived > adaToSell * avgBuyPrice) wins++;
         if (adaBalance === 0) {
@@ -341,11 +332,9 @@ export class TradeModelBacktester {
           : 0
       );
       if (cooldown > 0) cooldown--;
-      this.restoreMocks(originalGetHistorical, originalGetCurrent);
     }
 
-    const finalValue =
-      usdBalance + adaBalance * slicedAdaPrices[slicedAdaPrices.length - 6];
+    const finalValue = usdBalance + adaBalance * adaPrices[backtestEnd - 6];
     const totalReturn =
       ((finalValue - this.INITIAL_USD) / this.INITIAL_USD) * 100;
     const totalTrades = trades.length;

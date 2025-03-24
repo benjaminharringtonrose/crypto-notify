@@ -9,9 +9,9 @@ export class TradeModelBacktester {
   private TRANSACTION_FEE = 0.002;
   private INITIAL_USD = 1000;
   private MIN_TRADE_USD = 50;
-  private CASH_RESERVE = 50;
+  private CASH_RESERVE = 25; // Reduced from 50
   private STOP_LOSS_THRESHOLD = -0.1;
-  private TAKE_PROFIT_THRESHOLD = 0.03; // Raised to 3%
+  private TAKE_PROFIT_THRESHOLD = 0.05; // Raised to 5%
 
   private startDaysAgo: number;
   private endDaysAgo: number;
@@ -182,7 +182,7 @@ export class TradeModelBacktester {
       const decision = await predictor.predict();
 
       const atr = parseFloat(decision.atr);
-      const trailingStopPercent = (1.5 * atr) / currentAdaPrice; // Increased to 1.5
+      const trailingStopPercent = (1.5 * atr) / currentAdaPrice;
       const trailingStopPrice =
         adaBalance > 0 ? peakPrice * (1 - trailingStopPercent) : 0;
       const trailingStopTriggered =
@@ -203,7 +203,13 @@ export class TradeModelBacktester {
           decision.probabilities.sell
         ).toFixed(3)}, Momentum: ${momentumSafe.toFixed(4)}, Patterns: DT:${
           decision.isDoubleTop
-        }, TT:${decision.isTripleTop}, HS:${decision.isHeadAndShoulders}`
+        }, TT:${decision.isTripleTop}, HS:${
+          decision.isHeadAndShoulders
+        }, Unrealized Profit: ${
+          adaBalance > 0
+            ? ((currentAdaPrice - avgBuyPrice) / avgBuyPrice).toFixed(4)
+            : "N/A"
+        }`
       );
 
       const confidence = Math.max(
@@ -221,7 +227,7 @@ export class TradeModelBacktester {
       const buyCondition =
         decision.recommendation === Recommendation.Buy &&
         usdBalance > this.CASH_RESERVE + this.MIN_TRADE_USD &&
-        (cooldown === 0 || decision.probabilities.buy > 0.5);
+        cooldown === 0; // Removed >0.5 restriction
       const sellCondition =
         (decision.recommendation === Recommendation.Sell && adaBalance > 0) ||
         (adaBalance > 0 &&
@@ -274,7 +280,7 @@ export class TradeModelBacktester {
           adaAmount: adaBought,
           usdValue: usdToSpend,
         });
-        tradeReason = rsiValue < 20 ? "RSI < 20" : "High Buy Probability";
+        tradeReason = rsiValue < 30 ? "RSI < 30" : "High Buy Probability";
         console.log(
           `Buy at $${currentAdaPrice.toFixed(4)}, ADA: ${adaBought.toFixed(
             2
@@ -322,7 +328,7 @@ export class TradeModelBacktester {
           completedCycles++;
           avgBuyPrice = 0;
           peakPrice = 0;
-          cooldown = 2; // Always 2 days
+          cooldown = 2;
         }
       }
 

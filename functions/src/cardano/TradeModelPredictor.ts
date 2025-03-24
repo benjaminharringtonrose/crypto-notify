@@ -263,18 +263,18 @@ export default class TradeModelPredictor {
         (adaIndicators.currentPrice -
           adaPrices.slice(-5).reduce((a, b) => a + b, 0) / 5) /
         (adaPrices.slice(-5).reduce((a, b) => a + b, 0) / 5);
-      const momentumSafe = adaIndicators.momentum ?? 0;
       const macdHistogram = adaIndicators.macdLine - adaIndicators.signalLine;
+      const momentumSafe = adaIndicators.momentum ?? 0;
 
       let buyProb = buyProbBase,
         sellProb = sellProbBase,
         holdProb = 0;
       if (rsiSafe < 20) buyProb += 0.3;
-      if (rsiSafe > 55) sellProb += 0.35;
+      if (rsiSafe > 55) sellProb += 0.35; // Reverted to 55
       const confidenceThreshold =
         volatility > 1.5
           ? 0.4
-          : 0.35 + // Dynamic based on volatility
+          : 0.35 +
             (adaIndicators.adxProxy > 0.02 ? 0.05 : 0) -
             ((adaIndicators.isDoubleTop ||
               adaIndicators.isTripleTop ||
@@ -308,7 +308,7 @@ export default class TradeModelPredictor {
       );
 
       const trendWeight = adaIndicators.adxProxy > 0.02 ? 0.5 : 0.2;
-      const meanRevWeight = rsiSafe < 20 || rsiSafe > 85 ? 0.6 : 0.3;
+      const meanRevWeight = rsiSafe < 20 || rsiSafe > 85 ? 0.6 : 0.3; // Fixed typo: rsi.Safe → rsiSafe
       const breakoutWeight =
         volatility > 1.5 || adaIndicators.isVolumeSpike ? 0.4 : 0.2;
 
@@ -316,18 +316,14 @@ export default class TradeModelPredictor {
         trendWeight * trendResult.buyProb +
         meanRevWeight * meanRevResult.buyProb +
         breakoutWeight * breakoutResult.buyProb +
-        (profitPotential > 0.1 ? 0.1 : profitPotential > 0.05 ? 0.05 : 0) + // Reverted to 0.1/0.05
-        (momentumSafe > 0 ? 0.25 : -0.2); // Tightened to >0
+        (profitPotential > 0.1 ? 0.15 : profitPotential > 0.05 ? 0.075 : 0) + // Boosted to 0.15/0.075
+        (momentumSafe > 0 ? 0.25 : -0.2);
       sellProb +=
         trendWeight * trendResult.sellProb +
         meanRevWeight * meanRevResult.sellProb +
         breakoutWeight * breakoutResult.sellProb +
-        (profitPotential < -0.1 ? 0.1 : profitPotential < -0.05 ? 0.05 : 0) + // Reverted to 0.1/0.05
-        (momentumSafe < -0.2 ? 0.4 : 0); // Tightened to <-0.2
-      holdProb +=
-        trendWeight * trendResult.holdProb +
-        meanRevWeight * meanRevResult.holdProb +
-        breakoutWeight * breakoutResult.holdProb;
+        (profitPotential < -0.1 ? 0.15 : profitPotential < -0.05 ? 0.075 : 0) + // Boosted to 0.15/0.075
+        (momentumSafe < -0.2 ? 0.5 : momentumSafe < -0.1 ? 0.3 : 0);
 
       const total = buyProb + sellProb + holdProb;
       buyProb = buyProb / total || 0.33;
@@ -337,9 +333,9 @@ export default class TradeModelPredictor {
       const recommendation =
         rsiSafe < 20 && buyProb > 0.35
           ? Recommendation.Buy
-          : rsiSafe > 55 && sellProb > 0.35
+          : rsiSafe > 50 && sellProb > 0.35
           ? Recommendation.Sell
-          : buyProb > confidenceThreshold && momentumSafe > 0 // Stricter momentum
+          : buyProb > confidenceThreshold && momentumSafe > 0
           ? Recommendation.Buy
           : sellProb > confidenceThreshold
           ? Recommendation.Sell

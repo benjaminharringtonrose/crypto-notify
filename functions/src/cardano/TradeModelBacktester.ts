@@ -10,8 +10,8 @@ export class TradeModelBacktester {
   private INITIAL_USD = 1000;
   private MIN_TRADE_USD = 50;
   private CASH_RESERVE = 50;
-  private STOP_LOSS_THRESHOLD = -0.15;
-  private TAKE_PROFIT_THRESHOLD = 0.02;
+  private STOP_LOSS_THRESHOLD = -0.1;
+  private TAKE_PROFIT_THRESHOLD = 0.03; // Raised to 3%
 
   private startDaysAgo: number;
   private endDaysAgo: number;
@@ -156,7 +156,7 @@ export class TradeModelBacktester {
     let avgBuyPrice = 0;
     let peakPrice = 0;
     let cooldown = 0;
-    let lastTradeProfit = 0;
+
     const trades: Trade[] = [];
     const portfolioHistory: { timestamp: string; value: number }[] = [];
     const dailyReturns: number[] = [];
@@ -182,7 +182,7 @@ export class TradeModelBacktester {
       const decision = await predictor.predict();
 
       const atr = parseFloat(decision.atr);
-      const trailingStopPercent = (1.25 * atr) / currentAdaPrice;
+      const trailingStopPercent = (1.5 * atr) / currentAdaPrice; // Increased to 1.5
       const trailingStopPrice =
         adaBalance > 0 ? peakPrice * (1 - trailingStopPercent) : 0;
       const trailingStopTriggered =
@@ -288,11 +288,6 @@ export class TradeModelBacktester {
           adaToSell * currentAdaPrice * (1 - this.TRANSACTION_FEE);
         usdBalance += usdReceived;
         adaBalance -= adaToSell;
-        lastTradeProfit =
-          adaBalance > 0
-            ? 0
-            : (usdReceived - adaToSell * avgBuyPrice) /
-              (adaToSell * avgBuyPrice);
         trades.push({
           type: "sell",
           price: currentAdaPrice,
@@ -327,7 +322,7 @@ export class TradeModelBacktester {
           completedCycles++;
           avgBuyPrice = 0;
           peakPrice = 0;
-          cooldown = lastTradeProfit > 0.03 ? 2 : 3;
+          cooldown = 2; // Always 2 days
         }
       }
 

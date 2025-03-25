@@ -7,7 +7,7 @@ export default class FeatureCalculator {
   private dayIndex: number;
   private currentPrice: number;
   private isBTC: boolean;
-  private btcPrice?: number; // Added for ADA/BTC ratio
+  private btcPrice?: number;
 
   constructor({
     prices,
@@ -614,7 +614,7 @@ export default class FeatureCalculator {
       this.dayIndex < 0 ||
       this.dayIndex >= this.prices.length
     ) {
-      return Array(this.isBTC ? 29 : 32).fill(0); // Updated fallback to 32 for ADA
+      return Array(this.isBTC ? 29 : 32).fill(0);
     }
 
     const indicators = this.calculateIndicators();
@@ -656,7 +656,7 @@ export default class FeatureCalculator {
           ...baseFeatures,
           indicators.isTripleBottom ? 1 : 0,
           indicators.adxProxy,
-          this.btcPrice ? this.currentPrice / this.btcPrice : 0, // Added adaBtcRatio
+          this.btcPrice ? this.currentPrice / this.btcPrice : 0,
         ]; // 32 features
   }
 }

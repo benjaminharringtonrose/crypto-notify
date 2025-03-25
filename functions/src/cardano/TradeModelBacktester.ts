@@ -20,7 +20,7 @@ export class TradeModelBacktester {
   private endDaysAgo: number;
   private stepDays: number;
   private bucket: Bucket;
-  private readonly timesteps = 30; // Align with TradeModelTrainer
+  private readonly timesteps = 30;
 
   constructor(
     startDaysAgo: number = 450,

@@ -7,18 +7,14 @@ import { PredictionLoggerCallback } from "./callbacks/PredictionLoggerCallback";
 import { CyclicLearningRateCallback } from "./callbacks/CyclicLearningRateCallback";
 import FeatureCalculator from "./FeatureCalculator";
 import TradeModelFactory from "./TradeModelFactory";
-import serviceAccount from "../../../serviceAccount.json";
 import { HistoricalData, ModelConfig } from "../types";
-import * as fs from "fs";
-import * as path from "path";
 
 dotenv.config();
 
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
-    storageBucket:
-      process.env.STORAGE_BUCKET || "crypto-notify-ee5bc.firebasestorage.app",
+    credential: admin.credential.cert(require("../../../serviceAccount.json")),
+    storageBucket: process.env.STORAGE_BUCKET,
   });
 }
 
@@ -35,11 +31,9 @@ export class TradeModelTrainer {
   private model: tf.LayersModel | null = null;
   private lossFn: (yTrue: tf.Tensor, yPred: tf.Tensor) => tf.Scalar =
     this.focalLoss.bind(this);
-  private cacheDir = path.join(__dirname, "cache");
 
   constructor() {
     console.log("TradeModelTrainer initialized");
-    if (!fs.existsSync(this.cacheDir)) fs.mkdirSync(this.cacheDir);
   }
 
   private customPrecision(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {

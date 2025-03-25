@@ -1,4 +1,3 @@
-// ModelWeightManager.ts
 import * as tf from "@tensorflow/tfjs-node";
 import { FirebaseService } from "../api/FirebaseService";
 import { Bucket } from "@google-cloud/storage";
@@ -16,10 +15,26 @@ export class ModelWeightManager {
     const file = this.bucket.file(TRADE_PREDICTOR_WEIGHTS);
     const [weightsData] = await file.download();
     this.weights = JSON.parse(weightsData.toString("utf8")).weights;
+    this.validateWeights();
+  }
+
+  private validateWeights(): void {
+    if (
+      !this.weights ||
+      Object.values(this.weights).some((w: any) => !w || isNaN(w[0]))
+    ) {
+      console.warn(
+        "Invalid weights detected, falling back to random initialization."
+      );
+      this.weights = null; // Trigger random initialization in model
+    }
   }
 
   public setWeights(model: tf.LayersModel): void {
-    if (!this.weights) throw new Error("Weights not loaded");
+    if (!this.weights) {
+      console.log("Weights not loaded, using random initialization.");
+      return;
+    }
 
     model
       .getLayer("conv1d")
@@ -83,10 +98,10 @@ export class ModelWeightManager {
   }
 
   public getFeatureMeans(): number[] {
-    return this.weights.featureMeans;
+    return this.weights?.featureMeans || Array(61).fill(0);
   }
 
   public getFeatureStds(): number[] {
-    return this.weights.featureStds;
+    return this.weights?.featureStds || Array(61).fill(1);
   }
 }

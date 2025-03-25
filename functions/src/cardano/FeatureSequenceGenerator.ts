@@ -16,7 +16,6 @@ export class FeatureSequenceGenerator {
     endIndex: number
   ): number[][] {
     const sequence: number[][] = [];
-    // Ensure we don’t exceed array bounds
     const safeEndIndex = Math.min(endIndex, adaPrices.length - 1);
     const safeStartIndex = Math.max(0, safeEndIndex - this.timesteps + 1);
 
@@ -38,11 +37,10 @@ export class FeatureSequenceGenerator {
       sequence.push([...adaFeatures, ...btcFeatures]);
     }
 
-    // Pad if necessary
     while (sequence.length < this.timesteps) {
-      sequence.unshift(sequence[0] || Array(61).fill(0)); // Default to zeros if empty
+      sequence.unshift(sequence[0] || Array(61).fill(0));
     }
-    return sequence;
+    return sequence.slice(-this.timesteps); // Ensure exact length
   }
 
   public generateBatchSequences(
@@ -74,10 +72,10 @@ export class FeatureSequenceGenerator {
         Math.max(0, i - this.timesteps + 1),
         i
       );
-      if (sequence.length > 0) {
+      if (sequence.length === this.timesteps) {
         sequences.push(sequence);
       } else {
-        console.warn(`No sequence generated for index ${i}`);
+        console.warn(`Invalid sequence length at index ${i}`);
       }
     }
 

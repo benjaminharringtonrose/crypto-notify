@@ -95,8 +95,8 @@ export default class TradeModelPredictor {
     const recentLow = Math.min(...prices.slice(-10));
     const momentumSafe = momentum ?? 0;
 
-    let buyProb = 0.5, // Increased baseline
-      sellProb = 0.5, // Increased baseline
+    let buyProb = 0.8,
+      sellProb = 0.6,
       holdProb = 0.3;
     const conditions: string[] = [];
 
@@ -163,7 +163,8 @@ export default class TradeModelPredictor {
           conditions.push(
             "Overbought RSI + above Bollinger with negative momentum"
           );
-        } else if (rsiSafe > 70 && momentumSafe < 0) {
+        } else if (rsiSafe > 75 && momentumSafe < 0) {
+          // Tightened to 75
           sellProb += 0.35;
           conditions.push("High RSI with negative momentum");
         }
@@ -240,7 +241,7 @@ export default class TradeModelPredictor {
         .div(tf.tensor1d(stds));
       const logits = model.predict(featuresNormalized) as tf.Tensor2D;
       console.log(`Raw Logits: ${logits.dataSync()}`);
-      const scaledLogits = logits.mul(tf.scalar(2)); // Double logits for wider range
+      const scaledLogits = logits.mul(tf.scalar(2));
       const buyLogit = scaledLogits.slice([0, 1], [1, 1]).sigmoid();
       const sellLogit = scaledLogits.slice([0, 0], [1, 1]).sigmoid();
       buyProbBase = Math.min(buyLogit.dataSync()[0], 0.9);
@@ -272,19 +273,21 @@ export default class TradeModelPredictor {
         holdProb = 0;
       const metConditions: string[] = [];
 
-      if (!isUptrend && (rsiSafe >= 20 || momentumSafe <= 0.5)) {
+      if (!isUptrend && (rsiSafe >= 35 || momentumSafe <= 0.05)) {
+        // Lowered to 0.05
         buyProb = 0;
         holdProb = 0.6;
         metConditions.push(
           "Downtrend (SMA7 < SMA50), RSI not oversold or weak momentum"
         );
       }
-      if (rsiSafe > 70 || (adaIndicators.sma7 < sma50 && momentumSafe < 0)) {
+      if (rsiSafe > 75 || (adaIndicators.sma7 < sma50 && momentumSafe < 0)) {
+        // Tightened to 75
         sellProb = 0.9;
         buyProb = 0;
         holdProb = 0.1;
         metConditions.push(
-          "Sell override: RSI > 70 or Downtrend with negative momentum"
+          "Sell override: RSI > 75 or Downtrend with negative momentum"
         );
       }
       if (rsiSafe < 20 && momentumSafe > 0.5) {
@@ -321,7 +324,7 @@ export default class TradeModelPredictor {
 
       const trendWeight = adaIndicators.adxProxy > 0.025 ? 0.6 : 0.4;
       const meanRevWeight =
-        volatility > 1.5 || rsiSafe < 20 || rsiSafe > 70 ? 0.7 : 0.3;
+        volatility > 1.5 || rsiSafe < 20 || rsiSafe > 75 ? 0.7 : 0.3;
       const breakoutWeight =
         volatility > 1.8 || adaIndicators.isVolumeSpike ? 0.7 : 0.3;
 
@@ -359,7 +362,7 @@ export default class TradeModelPredictor {
       sellProb = Math.min(Math.max(sellProb, 0), 0.9);
       holdProb = 1 - buyProb - sellProb;
 
-      const confidenceThreshold = 0.55; // Lowered to match model output
+      const confidenceThreshold = 0.55;
       const recommendation =
         buyProb > confidenceThreshold && momentumSafe > 0 && isUptrend
           ? Recommendation.Buy

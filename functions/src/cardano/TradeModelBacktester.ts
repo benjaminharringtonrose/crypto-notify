@@ -15,10 +15,11 @@ export class TradeModelBacktester {
   private MIN_TRADE_USD = 100;
   private CASH_RESERVE = 25;
   private STOP_LOSS_THRESHOLD = -0.03;
-  private TAKE_PROFIT_THRESHOLD = 0.07;
-  private MAX_TRADES_PER_WEEK = 2;
+  private TAKE_PROFIT_THRESHOLD = 0.1; // Raised to 0.10
+  private MAX_TRADES_PER_WEEK = 3;
   // private MIN_HOLDING_DAYS = 3;
-  private COOLDOWN_AFTER_LOSS = 7;
+  private COOLDOWN_AFTER_LOSS = 3;
+  private MIN_PROFIT_FILTER = 0.02;
 
   private startDaysAgo: number;
   private endDaysAgo: number;
@@ -113,7 +114,13 @@ export class TradeModelBacktester {
       let buyProb = Math.min(buy, 0.9);
       let sellProb = Math.min(sellProbs[i], 0.9);
       const total = buyProb + sellProb;
-      if (total > 0) {
+      if (!isFinite(total) || total <= 0) {
+        console.warn(
+          `Invalid total at index ${i}: buy=${buyProb}, sell=${sellProb}, total=${total}. Using fallback.`
+        );
+        buyProb = 0.5;
+        sellProb = 0.5;
+      } else {
         buyProb /= total;
         sellProb /= total;
       }
@@ -214,8 +221,8 @@ export class TradeModelBacktester {
         i > 0 ? (currentAdaPrice - adaPrices[i - 1]) / adaPrices[i - 1] : 0;
       const isUptrend = sma7 > sma50;
 
-      if (!isUptrend && (rsi >= 20 || momentum <= 0.5)) buyProbRaw = 0;
-      if (rsi > 70 || (sma7 < sma50 && momentum < 0)) sellProbRaw = 0.9;
+      if (!isUptrend && (rsi >= 35 || momentum <= 0.05)) buyProbRaw = 0;
+      if (rsi > 75 || (sma7 < sma50 && momentum < 0)) sellProbRaw = 0.9;
 
       const buyProb = Math.min(Math.max(buyProbRaw, 0), 0.9);
       const sellProb = Math.min(Math.max(sellProbRaw, 0), 0.9);
@@ -233,7 +240,7 @@ export class TradeModelBacktester {
             0
           ) / 14;
       const trailingStopPrice =
-        adaBalance > 0 ? peakPrice * (1 - (1.5 * atr) / currentAdaPrice) : 0;
+        adaBalance > 0 ? peakPrice * (1 - (3.0 * atr) / currentAdaPrice) : 0; // Raised to 3.0
       const trailingStopTriggered =
         adaBalance > 0 && currentAdaPrice <= trailingStopPrice;
 
@@ -245,7 +252,10 @@ export class TradeModelBacktester {
         buyProb > 0.55 &&
         usdBalance > this.CASH_RESERVE + this.MIN_TRADE_USD &&
         cooldown === 0 &&
-        weeklyTradeCount < this.MAX_TRADES_PER_WEEK;
+        weeklyTradeCount < this.MAX_TRADES_PER_WEEK &&
+        (lastTradeProfit <= 0 ||
+          lastTradeProfit / (adaBalance * avgBuyPrice) >=
+            this.MIN_PROFIT_FILTER);
       const sellCondition =
         (sellProb > 0.55 && adaBalance > 0) ||
         (adaBalance > 0 &&
@@ -253,7 +263,6 @@ export class TradeModelBacktester {
             unrealizedProfit >= this.TAKE_PROFIT_THRESHOLD ||
             trailingStopTriggered));
 
-      // Force initial buy on Day 1
       if (isFirstTrade && i === backtestStart) {
         buyCondition = true;
         isFirstTrade = false;
@@ -275,12 +284,13 @@ export class TradeModelBacktester {
 
       if (buyCondition) {
         const atrFactor = Math.min(1, 1.5 / atr);
+        const positionSize = isUptrend && confidence > 0.65 ? 0.2 : 0.15; // 20% in strong uptrends
         const usdToSpend = isFirstTrade
-          ? usdBalance * 0.05 * (1 - this.TRANSACTION_FEE) // 5% initial buy
+          ? usdBalance * 0.05 * (1 - this.TRANSACTION_FEE)
           : Math.max(
               this.MIN_TRADE_USD,
               usdBalance *
-                Math.min(0.1, confidence * atrFactor) *
+                Math.min(positionSize, confidence * atrFactor) *
                 (1 - this.TRANSACTION_FEE)
             );
         if (usdBalance - usdToSpend < this.CASH_RESERVE) continue;
@@ -343,7 +353,7 @@ export class TradeModelBacktester {
           completedCycles++;
           avgBuyPrice = 0;
           peakPrice = 0;
-          cooldown = lastTradeProfit < 0 ? this.COOLDOWN_AFTER_LOSS : 2;
+          cooldown = lastTradeProfit < 0 ? this.COOLDOWN_AFTER_LOSS : 1;
           weeklyTradeCount++;
           lastTradeDay = i;
         }

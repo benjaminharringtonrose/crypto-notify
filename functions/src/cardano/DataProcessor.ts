@@ -26,6 +26,9 @@ export class DataProcessor {
     const adaData = await getHistoricalData("ADA", startDaysAgo);
     await new Promise((resolve) => setTimeout(resolve, 50));
     const btcData = await getHistoricalData("BTC", startDaysAgo);
+    console.log(
+      `ADA data length: ${adaData.prices.length}, BTC data length: ${btcData.prices.length}`
+    );
     return { adaData, btcData };
   }
 
@@ -41,7 +44,12 @@ export class DataProcessor {
         btcData,
         j
       );
-      if (!this.validateFeatures(adaFeatures, btcFeatures)) return null;
+      if (!this.validateFeatures(adaFeatures, btcFeatures)) {
+        console.log(
+          `Invalid features at index ${j}: adaFeatures length=${adaFeatures.length}, btcFeatures length=${btcFeatures.length}`
+        );
+        return null;
+      }
       const scale = 0.975 + Math.random() * 0.05;
       const noisyFeatures = [
         ...this.addNoise(adaFeatures, scale),
@@ -73,8 +81,7 @@ export class DataProcessor {
     });
     const adaFeatures = adaCalculator.compute();
     const btcFeatures = btcCalculator.compute();
-    const adaBtcRatio = adaData.prices[index] / btcData.prices[index];
-    return [[...adaFeatures, adaBtcRatio], btcFeatures];
+    return [adaFeatures, btcFeatures];
   }
 
   private validateFeatures(

@@ -7,14 +7,17 @@ import { getHistoricalPricesAndVolumes } from "../api/getHistoricalPricesAndVolu
 import FeatureCalculator from "./FeatureCalculator";
 import TradeModelFactory from "./TradeModelFactory";
 import { FirebaseService } from "../api/FirebaseService";
+import { ModelWeightManager } from "./TradeModelWeightManager";
+import { FeatureSequenceGenerator } from "./FeatureSequenceGenerator";
 
 dotenv.config();
 
 FirebaseService.getInstance();
 
 export default class TradeModelPredictor {
-  private bucket = admin.storage().bucket();
   private readonly timesteps = 30;
+  private weightManager = new ModelWeightManager();
+  private sequenceGenerator = new FeatureSequenceGenerator(this.timesteps);
 
   private async fetchAndCalculateIndicators() {
     const { currentAdaPrice, currentBtcPrice } = await getCurrentPrices();
@@ -201,96 +204,28 @@ export default class TradeModelPredictor {
           ? adaPrices.slice(-50).reduce((a, b) => a + b, 0) / 50
           : adaIndicators.sma20;
 
-      const file = this.bucket.file("tradePredictorWeights.json");
-      const [weightsData] = await file.download();
-      const { weights } = JSON.parse(weightsData.toString("utf8"));
+      await this.weightManager.loadWeights();
+      const factory = new TradeModelFactory(this.timesteps, 61);
+      const model = factory.createModel();
+      this.weightManager.setWeights(model);
 
-      const featureSequence: number[][] = [];
-      for (
-        let i = Math.max(0, adaPrices.length - this.timesteps);
-        i < adaPrices.length;
-        i++
-      ) {
-        const adaFeatures = new FeatureCalculator({
-          prices: adaPrices,
-          volumes: adaVolumes,
-          dayIndex: i,
-          currentPrice: adaPrices[i],
-          isBTC: false,
-        }).compute();
-        const btcFeatures = new FeatureCalculator({
-          prices: btcPrices,
-          volumes: btcVolumes,
-          dayIndex: i,
-          currentPrice: btcPrices[i],
-          isBTC: true,
-        }).compute();
-        featureSequence.push([...adaFeatures, ...btcFeatures]); // 61 features
-      }
+      const featureSequence = this.sequenceGenerator.generateSequence(
+        adaPrices,
+        adaVolumes,
+        btcPrices,
+        btcVolumes,
+        Math.max(0, adaPrices.length - this.timesteps),
+        adaPrices.length - 1
+      );
 
-      while (featureSequence.length < this.timesteps)
-        featureSequence.unshift(featureSequence[0]);
+      let buyProbBase = 0.5;
+      let sellProbBase = 0.5;
 
-      let buyProbBase = 0.5,
-        sellProbBase = 0.5;
-      await tf.tidy(() => {
-        const factory = new TradeModelFactory(this.timesteps, 61);
-        const model = factory.createModel();
-        model
-          .getLayer("conv1d")
-          .setWeights([
-            tf.tensor3d(weights.conv1Weights, [5, 61, 12]),
-            tf.tensor1d(weights.conv1Bias),
-          ]);
-        model
-          .getLayer("conv1d_2")
-          .setWeights([
-            tf.tensor3d(weights.conv2Weights, [3, 12, 24]),
-            tf.tensor1d(weights.conv2Bias),
-          ]);
-        model.getLayer("lstm1").setWeights([
-          tf.tensor2d(weights.lstm1Weights, [24, 512]), // 128 units * 4
-          tf.tensor2d(weights.lstm1RecurrentWeights, [128, 512]),
-          tf.tensor1d(weights.lstm1Bias),
-        ]);
-        model.getLayer("lstm2").setWeights([
-          tf.tensor2d(weights.lstm2Weights, [128, 256]), // 64 units * 4
-          tf.tensor2d(weights.lstm2RecurrentWeights, [64, 256]),
-          tf.tensor1d(weights.lstm2Bias),
-        ]);
-        model.getLayer("lstm3").setWeights([
-          tf.tensor2d(weights.lstm3Weights, [64, 64]), // 16 units * 4
-          tf.tensor2d(weights.lstm3RecurrentWeights, [16, 64]),
-          tf.tensor1d(weights.lstm3Bias),
-        ]);
-        model
-          .getLayer("time_distributed")
-          .setWeights([
-            tf.tensor2d(weights.timeDistributedWeights, [16, 16]),
-            tf.tensor1d(weights.timeDistributedBias),
-          ]);
-        model
-          .getLayer("batchNormalization")
-          .setWeights([
-            tf.tensor1d(weights.bnGamma),
-            tf.tensor1d(weights.bnBeta),
-            tf.tensor1d(weights.bnMovingMean),
-            tf.tensor1d(weights.bnMovingVariance),
-          ]);
-        model.getLayer("dense").setWeights([
-          tf.tensor2d(weights.dense1Weights, [384, 24]), // Updated from [480, 24]
-          tf.tensor1d(weights.dense1Bias),
-        ]);
-        model
-          .getLayer("dense_1")
-          .setWeights([
-            tf.tensor2d(weights.dense2Weights, [24, 2]),
-            tf.tensor1d(weights.dense2Bias),
-          ]);
+      tf.tidy(() => {
         const featuresNormalized = tf
           .tensor3d([featureSequence], [1, this.timesteps, 61])
-          .sub(tf.tensor1d(weights.featureMeans))
-          .div(tf.tensor1d(weights.featureStds));
+          .sub(tf.tensor1d(this.weightManager.getFeatureMeans()))
+          .div(tf.tensor1d(this.weightManager.getFeatureStds()));
         const prediction = model.predict(featuresNormalized) as tf.Tensor2D;
         const probs = prediction.dataSync() as Float32Array;
         if (probs.length === 2 && probs.every((v) => Number.isFinite(v)))
@@ -310,17 +245,15 @@ export default class TradeModelPredictor {
         holdProb = 0;
       const metConditions: string[] = [];
 
+      // Consolidated RSI adjustments
       if (rsiSafe < 20) {
         buyProb += 0.35;
         metConditions.push("RSI < 20 (oversold)");
-      }
-      if (rsiSafe > 80) {
+      } else if (rsiSafe > 80) {
         sellProb += 0.35;
         metConditions.push("RSI > 80 (overbought)");
       }
 
-      if (rsiSafe < 20) buyProb += 0.35;
-      if (rsiSafe > 80) sellProb += 0.35;
       const confidenceThreshold =
         volatility > 1.8
           ? 0.5

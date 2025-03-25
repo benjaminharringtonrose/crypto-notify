@@ -5,8 +5,8 @@ import { FIVE_YEARS_IN_DAYS } from "../constants";
 import { BacktestResult, Trade } from "../types";
 import serviceAccount from "../../../serviceAccount.json";
 import TradeModelFactory from "./TradeModelFactory";
-import FeatureCalculator from "./FeatureCalculator";
-import { Bucket } from "@google-cloud/storage";
+import { ModelWeightManager } from "./TradeModelWeightManager";
+import { FeatureSequenceGenerator } from "./FeatureSequenceGenerator";
 
 export class TradeModelBacktester {
   private TRANSACTION_FEE = 0.002;
@@ -19,8 +19,9 @@ export class TradeModelBacktester {
   private startDaysAgo: number;
   private endDaysAgo: number;
   private stepDays: number;
-  private bucket: Bucket;
   private readonly timesteps = 30;
+  private weightManager = new ModelWeightManager();
+  private sequenceGenerator = new FeatureSequenceGenerator(this.timesteps);
 
   constructor(
     startDaysAgo: number = 450,
@@ -39,7 +40,6 @@ export class TradeModelBacktester {
           "crypto-notify-ee5bc.firebasestorage.app",
       });
     }
-    this.bucket = admin.storage().bucket();
   }
 
   private async fetchHistoricalData(): Promise<{
@@ -67,13 +67,6 @@ export class TradeModelBacktester {
     startIndex: number,
     endIndex: number
   ): Promise<number[][]> {
-    const file = this.bucket.file("tradePredictorWeights.json");
-    const [weightsData] = await file.download();
-    const { weights } = JSON.parse(weightsData.toString("utf8"));
-
-    const sequences: number[][][] = [];
-    const indices: number[] = [];
-
     const expectedSequences = Math.floor(
       (endIndex - startIndex) / this.stepDays
     );
@@ -81,73 +74,37 @@ export class TradeModelBacktester {
       `Expected sequences: ${expectedSequences}, startIndex: ${startIndex}, endIndex: ${endIndex}`
     );
 
-    for (let i = startIndex; i < endIndex; i += this.stepDays) {
-      const sequence: number[][] = [];
-      for (let j = Math.max(0, i - this.timesteps + 1); j <= i; j++) {
-        if (j >= adaPrices.length || j >= btcPrices.length) {
-          console.log(`Index out of bounds at j=${j}, i=${i}`);
-          break;
-        }
-        const adaFeatures = new FeatureCalculator({
-          prices: adaPrices,
-          volumes: adaVolumes,
-          dayIndex: j,
-          currentPrice: adaPrices[j],
-          btcPrice: btcPrices[j],
-          isBTC: false,
-        }).compute();
-        const btcFeatures = new FeatureCalculator({
-          prices: btcPrices,
-          volumes: btcVolumes,
-          dayIndex: j,
-          currentPrice: btcPrices[j],
-          isBTC: true,
-        }).compute();
-        const combinedFeatures = [...adaFeatures, ...btcFeatures];
-        if (combinedFeatures.length !== 61) {
-          console.log(
-            `Feature count mismatch at i=${i}, j=${j}: expected 61, got ${combinedFeatures.length}, ` +
-              `adaFeatures=${adaFeatures.length}, btcFeatures=${btcFeatures.length}`
-          );
-        }
-        sequence.push(combinedFeatures); // 61 features expected
-      }
-      while (sequence.length < this.timesteps) {
-        sequence.unshift(sequence[0]); // Padding
-      }
-      if (sequence.length !== this.timesteps) {
-        console.log(`Invalid sequence length at i=${i}: ${sequence.length}`);
-      }
-      sequences.push(sequence);
-      indices.push(i);
+    await this.weightManager.loadWeights();
+    const factory = new TradeModelFactory(this.timesteps, 61);
+    const model = factory.createModel();
+    this.weightManager.setWeights(model);
+
+    const sequences = this.sequenceGenerator.generateBatchSequences(
+      adaPrices,
+      adaVolumes,
+      btcPrices,
+      btcVolumes,
+      startIndex,
+      endIndex,
+      this.stepDays
+    );
+
+    if (sequences.length === 0) {
+      throw new Error("No sequences generated for backtest");
     }
 
     console.log(`Generated sequences: ${sequences.length}`);
     if (sequences.length !== expectedSequences) {
-      console.log(
+      console.warn(
         `Sequence count mismatch: expected ${expectedSequences}, got ${sequences.length}`
       );
-      while (sequences.length < expectedSequences) {
-        console.log(`Padding sequence at index ${sequences.length}`);
-        sequences.push(sequences[sequences.length - 1]);
-        indices.push(indices[indices.length - 1] + this.stepDays);
-      }
     }
 
     return tf.tidy(() => {
-      const factory = new TradeModelFactory(this.timesteps, 61);
-      const model = factory.createModel();
-      model
-        .getLayer("conv1d")
-        .setWeights([
-          tf.tensor3d(weights.conv1Weights, [5, 61, 12]),
-          tf.tensor1d(weights.conv1Bias),
-        ]);
-      // ... (rest of the weight setting remains unchanged)
       const featuresNormalized = tf
         .tensor3d(sequences, [sequences.length, this.timesteps, 61])
-        .sub(tf.tensor1d(weights.featureMeans))
-        .div(tf.tensor1d(weights.featureStds));
+        .sub(tf.tensor1d(this.weightManager.getFeatureMeans()))
+        .div(tf.tensor1d(this.weightManager.getFeatureStds()));
       const predictions = model.predict(featuresNormalized) as tf.Tensor2D;
       return predictions.arraySync() as number[][];
     });

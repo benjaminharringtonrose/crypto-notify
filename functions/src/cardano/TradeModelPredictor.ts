@@ -107,51 +107,63 @@ export default class TradeModelPredictor {
           sma7 > sma21 &&
           prevSma7 <= prevSma21 &&
           sma7 > sma50 &&
+          isVolumeSpike &&
+          momentumSafe > 0.1 &&
           btcSma7 > btcSma21 &&
           btcPrevSma7 <= btcPrevSma21
         ) {
-          buyProb += 0.5;
-          conditions.push("SMA crossover up + BTC confirmation");
+          buyProb += 0.4;
+          conditions.push(
+            "SMA crossover up with volume and momentum + BTC confirmation"
+          );
         }
         if (
           sma7 < sma21 &&
           prevSma7 >= prevSma21 &&
           sma7 < sma50 &&
+          isVolumeSpike &&
+          momentumSafe < -0.1 &&
           btcSma7 < btcSma21 &&
           btcPrevSma7 >= btcPrevSma21
         ) {
-          sellProb += 0.5;
-          conditions.push("SMA crossover down + BTC confirmation");
+          sellProb += 0.4;
+          conditions.push(
+            "SMA crossover down with volume and momentum + BTC confirmation"
+          );
         }
-        if (macdHistogram > 0 && prevMacdHistogram <= 0) {
-          buyProb += 0.35;
-          conditions.push("MACD bullish crossover");
-        }
-        if (macdHistogram < 0 && prevMacdHistogram >= 0) {
-          sellProb += 0.35;
-          conditions.push("MACD bearish crossover");
-        }
-        if (adxProxy <= 0.02) {
-          holdProb += 0.2;
-          conditions.push("Low ADX (trend weak)");
-        }
-        if (momentumSafe < -0.2) {
-          sellProb += 0.3;
-          conditions.push("Negative momentum");
-        }
-        if (momentumSafe > 0.2) {
+        if (macdHistogram > 0 && prevMacdHistogram <= 0 && isVolumeSpike) {
           buyProb += 0.3;
-          conditions.push("Positive momentum");
+          conditions.push("MACD bullish crossover with volume");
+        }
+        if (macdHistogram < 0 && prevMacdHistogram >= 0 && isVolumeSpike) {
+          sellProb += 0.3;
+          conditions.push("MACD bearish crossover with volume");
+        }
+        if (adxProxy <= 0.025) {
+          holdProb += 0.25;
+          conditions.push("Low ADX (trend weak)");
         }
         break;
       case TradingStrategy.MeanReversion:
-        if (rsiSafe < 20 && currentPrice < sma20 - 2.5 * atr) {
-          buyProb += 0.5;
-          conditions.push("Oversold RSI + below Bollinger");
+        if (
+          rsiSafe < 20 &&
+          currentPrice < sma20 - 2.5 * atr &&
+          momentumSafe > 0
+        ) {
+          buyProb += 0.45;
+          conditions.push(
+            "Oversold RSI + below Bollinger with positive momentum"
+          );
         }
-        if (rsiSafe > 80 && currentPrice > sma20 + 2.5 * atr) {
-          sellProb += 0.5;
-          conditions.push("Overbought RSI + above Bollinger");
+        if (
+          rsiSafe > 80 &&
+          currentPrice > sma20 + 2.5 * atr &&
+          momentumSafe < 0
+        ) {
+          sellProb += 0.45;
+          conditions.push(
+            "Overbought RSI + above Bollinger with negative momentum"
+          );
         }
         if (rsiSafe >= 25 && rsiSafe <= 75) {
           holdProb += 0.2;
@@ -160,33 +172,29 @@ export default class TradeModelPredictor {
         break;
       case TradingStrategy.Breakout:
         if (currentPrice > recentHigh && isVolumeSpike && volatility > 1.8) {
-          buyProb += 0.5;
+          buyProb += 0.45;
           conditions.push("Breakout above resistance + volume spike");
         }
         if (currentPrice < recentLow && isVolumeSpike && volatility > 1.8) {
-          sellProb += 0.5;
+          sellProb += 0.45;
           conditions.push("Breakdown below support + volume spike");
         }
         if (currentPrice <= recentHigh && currentPrice >= recentLow) {
-          holdProb += 0.2;
+          holdProb += 0.25;
           conditions.push("Price within range");
-        }
-        if (volatility <= 1.8) {
-          holdProb += 0.15;
-          conditions.push("Low volatility");
         }
         break;
     }
 
-    const total = buyProb + sellProb + holdProb;
+    const total = buyProb + sellProb + holdProb || 1;
     buyProb /= total;
     sellProb /= total;
     holdProb /= total;
 
     const recommendation =
-      buyProb > 0.5
+      buyProb > 0.6
         ? Recommendation.Buy
-        : sellProb > 0.5
+        : sellProb > 0.6
         ? Recommendation.Sell
         : Recommendation.Hold;
     return { buyProb, sellProb, holdProb, recommendation, conditions };
@@ -227,14 +235,21 @@ export default class TradeModelPredictor {
       let sellProbBase = 0.5;
 
       tf.tidy(() => {
+        const means = this.weightManager.getFeatureMeans();
+        const stds = this.weightManager.getFeatureStds();
+        if (means.length !== 61 || stds.length !== 61) {
+          throw new Error("Feature means or stds length mismatch");
+        }
         const featuresNormalized = tf
           .tensor3d([featureSequence], [1, this.timesteps, 61])
-          .sub(tf.tensor1d(this.weightManager.getFeatureMeans()))
-          .div(tf.tensor1d(this.weightManager.getFeatureStds()));
+          .sub(tf.tensor1d(means))
+          .div(tf.tensor1d(stds));
         const prediction = model.predict(featuresNormalized) as tf.Tensor2D;
         const probs = prediction.dataSync() as Float32Array;
         if (probs.length === 2 && probs.every((v) => Number.isFinite(v)))
-          [sellProbBase, buyProbBase] = probs;
+          [sellProbBase, buyProbBase] = probs.map((p) =>
+            Math.min(Math.max(p, 0.1), 0.9)
+          ); // Cap probabilities
       });
 
       const volatility = adaIndicators.atr / adaIndicators.atrBaseline;
@@ -250,23 +265,22 @@ export default class TradeModelPredictor {
         holdProb = 0;
       const metConditions: string[] = [];
 
-      if (rsiSafe < 20) {
-        buyProb += 0.35;
-        metConditions.push("RSI < 20 (oversold)");
-      } else if (rsiSafe > 80) {
-        sellProb += 0.35;
-        metConditions.push("RSI > 80 (overbought)");
+      // Trend filter
+      const isTrending =
+        adaIndicators.adxProxy > 0.025 && adaIndicators.sma7 > sma50;
+      if (!isTrending) {
+        buyProb = Math.min(buyProb, 0.4);
+        sellProb = Math.min(sellProb, 0.4);
+        holdProb = Math.max(holdProb, 0.6);
+        metConditions.push("Weak trend detected (ADX < 0.025 or SMA7 < SMA50)");
       }
 
-      const confidenceThreshold =
-        volatility > 1.8
-          ? 0.5
-          : 0.45 + (adaIndicators.adxProxy > 0.02 ? 0.05 : 0);
-      if (buyProb < 0.4 || sellProb < 0.4) {
-        holdProb = 1 - (buyProb + sellProb);
-        buyProb *= 0.8;
-        sellProb *= 0.8;
-        metConditions.push("Low confidence in buy/sell");
+      if (rsiSafe < 20 && momentumSafe > 0) {
+        buyProb += 0.3;
+        metConditions.push("RSI < 20 (oversold) with positive momentum");
+      } else if (rsiSafe > 80 && momentumSafe < 0) {
+        sellProb += 0.3;
+        metConditions.push("RSI > 80 (overbought) with negative momentum");
       }
 
       const trendResult = this.evaluateStrategy(
@@ -292,62 +306,32 @@ export default class TradeModelPredictor {
       metConditions.push(...meanRevResult.conditions);
       metConditions.push(...breakoutResult.conditions);
 
-      const trendWeight = adaIndicators.adxProxy > 0.02 ? 0.5 : 0.3;
-      const meanRevWeight = rsiSafe < 20 || rsiSafe > 80 ? 0.45 : 0.25;
+      const trendWeight = adaIndicators.adxProxy > 0.025 ? 0.5 : 0.3;
+      const meanRevWeight = rsiSafe < 20 || rsiSafe > 80 ? 0.4 : 0.25;
       const breakoutWeight =
-        volatility > 1.8 || adaIndicators.isVolumeSpike ? 0.45 : 0.25;
+        volatility > 1.8 || adaIndicators.isVolumeSpike ? 0.4 : 0.25;
 
       buyProb +=
         trendWeight * trendResult.buyProb +
         meanRevWeight * meanRevResult.buyProb +
         breakoutWeight * breakoutResult.buyProb +
-        (profitPotential > 0.2 ? 0.3 : profitPotential > 0.1 ? 0.15 : 0) +
-        (momentumSafe > 0.2 ? 0.35 : -0.1);
+        (profitPotential > 0.15 ? 0.25 : profitPotential > 0.05 ? 0.1 : 0);
       sellProb +=
         trendWeight * trendResult.sellProb +
         meanRevWeight * meanRevResult.sellProb +
         breakoutWeight * breakoutResult.sellProb +
-        (profitPotential < -0.2 ? 0.3 : profitPotential < -0.1 ? 0.15 : 0) +
-        (momentumSafe < -0.3 ? 0.4 : momentumSafe < -0.2 ? 0.25 : 0);
+        (profitPotential < -0.15 ? 0.25 : profitPotential < -0.05 ? 0.1 : 0);
 
-      if (profitPotential > 0.2) {
-        buyProb += 0.3;
-        metConditions.push("High profit potential (>20%)");
-      } else if (profitPotential > 0.1) {
-        buyProb += 0.15;
-        metConditions.push("Moderate profit potential (>10%)");
-      }
-      if (profitPotential < -0.2) {
-        sellProb += 0.3;
-        metConditions.push("Significant loss potential (<-20%)");
-      } else if (profitPotential < -0.1) {
-        sellProb += 0.15;
-        metConditions.push("Moderate loss potential (<-10%)");
-      }
-      if (momentumSafe > 0.2) {
-        buyProb += 0.35;
-        metConditions.push("Strong positive momentum");
-      } else if (momentumSafe < -0.3) {
-        sellProb += 0.4;
-        metConditions.push("Strong negative momentum");
-      } else if (momentumSafe < -0.2) {
-        sellProb += 0.25;
-        metConditions.push("Moderate negative momentum");
-      }
-
-      const total = buyProb + sellProb + holdProb;
+      const total = buyProb + sellProb + holdProb || 1;
       buyProb = buyProb / total || 0.33;
       sellProb = sellProb / total || 0.33;
       holdProb = holdProb / total || 0.33;
 
+      const confidenceThreshold = volatility > 1.5 ? 0.65 : 0.55;
       const recommendation =
-        rsiSafe < 20 && buyProb > 0.5
+        buyProb > confidenceThreshold && momentumSafe > 0 && isTrending
           ? Recommendation.Buy
-          : rsiSafe > 80 && sellProb > 0.5
-          ? Recommendation.Sell
-          : buyProb > confidenceThreshold && momentumSafe > 0
-          ? Recommendation.Buy
-          : sellProb > confidenceThreshold
+          : sellProb > confidenceThreshold && momentumSafe < 0
           ? Recommendation.Sell
           : Recommendation.Hold;
 

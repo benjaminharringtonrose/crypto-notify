@@ -13,8 +13,10 @@ export class TradeModelBacktester {
   private INITIAL_USD = 1000;
   private MIN_TRADE_USD = 100;
   private CASH_RESERVE = 25;
-  private STOP_LOSS_THRESHOLD = -0.05;
-  private TAKE_PROFIT_THRESHOLD = 0.1;
+  private STOP_LOSS_THRESHOLD = -0.03; // Tightened from -0.05
+  private TAKE_PROFIT_THRESHOLD = 0.07; // Lowered from 0.1
+  private MAX_TRADES_PER_WEEK = 2;
+  private MIN_HOLDING_DAYS = 3;
 
   private startDaysAgo: number;
   private endDaysAgo: number;
@@ -101,10 +103,15 @@ export class TradeModelBacktester {
     }
 
     return tf.tidy(() => {
+      const means = this.weightManager.getFeatureMeans();
+      const stds = this.weightManager.getFeatureStds();
+      if (means.length !== 61 || stds.length !== 61) {
+        throw new Error("Feature means or stds length mismatch");
+      }
       const featuresNormalized = tf
         .tensor3d(sequences, [sequences.length, this.timesteps, 61])
-        .sub(tf.tensor1d(this.weightManager.getFeatureMeans()))
-        .div(tf.tensor1d(this.weightManager.getFeatureStds()));
+        .sub(tf.tensor1d(means))
+        .div(tf.tensor1d(stds));
       const predictions = model.predict(featuresNormalized) as tf.Tensor2D;
       return predictions.arraySync() as number[][];
     });
@@ -142,7 +149,7 @@ export class TradeModelBacktester {
 
     const startIndex = Math.max(0, adaPrices.length - this.startDaysAgo);
     const endIndex = Math.max(0, adaPrices.length - this.endDaysAgo);
-    const backtestStart = this.timesteps + 4; // Adjust for longer timesteps
+    const backtestStart = this.timesteps + 4;
     const backtestEnd = endIndex - 5;
 
     const predictions = await this.batchPredict(
@@ -159,6 +166,8 @@ export class TradeModelBacktester {
     let avgBuyPrice = 0;
     let peakPrice = 0;
     let cooldown = 0;
+    let weeklyTradeCount = 0;
+    let lastTradeDay = 0;
 
     const trades: Trade[] = [];
     const portfolioHistory: { timestamp: string; value: number }[] = [];
@@ -192,16 +201,23 @@ export class TradeModelBacktester {
       if (adaBalance > 0 && currentAdaPrice > peakPrice)
         peakPrice = currentAdaPrice;
 
+      const weekNumber = Math.floor((i - backtestStart) / 7);
+      if (weekNumber !== Math.floor((lastTradeDay - backtestStart) / 7))
+        weeklyTradeCount = 0;
+
       const buyCondition =
-        buyProb > 0.5 &&
+        buyProb > 0.65 &&
         usdBalance > this.CASH_RESERVE + this.MIN_TRADE_USD &&
-        cooldown === 0;
+        cooldown === 0 &&
+        unrealizedProfit < 0.02 &&
+        weeklyTradeCount < this.MAX_TRADES_PER_WEEK;
       const sellCondition =
-        (sellProb > 0.5 && adaBalance > 0) ||
+        (sellProb > 0.65 && adaBalance > 0) ||
         (adaBalance > 0 &&
           (unrealizedProfit <= this.STOP_LOSS_THRESHOLD ||
             unrealizedProfit >= this.TAKE_PROFIT_THRESHOLD ||
-            trailingStopTriggered));
+            trailingStopTriggered) &&
+          i - lastTradeDay >= this.MIN_HOLDING_DAYS);
 
       console.log(
         `Day ${i - (this.timesteps + 3)}: Price ${currentAdaPrice.toFixed(
@@ -212,10 +228,11 @@ export class TradeModelBacktester {
       );
 
       if (buyCondition) {
+        const atrFactor = Math.min(1, 1.5 / atr);
         const usdToSpend = Math.max(
           this.MIN_TRADE_USD,
           usdBalance *
-            Math.min(0.5, confidence * 1.5) *
+            Math.min(0.3, confidence * atrFactor) *
             (1 - this.TRANSACTION_FEE)
         );
         if (usdBalance - usdToSpend < this.CASH_RESERVE) continue;
@@ -236,6 +253,8 @@ export class TradeModelBacktester {
           adaAmount: adaBought,
           usdValue: usdToSpend,
         });
+        weeklyTradeCount++;
+        lastTradeDay = i;
         console.log(
           `Buy at $${currentAdaPrice.toFixed(4)}, ADA: ${adaBought.toFixed(
             2
@@ -265,7 +284,9 @@ export class TradeModelBacktester {
           completedCycles++;
           avgBuyPrice = 0;
           peakPrice = 0;
-          cooldown = 2;
+          cooldown = usdReceived < adaToSell * avgBuyPrice ? 5 : 2;
+          weeklyTradeCount++;
+          lastTradeDay = i;
         }
       }
 

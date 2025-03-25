@@ -61,7 +61,6 @@ export default class TradeModelPredictor {
     buyProb: number;
     sellProb: number;
     holdProb: number;
-    recommendation: Recommendation;
     conditions: string[];
   } {
     const {
@@ -96,8 +95,8 @@ export default class TradeModelPredictor {
     const recentLow = Math.min(...prices.slice(-10));
     const momentumSafe = momentum ?? 0;
 
-    let buyProb = 0.3,
-      sellProb = 0.3,
+    let buyProb = 0.5, // Increased baseline
+      sellProb = 0.5, // Increased baseline
       holdProb = 0.3;
     const conditions: string[] = [];
 
@@ -148,11 +147,11 @@ export default class TradeModelPredictor {
         if (
           rsiSafe < 20 &&
           currentPrice < sma20 - 2.5 * atr &&
-          momentumSafe > 0
+          momentumSafe > 0.5
         ) {
           buyProb += 0.45;
           conditions.push(
-            "Oversold RSI + below Bollinger with positive momentum"
+            "Oversold RSI + below Bollinger with strong positive momentum"
           );
         }
         if (
@@ -164,6 +163,9 @@ export default class TradeModelPredictor {
           conditions.push(
             "Overbought RSI + above Bollinger with negative momentum"
           );
+        } else if (rsiSafe > 70 && momentumSafe < 0) {
+          sellProb += 0.35;
+          conditions.push("High RSI with negative momentum");
         }
         if (rsiSafe >= 25 && rsiSafe <= 75) {
           holdProb += 0.2;
@@ -191,13 +193,7 @@ export default class TradeModelPredictor {
     sellProb /= total;
     holdProb /= total;
 
-    const recommendation =
-      buyProb > 0.7
-        ? Recommendation.Buy
-        : sellProb > 0.7
-        ? Recommendation.Sell
-        : Recommendation.Hold;
-    return { buyProb, sellProb, holdProb, recommendation, conditions };
+    return { buyProb, sellProb, holdProb, conditions };
   }
 
   public async predict(): Promise<TradeDecision> {
@@ -231,62 +227,73 @@ export default class TradeModelPredictor {
         adaPrices.length - 1
       );
 
-      let buyProbBase = 0.5;
-      let sellProbBase = 0.5;
+      let buyProbBase = 0.5,
+        sellProbBase = 0.5;
+      const means = this.weightManager.getFeatureMeans();
+      const stds = this.weightManager.getFeatureStds();
+      if (means.length !== 61 || stds.length !== 61) {
+        throw new Error("Feature means or stds length mismatch");
+      }
+      const features = tf.tensor3d([featureSequence], [1, this.timesteps, 61]);
+      const featuresNormalized = features
+        .sub(tf.tensor1d(means))
+        .div(tf.tensor1d(stds));
+      const logits = model.predict(featuresNormalized) as tf.Tensor2D;
+      console.log(`Raw Logits: ${logits.dataSync()}`);
+      const scaledLogits = logits.mul(tf.scalar(2)); // Double logits for wider range
+      const buyLogit = scaledLogits.slice([0, 1], [1, 1]).sigmoid();
+      const sellLogit = scaledLogits.slice([0, 0], [1, 1]).sigmoid();
+      buyProbBase = Math.min(buyLogit.dataSync()[0], 0.9);
+      sellProbBase = Math.min(sellLogit.dataSync()[0], 0.9);
+      const totalBase = buyProbBase + sellProbBase;
+      if (totalBase > 0) {
+        buyProbBase /= totalBase;
+        sellProbBase /= totalBase;
+      }
+      console.log(
+        `Pre-Adjusted Probs - Buy: ${buyProbBase.toFixed(
+          3
+        )}, Sell: ${sellProbBase.toFixed(3)}`
+      );
+      features.dispose();
+      featuresNormalized.dispose();
+      logits.dispose();
+      scaledLogits.dispose();
+      buyLogit.dispose();
+      sellLogit.dispose();
 
-      tf.tidy(() => {
-        const means = this.weightManager.getFeatureMeans();
-        const stds = this.weightManager.getFeatureStds();
-        if (means.length !== 61 || stds.length !== 61) {
-          throw new Error("Feature means or stds length mismatch");
-        }
-        const featuresNormalized = tf
-          .tensor3d([featureSequence], [1, this.timesteps, 61])
-          .sub(tf.tensor1d(means))
-          .div(tf.tensor1d(stds));
-        const prediction = model.predict(featuresNormalized) as tf.Tensor2D;
-        const temperature = 3; // Increased from 2
-        const scaledLogits = prediction.div(tf.scalar(temperature));
-        const probs = scaledLogits.softmax().dataSync() as Float32Array;
-        if (probs.length === 2 && probs.every((v) => Number.isFinite(v)))
-          [sellProbBase, buyProbBase] = probs.map((p) =>
-            Math.min(Math.max(p, 0.05), 0.95)
-          );
-        console.log(
-          `Raw Model Probs - Buy: ${buyProbBase.toFixed(
-            3
-          )}, Sell: ${sellProbBase.toFixed(3)}`
-        );
-      });
-
-      const volatility = adaIndicators.atr / adaIndicators.atrBaseline;
       const rsiSafe = adaIndicators.rsi ?? 50;
-      const profitPotential =
-        (adaIndicators.currentPrice -
-          adaPrices.slice(-5).reduce((a, b) => a + b, 0) / 5) /
-        (adaPrices.slice(-5).reduce((a, b) => a + b, 0) / 5);
       const momentumSafe = adaIndicators.momentum ?? 0;
+      const isUptrend = adaIndicators.sma7 > sma50;
+      const volatility = adaIndicators.atr / adaIndicators.atrBaseline;
 
       let buyProb = buyProbBase,
         sellProb = sellProbBase,
         holdProb = 0;
       const metConditions: string[] = [];
 
-      const isTrending =
-        adaIndicators.adxProxy > 0.025 && adaIndicators.sma7 > sma50;
-      if (!isTrending) {
-        buyProb = Math.min(buyProb, 0.4);
-        sellProb = Math.min(sellProb, 0.4);
-        holdProb = Math.max(holdProb, 0.6);
-        metConditions.push("Weak trend detected (ADX < 0.025 or SMA7 < SMA50)");
+      if (!isUptrend && (rsiSafe >= 20 || momentumSafe <= 0.5)) {
+        buyProb = 0;
+        holdProb = 0.6;
+        metConditions.push(
+          "Downtrend (SMA7 < SMA50), RSI not oversold or weak momentum"
+        );
       }
-
-      if (rsiSafe < 20 && momentumSafe > 0) {
-        buyProb += 0.3;
-        metConditions.push("RSI < 20 (oversold) with positive momentum");
-      } else if (rsiSafe > 80 && momentumSafe < 0) {
-        sellProb += 0.3;
-        metConditions.push("RSI > 80 (overbought) with negative momentum");
+      if (rsiSafe > 70 || (adaIndicators.sma7 < sma50 && momentumSafe < 0)) {
+        sellProb = 0.9;
+        buyProb = 0;
+        holdProb = 0.1;
+        metConditions.push(
+          "Sell override: RSI > 70 or Downtrend with negative momentum"
+        );
+      }
+      if (rsiSafe < 20 && momentumSafe > 0.5) {
+        buyProb = 0.9;
+        sellProb = 0;
+        holdProb = 0.1;
+        metConditions.push(
+          "Buy override: RSI < 20 with strong positive momentum"
+        );
       }
 
       const trendResult = this.evaluateStrategy(
@@ -312,12 +319,11 @@ export default class TradeModelPredictor {
       metConditions.push(...meanRevResult.conditions);
       metConditions.push(...breakoutResult.conditions);
 
-      // Dynamic weights based on volatility
       const trendWeight = adaIndicators.adxProxy > 0.025 ? 0.6 : 0.4;
       const meanRevWeight =
-        volatility > 1.5 || rsiSafe < 20 || rsiSafe > 80 ? 0.6 : 0.3;
+        volatility > 1.5 || rsiSafe < 20 || rsiSafe > 70 ? 0.7 : 0.3;
       const breakoutWeight =
-        volatility > 1.8 || adaIndicators.isVolumeSpike ? 0.6 : 0.3;
+        volatility > 1.8 || adaIndicators.isVolumeSpike ? 0.7 : 0.3;
 
       console.log(
         `Strategy Weights - Trend: ${trendWeight.toFixed(
@@ -326,36 +332,43 @@ export default class TradeModelPredictor {
           2
         )}, Breakout: ${breakoutWeight.toFixed(2)}`
       );
+      console.log(
+        `Strategy Contributions - Trend: Buy=${trendResult.buyProb.toFixed(
+          3
+        )}, Sell=${trendResult.sellProb.toFixed(
+          3
+        )}, MeanRev: Buy=${meanRevResult.buyProb.toFixed(
+          3
+        )}, Sell=${meanRevResult.sellProb.toFixed(
+          3
+        )}, Breakout: Buy=${breakoutResult.buyProb.toFixed(
+          3
+        )}, Sell=${breakoutResult.sellProb.toFixed(3)}`
+      );
 
       buyProb +=
         trendWeight * trendResult.buyProb +
         meanRevWeight * meanRevResult.buyProb +
-        breakoutWeight * breakoutResult.buyProb +
-        (profitPotential > 0.15 ? 0.25 : profitPotential > 0.05 ? 0.1 : 0);
+        breakoutWeight * breakoutResult.buyProb;
       sellProb +=
         trendWeight * trendResult.sellProb +
         meanRevWeight * meanRevResult.sellProb +
-        breakoutWeight * breakoutResult.sellProb +
-        (profitPotential < -0.15 ? 0.25 : profitPotential < -0.05 ? 0.1 : 0);
+        breakoutWeight * breakoutResult.sellProb;
 
-      if (buyProb > 0.9) buyProb = 0.9 - (buyProb - 0.9) * 0.5;
-      if (sellProb > 0.9) sellProb = 0.9 - (sellProb - 0.9) * 0.5;
+      buyProb = Math.min(Math.max(buyProb, 0), 0.9);
+      sellProb = Math.min(Math.max(sellProb, 0), 0.9);
+      holdProb = 1 - buyProb - sellProb;
 
-      const total = buyProb + sellProb + holdProb || 1;
-      buyProb = buyProb / total || 0.33;
-      sellProb = sellProb / total || 0.33;
-      holdProb = holdProb / total || 0.33;
-
-      const confidenceThreshold = 0.7; // Raised from 0.55/0.65
+      const confidenceThreshold = 0.55; // Lowered to match model output
       const recommendation =
-        buyProb > confidenceThreshold && momentumSafe > 0 && isTrending
+        buyProb > confidenceThreshold && momentumSafe > 0 && isUptrend
           ? Recommendation.Buy
-          : sellProb > confidenceThreshold && momentumSafe < 0
+          : sellProb > confidenceThreshold
           ? Recommendation.Sell
           : Recommendation.Hold;
 
       console.log(
-        `Adjusted Probabilities - Buy: ${buyProb.toFixed(
+        `Final Probabilities - Buy: ${buyProb.toFixed(
           3
         )}, Sell: ${sellProb.toFixed(3)}, Hold: ${holdProb.toFixed(
           3
@@ -386,7 +399,7 @@ export default class TradeModelPredictor {
         probabilities: { buy: buyProb, hold: holdProb, sell: sellProb },
         recommendation,
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        profitPotential,
+        profitPotential: 0,
         isDoubleTop: adaIndicators.isDoubleTop,
         isTripleTop: adaIndicators.isTripleTop,
         isHeadAndShoulders: adaIndicators.isHeadAndShoulders,

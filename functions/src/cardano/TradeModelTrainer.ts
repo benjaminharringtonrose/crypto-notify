@@ -8,15 +8,11 @@ import { CyclicLearningRateCallback } from "./callbacks/CyclicLearningRateCallba
 import FeatureCalculator from "./FeatureCalculator";
 import TradeModelFactory from "./TradeModelFactory";
 import { HistoricalData, ModelConfig } from "../types";
+import { FirebaseService } from "../api/FirebaseService";
 
 dotenv.config();
 
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(require("../../../serviceAccount.json")),
-    storageBucket: process.env.STORAGE_BUCKET,
-  });
-}
+FirebaseService.getInstance();
 
 export class TradeModelTrainer {
   private readonly config: ModelConfig = {

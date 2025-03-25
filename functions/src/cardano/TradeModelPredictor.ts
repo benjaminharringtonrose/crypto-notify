@@ -6,15 +6,11 @@ import { getCurrentPrices } from "../api/getCurrentPrices";
 import { getHistoricalPricesAndVolumes } from "../api/getHistoricalPricesAndVolumes";
 import FeatureCalculator from "./FeatureCalculator";
 import TradeModelFactory from "./TradeModelFactory";
+import { FirebaseService } from "../api/FirebaseService";
 
 dotenv.config();
 
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(require("../../../serviceAccount.json")),
-    storageBucket: process.env.STORAGE_BUCKET,
-  });
-}
+FirebaseService.getInstance();
 
 export default class TradeModelPredictor {
   private bucket = admin.storage().bucket();

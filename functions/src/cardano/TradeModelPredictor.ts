@@ -12,13 +12,13 @@ dotenv.config();
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(require("../../../serviceAccount.json")),
-    storageBucket:
-      process.env.STORAGE_BUCKET || "crypto-notify-ee5bc.firebasestorage.app",
+    storageBucket: process.env.STORAGE_BUCKET,
   });
 }
-const bucket = admin.storage().bucket();
 
 export default class TradeModelPredictor {
+  private bucket = admin.storage().bucket();
+
   private async fetchAndCalculateIndicators() {
     const { currentAdaPrice, currentBtcPrice } = await getCurrentPrices();
     const { adaPrices, adaVolumes, btcPrices, btcVolumes } =
@@ -165,7 +165,7 @@ export default class TradeModelPredictor {
           ? adaPrices.slice(-50).reduce((a, b) => a + b, 0) / 50
           : adaIndicators.sma20;
 
-      const file = bucket.file("tradePredictorWeights.json");
+      const file = this.bucket.file("tradePredictorWeights.json");
       const [weightsData] = await file.download();
       const { weights } = JSON.parse(weightsData.toString("utf8"));
 

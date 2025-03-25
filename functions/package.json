@@ -10,9 +10,9 @@
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
     "test": "npx ts-node src/test.ts",
-    "train:ada": "npx ts-node src/scripts/trainTradeModel.ts",
+    "train:ada": "rm -rf src/cardano/cache/training_data.json && npx ts-node src/scripts/trainTradeModel.ts",
     "train:backtest": "npx ts-node src/scripts/backtestTradeModel.ts",
-    "train:full": "npm run train:ada && npm run train:backtest"
+    "train:full": "rm -rf src/cardano/cache/training_data.json && npm run train:ada && npm run train:backtest"
   },
   "engines": {
     "node": "20"

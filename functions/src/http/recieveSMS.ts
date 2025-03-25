@@ -2,8 +2,10 @@ import { https } from "firebase-functions";
 import { CryptoIds, RecieveSMSRequest } from "../types";
 import { formatAnalysisResults, sendSMS } from "../utils";
 import TradePredictor from "../cardano/TradeModelPredictor";
+import { MEMORY } from "../constants";
 
 export const receiveSMS = https.onRequest(
+  { memory: MEMORY },
   async (request: RecieveSMSRequest, response) => {
     try {
       const replyText = request.body.text || "No message";

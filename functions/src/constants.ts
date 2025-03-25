@@ -14,6 +14,7 @@ export const PRICES = [0.8, 0.9, 1.0, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
 export const EVERY_TEN_MINS = `*/10 * * * *`; // every 10 mins
 export const EVERYDAY_AT = `45 17 * * *`; // every day at 4:45 PM ET
 export const TIME_ZONE = "America/New_York";
+export const MEMORY = "512MiB";
 export const NOTIFICATION_COOLDOWN = 30 * 60 * 1000; // 30 mins
 export const AVERAGE_BUY_PRICE = 0.72;
 
@@ -21,7 +22,7 @@ export const FIVE_YEARS_IN_DAYS = 1826;
 
 export const RUN_TRADE_MODEL_CONFIG: ScheduleOptions = {
   schedule: EVERY_TEN_MINS,
-  memory: "512MiB",
+  memory: MEMORY,
 };
 
 export const ANALYSIS_SCHEDULE: ScheduleOptions = {

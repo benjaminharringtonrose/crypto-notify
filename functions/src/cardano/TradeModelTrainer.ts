@@ -21,15 +21,15 @@ if (!admin.apps.length) {
       process.env.STORAGE_BUCKET || "crypto-notify-ee5bc.firebasestorage.app",
   });
 }
-const bucket = admin.storage().bucket();
 
 export class TradeModelTrainer {
   private readonly config: ModelConfig = {
-    timesteps: 20,
-    epochs: 80, // Extended
-    batchSize: 128,
-    initialLearningRate: 0.0008, // Increased max LR
+    timesteps: 30, // Increased from 20
+    epochs: 100, // Increased from 80
+    batchSize: 64, // Reduced from 128
+    initialLearningRate: 0.0008,
   };
+  private bucket = admin.storage().bucket();
   private readonly backtestStartDays: number = 450;
   private readonly trainingPeriodDays: number = 365;
   private model: tf.LayersModel | null = null;
@@ -38,10 +38,7 @@ export class TradeModelTrainer {
   private cacheDir = path.join(__dirname, "cache");
 
   constructor() {
-    console.log(
-      "TradeModelTrainer initialized with Firebase app:",
-      admin.apps[0]?.name || "none"
-    );
+    console.log("TradeModelTrainer initialized");
     if (!fs.existsSync(this.cacheDir)) fs.mkdirSync(this.cacheDir);
   }
 
@@ -67,20 +64,14 @@ export class TradeModelTrainer {
   }
 
   private focalLoss(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
-    const gamma = 2.0;
-    const alpha = tf.tensor1d([0.5, 0.5]);
+    const gamma = 1.5; // Reduced from 2.0
+    const alpha = tf.tensor1d([0.75, 0.25]); // Adjusted to prioritize Sell
     const ce = tf.losses.sigmoidCrossEntropy(yTrue, yPred);
     const pt = yTrue.mul(yPred).sum(-1).clipByValue(0, 1);
     const focalWeight = tf.pow(tf.sub(1, pt), gamma);
     const yTrueIndices = yTrue.argMax(-1);
     const alphaWeighted = tf.gather(alpha, yTrueIndices);
     const loss = ce.mul(focalWeight).mul(alphaWeighted).mean() as tf.Scalar;
-    console.log(
-      `Focal Loss: ${loss.dataSync()[0].toFixed(4)}, CE: ${ce
-        .mean()
-        .dataSync()[0]
-        .toFixed(4)}`
-    );
     alpha.dispose();
     return loss;
   }
@@ -94,9 +85,6 @@ export class TradeModelTrainer {
     const adaData = await getHistoricalData("ADA", startDaysAgo);
     await new Promise((resolve) => setTimeout(resolve, 50));
     const btcData = await getHistoricalData("BTC", startDaysAgo);
-    console.log(
-      `ADA data length: ${adaData.prices.length}, BTC data length: ${btcData.prices.length}`
-    );
     return { adaData, btcData };
   }
 
@@ -152,18 +140,12 @@ export class TradeModelTrainer {
     adaFeatures: number[],
     btcFeatures: number[]
   ): boolean {
-    const isValid =
+    return (
       Array.isArray(adaFeatures) &&
       adaFeatures.length === 32 &&
       Array.isArray(btcFeatures) &&
-      btcFeatures.length === 29;
-    if (!isValid)
-      console.warn(
-        `Invalid features - ADA: ${adaFeatures?.length || "undefined"}, BTC: ${
-          btcFeatures?.length || "undefined"
-        }`
-      );
-    return isValid;
+      btcFeatures.length === 29
+    );
   }
 
   private addNoise(features: number[], scale: number): number[] {
@@ -193,9 +175,6 @@ export class TradeModelTrainer {
         balancedY.push(label);
       }
     });
-    console.log(
-      `Buy samples: ${buySamples.length}, Sell samples: ${sellSamples.length}`
-    );
     return { X: balancedX, y: balancedY };
   }
 
@@ -334,7 +313,7 @@ export class TradeModelTrainer {
         0.00005,
         this.config.initialLearningRate,
         8
-      ); // Shortened cycle
+      );
 
       if (!this.model) throw new Error("Model initialization failed");
 
@@ -361,7 +340,7 @@ export class TradeModelTrainer {
         epochs: this.config.epochs,
         validationData: valDataset,
         callbacks: [
-          tf.callbacks.earlyStopping({ monitor: "val_loss", patience: 20 }), // Extended patience
+          tf.callbacks.earlyStopping({ monitor: "val_loss", patience: 15 }), // Increased from 20
           bestWeightsCallback,
           predictionLoggerCallback,
           cyclicLRCallback,
@@ -403,12 +382,6 @@ export class TradeModelTrainer {
       p[1] > bestThreshold ? 1 : 0
     );
 
-    console.log("Sample predictions:", predArray.slice(0, 5));
-    console.log(
-      "Predictions vs Labels (first 5):",
-      predictedLabels.slice(0, 5),
-      yArray.slice(0, 5)
-    );
     const buyCount = predictedLabels.filter((p) => p === 1).length;
     console.log(
       `Predicted Buy: ${buyCount}, Sell: ${predictedLabels.length - buyCount}`
@@ -533,6 +506,15 @@ export class TradeModelTrainer {
       lstm2Bias: Array.from(
         await this.model.getLayer("lstm2").getWeights()[2].data()
       ),
+      lstm3Weights: Array.from(
+        await this.model.getLayer("lstm3").getWeights()[0].data()
+      ),
+      lstm3RecurrentWeights: Array.from(
+        await this.model.getLayer("lstm3").getWeights()[1].data()
+      ),
+      lstm3Bias: Array.from(
+        await this.model.getLayer("lstm3").getWeights()[2].data()
+      ),
       timeDistributedWeights: Array.from(
         await this.model.getLayer("time_distributed").getWeights()[0].data()
       ),
@@ -567,11 +549,9 @@ export class TradeModelTrainer {
       featureStds: Array.from(await X_std.data()),
     };
     const weightsJson = JSON.stringify({ weights });
-    const file = bucket.file("tradePredictorWeights.json");
+    const file = this.bucket.file("tradePredictorWeights.json");
     await file.save(weightsJson, { contentType: "application/json" });
-    console.log(
-      "Model weights saved to Firebase Storage at tradePredictorWeights.json"
-    );
+    console.log("Model weights saved to Firebase Storage");
     X_mean.dispose();
     X_std.dispose();
   }

@@ -192,9 +192,9 @@ export default class TradeModelPredictor {
     holdProb /= total;
 
     const recommendation =
-      buyProb > 0.6
+      buyProb > 0.7
         ? Recommendation.Buy
-        : sellProb > 0.6
+        : sellProb > 0.7
         ? Recommendation.Sell
         : Recommendation.Hold;
     return { buyProb, sellProb, holdProb, recommendation, conditions };
@@ -245,11 +245,18 @@ export default class TradeModelPredictor {
           .sub(tf.tensor1d(means))
           .div(tf.tensor1d(stds));
         const prediction = model.predict(featuresNormalized) as tf.Tensor2D;
-        const probs = prediction.dataSync() as Float32Array;
+        const temperature = 3; // Increased from 2
+        const scaledLogits = prediction.div(tf.scalar(temperature));
+        const probs = scaledLogits.softmax().dataSync() as Float32Array;
         if (probs.length === 2 && probs.every((v) => Number.isFinite(v)))
           [sellProbBase, buyProbBase] = probs.map((p) =>
-            Math.min(Math.max(p, 0.1), 0.9)
-          ); // Cap probabilities
+            Math.min(Math.max(p, 0.05), 0.95)
+          );
+        console.log(
+          `Raw Model Probs - Buy: ${buyProbBase.toFixed(
+            3
+          )}, Sell: ${sellProbBase.toFixed(3)}`
+        );
       });
 
       const volatility = adaIndicators.atr / adaIndicators.atrBaseline;
@@ -265,7 +272,6 @@ export default class TradeModelPredictor {
         holdProb = 0;
       const metConditions: string[] = [];
 
-      // Trend filter
       const isTrending =
         adaIndicators.adxProxy > 0.025 && adaIndicators.sma7 > sma50;
       if (!isTrending) {
@@ -306,10 +312,20 @@ export default class TradeModelPredictor {
       metConditions.push(...meanRevResult.conditions);
       metConditions.push(...breakoutResult.conditions);
 
-      const trendWeight = adaIndicators.adxProxy > 0.025 ? 0.5 : 0.3;
-      const meanRevWeight = rsiSafe < 20 || rsiSafe > 80 ? 0.4 : 0.25;
+      // Dynamic weights based on volatility
+      const trendWeight = adaIndicators.adxProxy > 0.025 ? 0.6 : 0.4;
+      const meanRevWeight =
+        volatility > 1.5 || rsiSafe < 20 || rsiSafe > 80 ? 0.6 : 0.3;
       const breakoutWeight =
-        volatility > 1.8 || adaIndicators.isVolumeSpike ? 0.4 : 0.25;
+        volatility > 1.8 || adaIndicators.isVolumeSpike ? 0.6 : 0.3;
+
+      console.log(
+        `Strategy Weights - Trend: ${trendWeight.toFixed(
+          2
+        )}, MeanRev: ${meanRevWeight.toFixed(
+          2
+        )}, Breakout: ${breakoutWeight.toFixed(2)}`
+      );
 
       buyProb +=
         trendWeight * trendResult.buyProb +
@@ -322,12 +338,15 @@ export default class TradeModelPredictor {
         breakoutWeight * breakoutResult.sellProb +
         (profitPotential < -0.15 ? 0.25 : profitPotential < -0.05 ? 0.1 : 0);
 
+      if (buyProb > 0.9) buyProb = 0.9 - (buyProb - 0.9) * 0.5;
+      if (sellProb > 0.9) sellProb = 0.9 - (sellProb - 0.9) * 0.5;
+
       const total = buyProb + sellProb + holdProb || 1;
       buyProb = buyProb / total || 0.33;
       sellProb = sellProb / total || 0.33;
       holdProb = holdProb / total || 0.33;
 
-      const confidenceThreshold = volatility > 1.5 ? 0.65 : 0.55;
+      const confidenceThreshold = 0.7; // Raised from 0.55/0.65
       const recommendation =
         buyProb > confidenceThreshold && momentumSafe > 0 && isTrending
           ? Recommendation.Buy

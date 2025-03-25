@@ -14,10 +14,11 @@ export class TradeModelBacktester {
   private INITIAL_USD = 1000;
   private MIN_TRADE_USD = 100;
   private CASH_RESERVE = 25;
-  private STOP_LOSS_THRESHOLD = -0.03; // Tightened from -0.05
-  private TAKE_PROFIT_THRESHOLD = 0.07; // Lowered from 0.1
+  private STOP_LOSS_THRESHOLD = -0.03;
+  private TAKE_PROFIT_THRESHOLD = 0.07;
   private MAX_TRADES_PER_WEEK = 2;
   private MIN_HOLDING_DAYS = 3;
+  private COOLDOWN_AFTER_LOSS = 7; // Increased from 5
 
   private startDaysAgo: number;
   private endDaysAgo: number;
@@ -88,12 +89,6 @@ export class TradeModelBacktester {
     }
 
     console.log(`Generated sequences: ${sequences.length}`);
-    if (sequences.length !== expectedSequences) {
-      console.warn(
-        `Sequence count mismatch: expected ${expectedSequences}, got ${sequences.length}`
-      );
-    }
-
     return tf.tidy(() => {
       const means = this.weightManager.getFeatureMeans();
       const stds = this.weightManager.getFeatureStds();
@@ -160,6 +155,7 @@ export class TradeModelBacktester {
     let cooldown = 0;
     let weeklyTradeCount = 0;
     let lastTradeDay = 0;
+    let lastTradeProfit = 0;
 
     const trades: Trade[] = [];
     const portfolioHistory: { timestamp: string; value: number }[] = [];
@@ -198,13 +194,13 @@ export class TradeModelBacktester {
         weeklyTradeCount = 0;
 
       const buyCondition =
-        buyProb > 0.65 &&
+        buyProb > 0.7 &&
         usdBalance > this.CASH_RESERVE + this.MIN_TRADE_USD &&
         cooldown === 0 &&
         unrealizedProfit < 0.02 &&
         weeklyTradeCount < this.MAX_TRADES_PER_WEEK;
       const sellCondition =
-        (sellProb > 0.65 && adaBalance > 0) ||
+        (sellProb > 0.7 && adaBalance > 0) ||
         (adaBalance > 0 &&
           (unrealizedProfit <= this.STOP_LOSS_THRESHOLD ||
             unrealizedProfit >= this.TAKE_PROFIT_THRESHOLD ||
@@ -216,7 +212,9 @@ export class TradeModelBacktester {
           4
         )}, Buy Prob: ${buyProb.toFixed(3)}, Sell Prob: ${sellProb.toFixed(
           3
-        )}, Confidence: ${confidence.toFixed(3)}`
+        )}, Confidence: ${confidence.toFixed(3)}, ATR: ${atr.toFixed(
+          4
+        )}, Weekly Trades: ${weeklyTradeCount}`
       );
 
       if (buyCondition) {
@@ -224,8 +222,8 @@ export class TradeModelBacktester {
         const usdToSpend = Math.max(
           this.MIN_TRADE_USD,
           usdBalance *
-            Math.min(0.3, confidence * atrFactor) *
-            (1 - this.TRANSACTION_FEE)
+            Math.min(0.2, confidence * atrFactor) *
+            (1 - this.TRANSACTION_FEE) // Reduced from 0.3
         );
         if (usdBalance - usdToSpend < this.CASH_RESERVE) continue;
         const adaBought = usdToSpend / currentAdaPrice;
@@ -250,7 +248,9 @@ export class TradeModelBacktester {
         console.log(
           `Buy at $${currentAdaPrice.toFixed(4)}, ADA: ${adaBought.toFixed(
             2
-          )}, USD: ${usdToSpend.toFixed(2)}`
+          )}, USD: ${usdToSpend.toFixed(
+            2
+          )}, Condition: Confidence=${confidence.toFixed(3)}`
         );
       } else if (sellCondition) {
         const adaToSell = adaBalance;
@@ -258,6 +258,7 @@ export class TradeModelBacktester {
           adaToSell * currentAdaPrice * (1 - this.TRANSACTION_FEE);
         usdBalance += usdReceived;
         adaBalance -= adaToSell;
+        lastTradeProfit = usdReceived - adaToSell * avgBuyPrice;
         trades.push({
           type: "sell",
           price: currentAdaPrice,
@@ -269,14 +270,22 @@ export class TradeModelBacktester {
         console.log(
           `Sell at $${currentAdaPrice.toFixed(4)}, ADA: ${adaToSell.toFixed(
             2
-          )}, USD: ${usdReceived.toFixed(2)}`
+          )}, USD: ${usdReceived.toFixed(
+            2
+          )}, Unrealized Profit: ${unrealizedProfit.toFixed(4)}, Condition: ${
+            sellProb > 0.7
+              ? "Sell Prob"
+              : trailingStopTriggered
+              ? "Trailing Stop"
+              : "Threshold"
+          }`
         );
         if (usdReceived > adaToSell * avgBuyPrice) wins++;
         if (adaBalance === 0) {
           completedCycles++;
           avgBuyPrice = 0;
           peakPrice = 0;
-          cooldown = usdReceived < adaToSell * avgBuyPrice ? 5 : 2;
+          cooldown = lastTradeProfit < 0 ? this.COOLDOWN_AFTER_LOSS : 2;
           weeklyTradeCount++;
           lastTradeDay = i;
         }

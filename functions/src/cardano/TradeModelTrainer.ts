@@ -9,6 +9,7 @@ import FeatureCalculator from "./FeatureCalculator";
 import TradeModelFactory from "./TradeModelFactory";
 import { HistoricalData, ModelConfig } from "../types";
 import { FirebaseService } from "../api/FirebaseService";
+import { TRADE_PREDICTOR_WEIGHTS } from "../constants";
 
 dotenv.config();
 
@@ -544,7 +545,7 @@ export class TradeModelTrainer {
       featureStds: Array.from(await X_std.data()),
     };
     const weightsJson = JSON.stringify({ weights });
-    const file = this.bucket.file("tradePredictorWeights.json");
+    const file = this.bucket.file(TRADE_PREDICTOR_WEIGHTS);
     await file.save(weightsJson, { contentType: "application/json" });
     console.log("Model weights saved to Firebase Storage");
     X_mean.dispose();

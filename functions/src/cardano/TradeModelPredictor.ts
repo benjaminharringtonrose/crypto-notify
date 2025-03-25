@@ -18,6 +18,7 @@ if (!admin.apps.length) {
 
 export default class TradeModelPredictor {
   private bucket = admin.storage().bucket();
+  private readonly timesteps = 30;
 
   private async fetchAndCalculateIndicators() {
     const { currentAdaPrice, currentBtcPrice } = await getCurrentPrices();
@@ -169,10 +170,9 @@ export default class TradeModelPredictor {
       const [weightsData] = await file.download();
       const { weights } = JSON.parse(weightsData.toString("utf8"));
 
-      const timesteps = 20;
       const featureSequence: number[][] = [];
       for (
-        let i = Math.max(0, adaPrices.length - timesteps);
+        let i = Math.max(0, adaPrices.length - this.timesteps);
         i < adaPrices.length;
         i++
       ) {
@@ -190,16 +190,15 @@ export default class TradeModelPredictor {
           currentPrice: btcPrices[i],
           isBTC: true,
         }).compute();
-        const adaBtcRatio = adaPrices[i] / btcPrices[i];
-        featureSequence.push([...adaFeatures, ...btcFeatures, adaBtcRatio]);
+        featureSequence.push([...adaFeatures, ...btcFeatures]); // 61 features
       }
-      while (featureSequence.length < timesteps)
+      while (featureSequence.length < this.timesteps)
         featureSequence.unshift(featureSequence[0]);
 
       let buyProbBase = 0.5,
         sellProbBase = 0.5;
       await tf.tidy(() => {
-        const factory = new TradeModelFactory(timesteps, 61);
+        const factory = new TradeModelFactory(this.timesteps, 61);
         const model = factory.createModel();
         model
           .getLayer("conv1d")
@@ -213,19 +212,26 @@ export default class TradeModelPredictor {
             tf.tensor3d(weights.conv2Weights, [3, 12, 24]),
             tf.tensor1d(weights.conv2Bias),
           ]);
+        model.getLayer("lstm1").setWeights([
+          tf.tensor2d(weights.lstm1Weights, [24, 512]), // 128 units * 4 (LSTM gates)
+          tf.tensor2d(weights.lstm1RecurrentWeights, [128, 512]),
+          tf.tensor1d(weights.lstm1Bias),
+        ]);
+        model.getLayer("lstm2").setWeights([
+          tf.tensor2d(weights.lstm2Weights, [128, 256]), // 64 units * 4
+          tf.tensor2d(weights.lstm2RecurrentWeights, [64, 256]),
+          tf.tensor1d(weights.lstm2Bias),
+        ]);
+        model.getLayer("lstm3").setWeights([
+          tf.tensor2d(weights.lstm3Weights, [64, 64]), // 16 units * 4
+          tf.tensor2d(weights.lstm3RecurrentWeights, [16, 64]),
+          tf.tensor1d(weights.lstm3Bias),
+        ]);
         model
-          .getLayer("lstm1")
+          .getLayer("time_distributed")
           .setWeights([
-            tf.tensor2d(weights.lstm1Weights, [24, 256]),
-            tf.tensor2d(weights.lstm1RecurrentWeights, [64, 256]),
-            tf.tensor1d(weights.lstm1Bias),
-          ]);
-        model
-          .getLayer("lstm2")
-          .setWeights([
-            tf.tensor2d(weights.lstm2Weights, [64, 128]),
-            tf.tensor2d(weights.lstm2RecurrentWeights, [32, 128]),
-            tf.tensor1d(weights.lstm2Bias),
+            tf.tensor2d(weights.timeDistributedWeights, [16, 16]),
+            tf.tensor1d(weights.timeDistributedBias),
           ]);
         model
           .getLayer("batchNormalization")
@@ -235,12 +241,10 @@ export default class TradeModelPredictor {
             tf.tensor1d(weights.bnMovingMean),
             tf.tensor1d(weights.bnMovingVariance),
           ]);
-        model
-          .getLayer("dense")
-          .setWeights([
-            tf.tensor2d(weights.dense1Weights, [224, 24]),
-            tf.tensor1d(weights.dense1Bias),
-          ]);
+        model.getLayer("dense").setWeights([
+          tf.tensor2d(weights.dense1Weights, [480, 24]), // 30 * 16 flattened
+          tf.tensor1d(weights.dense1Bias),
+        ]);
         model
           .getLayer("dense_1")
           .setWeights([
@@ -248,7 +252,7 @@ export default class TradeModelPredictor {
             tf.tensor1d(weights.dense2Bias),
           ]);
         const featuresNormalized = tf
-          .tensor3d([featureSequence], [1, timesteps, 61])
+          .tensor3d([featureSequence], [1, this.timesteps, 61])
           .sub(tf.tensor1d(weights.featureMeans))
           .div(tf.tensor1d(weights.featureStds));
         const prediction = model.predict(featuresNormalized) as tf.Tensor2D;
@@ -257,6 +261,7 @@ export default class TradeModelPredictor {
           [sellProbBase, buyProbBase] = probs;
       });
 
+      // Rest of the logic remains the same
       const volatility = adaIndicators.atr / adaIndicators.atrBaseline;
       const rsiSafe = adaIndicators.rsi ?? 50;
       const profitPotential =
@@ -273,9 +278,8 @@ export default class TradeModelPredictor {
       const confidenceThreshold =
         volatility > 1.8
           ? 0.5
-          : 0.45 + (adaIndicators.adxProxy > 0.02 ? 0.05 : 0); // Raised
+          : 0.45 + (adaIndicators.adxProxy > 0.02 ? 0.05 : 0);
       if (buyProb < 0.4 || sellProb < 0.4) {
-        // Hold buffer
         holdProb = 1 - (buyProb + sellProb);
         buyProb *= 0.8;
         sellProb *= 0.8;

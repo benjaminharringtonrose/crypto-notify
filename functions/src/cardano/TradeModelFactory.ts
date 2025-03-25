@@ -35,18 +35,18 @@ export default class TradeModelFactory {
 
     model.add(
       tf.layers.lstm({
-        units: 128, // Increased from 64
+        units: 128,
         returnSequences: true,
         kernelInitializer: "orthogonal",
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.005 }), // Reduced from 0.01
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.005 }),
         name: "lstm1",
       })
     );
-    model.add(tf.layers.dropout({ rate: 0.3 })); // Increased from 0.25
+    model.add(tf.layers.dropout({ rate: 0.3 }));
 
     model.add(
       tf.layers.lstm({
-        units: 64, // Increased from 32
+        units: 64,
         returnSequences: true,
         kernelInitializer: "orthogonal",
         kernelRegularizer: tf.regularizers.l2({ l2: 0.005 }),
@@ -57,7 +57,7 @@ export default class TradeModelFactory {
 
     model.add(
       tf.layers.lstm({
-        units: 16, // New third LSTM layer
+        units: 16,
         returnSequences: true,
         kernelInitializer: "orthogonal",
         kernelRegularizer: tf.regularizers.l2({ l2: 0.005 }),

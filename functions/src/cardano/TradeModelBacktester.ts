@@ -11,15 +11,16 @@ import { Bucket } from "@google-cloud/storage";
 export class TradeModelBacktester {
   private TRANSACTION_FEE = 0.002;
   private INITIAL_USD = 1000;
-  private MIN_TRADE_USD = 100; // Increased
+  private MIN_TRADE_USD = 100;
   private CASH_RESERVE = 25;
-  private STOP_LOSS_THRESHOLD = -0.05; // Tightened
-  private TAKE_PROFIT_THRESHOLD = 0.1; // Increased
+  private STOP_LOSS_THRESHOLD = -0.05;
+  private TAKE_PROFIT_THRESHOLD = 0.1;
 
   private startDaysAgo: number;
   private endDaysAgo: number;
   private stepDays: number;
   private bucket: Bucket;
+  private readonly timesteps = 30; // Align with TradeModelTrainer
 
   constructor(
     startDaysAgo: number = 450,
@@ -70,13 +71,12 @@ export class TradeModelBacktester {
     const [weightsData] = await file.download();
     const { weights } = JSON.parse(weightsData.toString("utf8"));
 
-    const timesteps = 20;
     const sequences: number[][][] = [];
     const indices: number[] = [];
 
     for (let i = startIndex; i < endIndex; i += this.stepDays) {
       const sequence: number[][] = [];
-      for (let j = Math.max(0, i - timesteps + 1); j <= i; j++) {
+      for (let j = Math.max(0, i - this.timesteps + 1); j <= i; j++) {
         const adaFeatures = new FeatureCalculator({
           prices: adaPrices,
           volumes: adaVolumes,
@@ -91,16 +91,15 @@ export class TradeModelBacktester {
           currentPrice: btcPrices[j],
           isBTC: true,
         }).compute();
-        const adaBtcRatio = adaPrices[j] / btcPrices[j];
-        sequence.push([...adaFeatures, ...btcFeatures, adaBtcRatio]);
+        sequence.push([...adaFeatures, ...btcFeatures]); // 61 features
       }
-      while (sequence.length < timesteps) sequence.unshift(sequence[0]);
+      while (sequence.length < this.timesteps) sequence.unshift(sequence[0]);
       sequences.push(sequence);
       indices.push(i);
     }
 
     return tf.tidy(() => {
-      const factory = new TradeModelFactory(timesteps, 61);
+      const factory = new TradeModelFactory(this.timesteps, 61);
       const model = factory.createModel();
       model
         .getLayer("conv1d")
@@ -114,19 +113,26 @@ export class TradeModelBacktester {
           tf.tensor3d(weights.conv2Weights, [3, 12, 24]),
           tf.tensor1d(weights.conv2Bias),
         ]);
+      model.getLayer("lstm1").setWeights([
+        tf.tensor2d(weights.lstm1Weights, [24, 512]), // 128 units * 4
+        tf.tensor2d(weights.lstm1RecurrentWeights, [128, 512]),
+        tf.tensor1d(weights.lstm1Bias),
+      ]);
+      model.getLayer("lstm2").setWeights([
+        tf.tensor2d(weights.lstm2Weights, [128, 256]), // 64 units * 4
+        tf.tensor2d(weights.lstm2RecurrentWeights, [64, 256]),
+        tf.tensor1d(weights.lstm2Bias),
+      ]);
+      model.getLayer("lstm3").setWeights([
+        tf.tensor2d(weights.lstm3Weights, [64, 64]), // 16 units * 4
+        tf.tensor2d(weights.lstm3RecurrentWeights, [16, 64]),
+        tf.tensor1d(weights.lstm3Bias),
+      ]);
       model
-        .getLayer("lstm1")
+        .getLayer("time_distributed")
         .setWeights([
-          tf.tensor2d(weights.lstm1Weights, [24, 256]),
-          tf.tensor2d(weights.lstm1RecurrentWeights, [64, 256]),
-          tf.tensor1d(weights.lstm1Bias),
-        ]);
-      model
-        .getLayer("lstm2")
-        .setWeights([
-          tf.tensor2d(weights.lstm2Weights, [64, 128]),
-          tf.tensor2d(weights.lstm2RecurrentWeights, [32, 128]),
-          tf.tensor1d(weights.lstm2Bias),
+          tf.tensor2d(weights.timeDistributedWeights, [16, 16]),
+          tf.tensor1d(weights.timeDistributedBias),
         ]);
       model
         .getLayer("batchNormalization")
@@ -136,12 +142,10 @@ export class TradeModelBacktester {
           tf.tensor1d(weights.bnMovingMean),
           tf.tensor1d(weights.bnMovingVariance),
         ]);
-      model
-        .getLayer("dense")
-        .setWeights([
-          tf.tensor2d(weights.dense1Weights, [224, 24]),
-          tf.tensor1d(weights.dense1Bias),
-        ]);
+      model.getLayer("dense").setWeights([
+        tf.tensor2d(weights.dense1Weights, [480, 24]), // 30 * 16 flattened
+        tf.tensor1d(weights.dense1Bias),
+      ]);
       model
         .getLayer("dense_1")
         .setWeights([
@@ -149,7 +153,7 @@ export class TradeModelBacktester {
           tf.tensor1d(weights.dense2Bias),
         ]);
       const featuresNormalized = tf
-        .tensor3d(sequences, [sequences.length, timesteps, 61])
+        .tensor3d(sequences, [sequences.length, this.timesteps, 61])
         .sub(tf.tensor1d(weights.featureMeans))
         .div(tf.tensor1d(weights.featureStds));
       const predictions = model.predict(featuresNormalized) as tf.Tensor2D;
@@ -189,7 +193,7 @@ export class TradeModelBacktester {
 
     const startIndex = Math.max(0, adaPrices.length - this.startDaysAgo);
     const endIndex = Math.max(0, adaPrices.length - this.endDaysAgo);
-    const backtestStart = 53;
+    const backtestStart = this.timesteps + 4; // Adjust for longer timesteps
     const backtestEnd = endIndex - 5;
 
     const predictions = await this.batchPredict(
@@ -233,7 +237,7 @@ export class TradeModelBacktester {
             0
           ) / 14;
       const trailingStopPrice =
-        adaBalance > 0 ? peakPrice * (1 - (1.5 * atr) / currentAdaPrice) : 0; // Adjusted
+        adaBalance > 0 ? peakPrice * (1 - (1.5 * atr) / currentAdaPrice) : 0;
       const trailingStopTriggered =
         adaBalance > 0 && currentAdaPrice <= trailingStopPrice;
       if (adaBalance > 0 && currentAdaPrice > peakPrice)
@@ -242,7 +246,7 @@ export class TradeModelBacktester {
       const buyCondition =
         buyProb > 0.5 &&
         usdBalance > this.CASH_RESERVE + this.MIN_TRADE_USD &&
-        cooldown === 0; // Raised threshold
+        cooldown === 0;
       const sellCondition =
         (sellProb > 0.5 && adaBalance > 0) ||
         (adaBalance > 0 &&
@@ -251,7 +255,7 @@ export class TradeModelBacktester {
             trailingStopTriggered));
 
       console.log(
-        `Day ${i - 52}: Price ${currentAdaPrice.toFixed(
+        `Day ${i - (this.timesteps + 3)}: Price ${currentAdaPrice.toFixed(
           4
         )}, Buy Prob: ${buyProb.toFixed(3)}, Sell Prob: ${sellProb.toFixed(
           3
@@ -264,7 +268,7 @@ export class TradeModelBacktester {
           usdBalance *
             Math.min(0.5, confidence * 1.5) *
             (1 - this.TRANSACTION_FEE)
-        ); // Increased max size
+        );
         if (usdBalance - usdToSpend < this.CASH_RESERVE) continue;
         const adaBought = usdToSpend / currentAdaPrice;
         adaBalance += adaBought;

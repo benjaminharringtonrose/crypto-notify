@@ -24,9 +24,9 @@ if (!admin.apps.length) {
 
 export class TradeModelTrainer {
   private readonly config: ModelConfig = {
-    timesteps: 30, // Increased from 20
-    epochs: 100, // Increased from 80
-    batchSize: 64, // Reduced from 128
+    timesteps: 30,
+    epochs: 100,
+    batchSize: 64,
     initialLearningRate: 0.0008,
   };
   private bucket = admin.storage().bucket();
@@ -64,8 +64,8 @@ export class TradeModelTrainer {
   }
 
   private focalLoss(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
-    const gamma = 1.5; // Reduced from 2.0
-    const alpha = tf.tensor1d([0.75, 0.25]); // Adjusted to prioritize Sell
+    const gamma = 1.5;
+    const alpha = tf.tensor1d([0.75, 0.25]);
     const ce = tf.losses.sigmoidCrossEntropy(yTrue, yPred);
     const pt = yTrue.mul(yPred).sum(-1).clipByValue(0, 1);
     const focalWeight = tf.pow(tf.sub(1, pt), gamma);
@@ -154,7 +154,7 @@ export class TradeModelTrainer {
 
   private adjustSequenceLength(sequence: number[][]): number[][] {
     while (sequence.length < this.config.timesteps)
-      sequence.push([...sequence[sequence.length - 1]]);
+      sequence.unshift(sequence[0]); // Pad with first entry instead of last
     while (sequence.length > this.config.timesteps) sequence.pop();
     return sequence;
   }
@@ -165,6 +165,9 @@ export class TradeModelTrainer {
   ): { X: number[][][]; y: number[] } {
     const buySamples = X.filter((_, i) => y[i] === 1);
     const sellSamples = X.filter((_, i) => y[i] === 0);
+    console.log(
+      `Before balancing - Buy samples: ${buySamples.length}, Sell samples: ${sellSamples.length}`
+    );
     const maxSamples = Math.max(buySamples.length, sellSamples.length);
     const balancedX: number[][][] = [];
     const balancedY: number[] = [];
@@ -175,6 +178,11 @@ export class TradeModelTrainer {
         balancedY.push(label);
       }
     });
+    console.log(
+      `After balancing - Buy samples: ${
+        balancedY.filter((l) => l === 1).length
+      }, Sell samples: ${balancedY.filter((l) => l === 0).length}`
+    );
     return { X: balancedX, y: balancedY };
   }
 
@@ -191,6 +199,8 @@ export class TradeModelTrainer {
       seq.forEach((val, i) => (stds[i] += (val - means[i]) ** 2))
     );
     stds.forEach((sum, i) => (stds[i] = Math.sqrt(sum / features.length) || 1));
+    console.log(`Feature means: ${means.slice(0, 5)}...`); // Log first 5 for brevity
+    console.log(`Feature stds: ${stds.slice(0, 5)}...`);
     return { mean: means, std: stds };
   }
 
@@ -248,6 +258,14 @@ export class TradeModelTrainer {
     X: number[][][],
     y: number[]
   ): Promise<{ X_mean: tf.Tensor; X_std: tf.Tensor }> {
+    console.log(
+      `Input data dimensions: [${X.length}, ${X[0].length}, ${X[0][0].length}]`
+    );
+    if (X[0].length !== this.config.timesteps) {
+      throw new Error(
+        `Data timestep mismatch: expected ${this.config.timesteps}, got ${X[0].length}`
+      );
+    }
     const X_tensor = tf.tensor3d(X, [X.length, this.config.timesteps, 61]);
     const y_tensor = tf.tensor2d(
       y.map((label) => [label === 0 ? 1 : 0, label === 1 ? 1 : 0]),
@@ -299,7 +317,7 @@ export class TradeModelTrainer {
       const cyclicLRCallback = new CyclicLearningRateCallback(
         0.00005,
         this.config.initialLearningRate,
-        8
+        10 // Extended from 8
       );
 
       if (!this.model) throw new Error("Model initialization failed");
@@ -327,7 +345,7 @@ export class TradeModelTrainer {
         epochs: this.config.epochs,
         validationData: valDataset,
         callbacks: [
-          tf.callbacks.earlyStopping({ monitor: "val_loss", patience: 15 }), // Increased from 20
+          tf.callbacks.earlyStopping({ monitor: "val_loss", patience: 15 }),
           bestWeightsCallback,
           predictionLoggerCallback,
           cyclicLRCallback,

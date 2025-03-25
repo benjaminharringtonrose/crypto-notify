@@ -1,12 +1,13 @@
-import * as admin from "firebase-admin";
 import * as tf from "@tensorflow/tfjs-node";
 import { getHistoricalData } from "../api/getHistoricalData";
 import { FIVE_YEARS_IN_DAYS } from "../constants";
 import { BacktestResult, Trade } from "../types";
-import serviceAccount from "../../../serviceAccount.json";
 import TradeModelFactory from "./TradeModelFactory";
 import { ModelWeightManager } from "./TradeModelWeightManager";
 import { FeatureSequenceGenerator } from "./FeatureSequenceGenerator";
+import { FirebaseService } from "../api/FirebaseService";
+
+FirebaseService.getInstance();
 
 export class TradeModelBacktester {
   private TRANSACTION_FEE = 0.002;
@@ -33,15 +34,6 @@ export class TradeModelBacktester {
     this.startDaysAgo = startDaysAgo;
     this.endDaysAgo = endDaysAgo;
     this.stepDays = stepDays;
-
-    if (!admin.apps.length) {
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount as any),
-        storageBucket:
-          process.env.STORAGE_BUCKET ||
-          "crypto-notify-ee5bc.firebasestorage.app",
-      });
-    }
   }
 
   private async fetchHistoricalData(): Promise<{

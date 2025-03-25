@@ -1,7 +1,12 @@
 import * as admin from "firebase-admin";
 import * as tf from "@tensorflow/tfjs-node";
 import dotenv from "dotenv";
-import { TradeDecision, Indicators, Recommendation } from "../types";
+import {
+  TradeDecision,
+  Indicators,
+  TradingStrategy,
+  Recommendation,
+} from "../types";
 import { getCurrentPrices } from "../api/getCurrentPrices";
 import { getHistoricalPricesAndVolumes } from "../api/getHistoricalPricesAndVolumes";
 import FeatureCalculator from "./FeatureCalculator";
@@ -48,7 +53,7 @@ export default class TradeModelPredictor {
   }
 
   private evaluateStrategy(
-    name: string,
+    name: TradingStrategy,
     adaIndicators: Indicators,
     btcIndicators: Indicators,
     sma50: number
@@ -97,7 +102,7 @@ export default class TradeModelPredictor {
     const conditions: string[] = [];
 
     switch (name) {
-      case "TrendFollowing":
+      case TradingStrategy.TrendFollowing:
         if (
           sma7 > sma21 &&
           prevSma7 <= prevSma21 &&
@@ -139,7 +144,7 @@ export default class TradeModelPredictor {
           conditions.push("Positive momentum");
         }
         break;
-      case "MeanReversion":
+      case TradingStrategy.MeanReversion:
         if (rsiSafe < 20 && currentPrice < sma20 - 2.5 * atr) {
           buyProb += 0.5;
           conditions.push("Oversold RSI + below Bollinger");
@@ -153,7 +158,7 @@ export default class TradeModelPredictor {
           conditions.push("Neutral RSI range");
         }
         break;
-      case "Breakout":
+      case TradingStrategy.Breakout:
         if (currentPrice > recentHigh && isVolumeSpike && volatility > 1.8) {
           buyProb += 0.5;
           conditions.push("Breakout above resistance + volume spike");
@@ -245,7 +250,6 @@ export default class TradeModelPredictor {
         holdProb = 0;
       const metConditions: string[] = [];
 
-      // Consolidated RSI adjustments
       if (rsiSafe < 20) {
         buyProb += 0.35;
         metConditions.push("RSI < 20 (oversold)");
@@ -266,19 +270,19 @@ export default class TradeModelPredictor {
       }
 
       const trendResult = this.evaluateStrategy(
-        "TrendFollowing",
+        TradingStrategy.TrendFollowing,
         adaIndicators,
         btcIndicators,
         sma50
       );
       const meanRevResult = this.evaluateStrategy(
-        "MeanReversion",
+        TradingStrategy.MeanReversion,
         adaIndicators,
         btcIndicators,
         sma50
       );
       const breakoutResult = this.evaluateStrategy(
-        "Breakout",
+        TradingStrategy.Breakout,
         adaIndicators,
         btcIndicators,
         sma50

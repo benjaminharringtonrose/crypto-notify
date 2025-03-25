@@ -167,6 +167,12 @@ export enum Docs {
   Cardano = "cardano",
 }
 
+export enum TradingStrategy {
+  TrendFollowing = "TrendFollowing",
+  MeanReversion = "MeanReversion",
+  Breakout = "Breakout",
+}
+
 export interface HistoricalData {
   prices: number[];
   volumes: number[];

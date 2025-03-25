@@ -220,13 +220,6 @@ export class TradeModelTrainer {
     y: number[];
     featureStats: { mean: number[]; std: number[] };
   }> {
-    const cacheFile = path.join(this.cacheDir, "training_data.json");
-    if (fs.existsSync(cacheFile)) {
-      console.log("Loading cached training data...");
-      const cached = JSON.parse(fs.readFileSync(cacheFile, "utf8"));
-      return { X: cached.X, y: cached.y, featureStats: cached.featureStats };
-    }
-
     const { adaData, btcData } = await this.fetchHistoricalData();
     const X: number[][][] = [];
     const y: number[] = [];
@@ -248,12 +241,6 @@ export class TradeModelTrainer {
     const balancedData = this.balanceDataset(X, y);
     console.log(`Total samples: ${balancedData.X.length}`);
     const featureStats = this.computeFeatureStats(allFeatures);
-    fs.writeFileSync(
-      cacheFile,
-      JSON.stringify({ X: balancedData.X, y: balancedData.y, featureStats }),
-      "utf8"
-    );
-    console.log("Cached training data saved.");
     return { X: balancedData.X, y: balancedData.y, featureStats };
   }
 

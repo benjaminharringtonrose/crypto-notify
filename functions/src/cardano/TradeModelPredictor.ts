@@ -213,7 +213,7 @@ export default class TradeModelPredictor {
             tf.tensor1d(weights.conv2Bias),
           ]);
         model.getLayer("lstm1").setWeights([
-          tf.tensor2d(weights.lstm1Weights, [24, 512]), // 128 units * 4 (LSTM gates)
+          tf.tensor2d(weights.lstm1Weights, [24, 512]), // 128 units * 4
           tf.tensor2d(weights.lstm1RecurrentWeights, [128, 512]),
           tf.tensor1d(weights.lstm1Bias),
         ]);
@@ -242,7 +242,7 @@ export default class TradeModelPredictor {
             tf.tensor1d(weights.bnMovingVariance),
           ]);
         model.getLayer("dense").setWeights([
-          tf.tensor2d(weights.dense1Weights, [480, 24]), // 30 * 16 flattened
+          tf.tensor2d(weights.dense1Weights, [384, 24]), // Updated from [480, 24]
           tf.tensor1d(weights.dense1Bias),
         ]);
         model
@@ -261,7 +261,6 @@ export default class TradeModelPredictor {
           [sellProbBase, buyProbBase] = probs;
       });
 
-      // Rest of the logic remains the same
       const volatility = adaIndicators.atr / adaIndicators.atrBaseline;
       const rsiSafe = adaIndicators.rsi ?? 50;
       const profitPotential =

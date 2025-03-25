@@ -7,6 +7,7 @@ export default class FeatureCalculator {
   private dayIndex: number;
   private currentPrice: number;
   private isBTC: boolean;
+  private btcPrice?: number; // Added for ADA/BTC ratio
 
   constructor({
     prices,
@@ -14,12 +15,14 @@ export default class FeatureCalculator {
     dayIndex,
     currentPrice,
     isBTC = false,
-  }: MarketData & { isBTC?: boolean }) {
+    btcPrice,
+  }: MarketData & { isBTC?: boolean; btcPrice?: number }) {
     this.prices = prices;
     this.volumes = volumes;
     this.dayIndex = dayIndex;
     this.currentPrice = currentPrice;
     this.isBTC = isBTC;
+    this.btcPrice = btcPrice;
   }
 
   private calculateVWAP(
@@ -611,7 +614,7 @@ export default class FeatureCalculator {
       this.dayIndex < 0 ||
       this.dayIndex >= this.prices.length
     ) {
-      return Array(this.isBTC ? 29 : 31).fill(0);
+      return Array(this.isBTC ? 29 : 32).fill(0); // Updated fallback to 32 for ADA
     }
 
     const indicators = this.calculateIndicators();
@@ -648,11 +651,12 @@ export default class FeatureCalculator {
     ];
 
     return this.isBTC
-      ? baseFeatures
+      ? baseFeatures // 29 features
       : [
           ...baseFeatures,
           indicators.isTripleBottom ? 1 : 0,
           indicators.adxProxy,
-        ];
+          this.btcPrice ? this.currentPrice / this.btcPrice : 0, // Added adaBtcRatio
+        ]; // 32 features
   }
 }

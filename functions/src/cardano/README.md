@@ -25,7 +25,7 @@ The Trade Prediction Model is designed to assist traders by providing data-drive
 
 ### Type of Trading
 
-This system is optimized for **short-term cryptocurrency trading**, specifically **day trading** and **swing trading** on Cardano (ADA). It focuses on capturing price movements over horizons of a few hours to several days, using a 5-day lookahead for labeling training data (configurable in `DataProcessor.ts`). The model combines machine learning predictions with technical analysis to identify entry and exit points based on momentum, reversals, and breakouts.
+This system is optimized for **short-term cryptocurrency trading**, specifically **day trading** and **swing trading** on Cardano (ADA). It focuses on capturing price movements over horizons of a few hours to several days, using a 7-day lookahead for labeling training data (configurable in `DataProcessor.ts`). The model combines machine learning predictions with technical analysis to identify entry and exit points based on momentum, reversals, and breakouts.
 
 ### When to Use
 
@@ -158,6 +158,172 @@ Implements custom metrics optimized for trading signal evaluation.
 ### TradeModelFactory
 
 Defines the CNN-LSTM architecture with regularization and dropout.
+
+### Feature Calculations and Meanings
+
+The FeatureCalculator class generates a set of technical indicators and features used by the model. Below is a detailed list of the calculations and their meanings:
+
+- **RSI (Relative Strength Index)**:
+
+  - **Calculation**: 100 - (100 / (1 + RS)), where RS = (Average Gain over 14 periods) / (Average Loss over 14 periods). Gains and losses are based on price changes over the period.
+  - **Meaning**: Measures momentum and overbought/oversold conditions. RSI < 20 suggests oversold (potential buy), RSI > 80 suggests overbought (potential sell).
+
+- **Previous RSI**:
+
+  - **Calculation**: Same as RSI but calculated on the previous period’s data (shifted back by one day).
+  - **Meaning**: Provides context for RSI trend direction.
+
+- **SMA7 (7-day Simple Moving Average)**:
+
+  - **Calculation**: (Sum of prices over 7 days) / 7.
+  - **Meaning**: Smooths short-term price fluctuations to identify trends. Compared with longer SMAs to detect crossovers.
+
+- **SMA21 (21-day Simple Moving Average)**:
+
+  - **Calculation**: (Sum of prices over 21 days) / 21.
+  - **Meaning**: Indicates medium-term trend direction.
+
+- **Previous SMA7 and SMA21**:
+
+  - **Calculation**: SMA7 and SMA21 calculated on data shifted back by one day.
+  - **Meaning**: Used to detect SMA crossovers (e.g., SMA7 crossing above SMA21 signals a bullish trend).
+
+- **MACD Line**:
+
+  - **Calculation**: EMA12 - EMA26, where EMA12 is the 12-day Exponential Moving Average and EMA26 is the 26-day EMA. EMA = Price _ k + Previous EMA _ (1 - k), with k = 2 / (period + 1).
+  - **Meaning**: Measures momentum and trend direction. Positive values indicate bullish momentum.
+
+- **Signal Line**:
+
+  - **Calculation**: 9-day EMA of the MACD Line.
+  - **Meaning**: Smooths MACD to generate crossover signals. MACD crossing above Signal Line is bullish.
+
+- **Current Price**:
+
+  - **Calculation**: The price at the current day index.
+  - **Meaning**: The raw price input for comparison with indicators.
+
+- **Upper Bollinger Band**:
+
+  - **Calculation**: SMA20 + 2 \_ StdDev20, where SMA20 is the 20-day SMA and StdDev20 is the standard deviation over 20 days.
+  - **Meaning**: Indicates potential overbought levels or resistance.
+
+- **Lower Bollinger Band**:
+
+  - **Calculation**: SMA20 - 2 \_ StdDev20.
+  - **Meaning**: Indicates potential oversold levels or support.
+
+- **OBV (On-Balance Volume)**:
+
+  - **Calculation**: Cumulative sum where volume is added if price increases, subtracted if price decreases, or unchanged if price is flat.
+  - **Meaning**: Tracks volume flow to confirm price trends. Rising OBV with price suggests bullishness.
+
+- **ATR (Average True Range)**:
+
+  - **Calculation**: Average of the true range (absolute price change) over 14 days.
+  - **Meaning**: Measures volatility. Higher ATR indicates greater price movement.
+
+- **ATR Baseline**:
+
+  - **Calculation**: ATR calculated up to the previous day.
+  - **Meaning**: Provides a reference for current volatility trends.
+
+- **Z-Score**:
+
+  - **Calculation**: (Current Price - SMA20) / StdDev20.
+  - **Meaning**: Indicates how far the price deviates from the mean in standard deviations. Useful for mean-reversion strategies.
+
+- **VWAP (Volume-Weighted Average Price)**:
+
+  - **Calculation**: (Sum of (Price \_ Volume) over 7 days) / (Sum of Volume over 7 days).
+  - **Meaning**: Represents the average price weighted by volume, often a benchmark for fair value.
+
+- **Stochastic RSI**:
+
+  - **Calculation**: ((Current RSI - Lowest RSI over 14 periods) / (Highest RSI over 14 periods - Lowest RSI)) \_ 100.
+  - **Meaning**: Combines RSI with stochastic oscillator to identify overbought/oversold conditions with momentum.
+
+- **Previous Stochastic RSI**:
+
+  - **Calculation**: Stochastic RSI calculated on the previous day’s data.
+  - **Meaning**: Tracks changes in Stochastic RSI for trend analysis.
+
+- **Fibonacci 61.8% Level**:
+
+  - **Calculation**: Low + (High - Low) \_ 0.618, where High and Low are the max and min prices over 30 days.
+  - **Meaning**: A key retracement level often acting as support or resistance.
+
+- **Previous Day’s Price**:
+
+  - **Calculation**: Price from the previous day.
+  - **Meaning**: Used to calculate daily changes and momentum.
+
+- **Volume Oscillator**:
+
+  - **Calculation**: ((SMA of Volume over 5 days - SMA over 14 days) / SMA over 14 days) \_ 100.
+  - **Meaning**: Measures volume trend strength. Positive values indicate increasing volume momentum.
+
+- **Previous Volume Oscillator**:
+
+  - **Calculation**: Volume Oscillator calculated on the previous day’s data.
+  - **Meaning**: Tracks volume momentum changes.
+
+- **Double Top (Binary)**:
+
+  - **Calculation**: Detects two peaks at similar levels with a trough between, followed by a price drop below the trough, with volume confirmation.
+  - **Meaning**: Bearish reversal pattern indicating potential sell.
+
+- **Head and Shoulders (Binary)**:
+
+  - **Calculation**: Identifies a peak (head) between two lower peaks (shoulders) with a neckline break, confirmed by volume.
+  - **Meaning**: Strong bearish reversal signal.
+
+- **Previous MACD Line**:
+
+  - **Calculation**: MACD Line calculated on the previous day’s data.
+  - **Meaning**: Used to detect MACD crossovers.
+
+- **Triple Top (Binary)**:
+
+  - **Calculation**: Detects three peaks at similar levels with troughs, followed by a price drop below support, with volume confirmation.
+  - **Meaning**: Strong bearish reversal pattern.
+
+- **Volume Spike (Binary)**:
+
+  - **Calculation**: Current volume > 2 \_ SMA of volume over 5 days.
+  - **Meaning**: Indicates significant buying/selling pressure, often confirming breakouts or reversals.
+
+- **Momentum**:
+
+  - **Calculation**: Current Price - Price from 10 days ago.
+  - **Meaning**: Measures price velocity. Positive momentum supports buys, negative supports sells.
+
+- **Price Change Percentage**:
+
+  - **Calculation**: ((Current Price - Previous Price) / Previous Price) \_ 100.
+  - **Meaning**: Daily price change as a percentage, useful for volatility assessment.
+
+- **Volume-Adjusted Momentum**:
+
+  - **Calculation**: (Current Price - Price from 10 days ago) / ATR.
+  - **Meaning**: Normalizes momentum by volatility for more robust signals.
+
+- **Triple Bottom (Binary, ADA only)**:
+
+  - **Calculation**: Detects three similar troughs with decreasing volume, followed by a breakout above resistance.
+  - **Meaning**: Bullish reversal pattern indicating potential buy.
+
+- **ADX Proxy (ADA only)**:
+
+  - **Calculation**: |SMA7 - SMA50| / SMA50.
+  - **Meaning**: Approximates trend strength. Higher values indicate stronger trends.
+
+- **ADA/BTC Price Ratio (ADA only)**:
+
+  - **Calculation**: Current ADA Price / Current BTC Price.
+  - **Meaning**: Measures ADA’s performance relative to BTC, capturing correlation effects.
+
+These features are computed for both ADA (32 features) and BTC (29 features, excluding Triple Bottom, ADX Proxy, and ADA/BTC Ratio), forming a 61-feature input vector per timestep for the model.
 
 ## Contributing
 

@@ -24,14 +24,14 @@ export class PredictionLoggerCallback extends tf.CustomCallback {
     if (!this.model)
       throw new Error("Model not set in PredictionLoggerCallback");
 
-    // Log first 5 validation predictions (existing functionality)
+    // Log first 5 validation predictions
     const predsFirstFive = this.model.predict(
       this.validationData.slice([0], [5])
     ) as tf.Tensor;
     const predArrayFirstFive = (await predsFirstFive.array()) as number[][];
     const predictedLabelsFirstFive = predArrayFirstFive.map((p) =>
       p[1] > 0.3 ? 1 : 0
-    ); // Adjusted threshold
+    );
     const buyCountFirstFive = predictedLabelsFirstFive.filter(
       (p) => p === 1
     ).length;
@@ -47,22 +47,44 @@ export class PredictionLoggerCallback extends tf.CustomCallback {
       }`
     );
 
-    // New logging: Class distribution across all validation data
-    const predsAll = this.model.predict(this.validationData) as tf.Tensor;
-    const predLabelsAll = predsAll.argMax(-1).dataSync();
-    const buyCountAll = Array.from(predLabelsAll).filter((p) => p === 1).length;
-    const totalValSamples = predLabelsAll.length;
+    // Log class distribution across all validation data
+    const predsAllVal = this.model.predict(this.validationData) as tf.Tensor;
+    const predLabelsAllVal = predsAllVal.argMax(-1).dataSync();
+    const buyCountAllVal = Array.from(predLabelsAllVal).filter(
+      (p) => p === 1
+    ).length;
+    const totalValSamples = predLabelsAllVal.length;
     console.log(
-      `Epoch ${epoch + 1} Validation Buy Count: ${buyCountAll}, Sell Count: ${
-        totalValSamples - buyCountAll
-      }, Buy Ratio: ${(buyCountAll / totalValSamples).toFixed(3)}`
+      `Epoch ${
+        epoch + 1
+      } Validation Buy Count: ${buyCountAllVal}, Sell Count: ${
+        totalValSamples - buyCountAllVal
+      }, Buy Ratio: ${(buyCountAllVal / totalValSamples).toFixed(3)}`
     );
+
+    // Log class distribution across all training data (moved from TradeModelTrainer)
+    if (this.X_train && this.y_train) {
+      const predsAllTrain = this.model.predict(this.X_train) as tf.Tensor;
+      const predLabelsAllTrain = predsAllTrain.argMax(-1).dataSync();
+      const buyCountAllTrain = Array.from(predLabelsAllTrain).filter(
+        (p) => p === 1
+      ).length;
+      const totalTrainSamples = predLabelsAllTrain.length;
+      console.log(
+        `Epoch ${
+          epoch + 1
+        } Training Buy Count: ${buyCountAllTrain}, Sell Count: ${
+          totalTrainSamples - buyCountAllTrain
+        }, Buy Ratio: ${(buyCountAllTrain / totalTrainSamples).toFixed(3)}`
+      );
+      predsAllTrain.dispose();
+    }
 
     if (logs)
       console.log(`Epoch ${epoch + 1} Val Loss: ${logs.val_loss.toFixed(4)}`);
 
     predsFirstFive.dispose();
-    predsAll.dispose();
+    predsAllVal.dispose();
   }
 
   async onBatchEnd(batch: number, logs?: tf.Logs) {

@@ -51,7 +51,7 @@ export class TradeModelTrainer {
     );
     const X_mean = tf.tensor1d(
       this.dataProcessor["computeFeatureStats"](X.flat(1)).mean
-    ); // Access private method for simplicity
+    );
     const X_std = tf.tensor1d(
       this.dataProcessor["computeFeatureStats"](X.flat(1)).std
     );

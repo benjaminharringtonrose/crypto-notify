@@ -35,36 +35,36 @@ export default class TradeModelFactory {
 
     model.add(
       tf.layers.lstm({
-        units: 128,
+        units: 64, // Reduced from 128
         returnSequences: true,
         kernelInitializer: "orthogonal",
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.005 }),
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }), // Increased from 0.005
         name: "lstm1",
       })
     );
-    model.add(tf.layers.dropout({ rate: 0.3 }));
+    model.add(tf.layers.dropout({ rate: 0.5 })); // Increased from 0.3
 
     model.add(
       tf.layers.lstm({
-        units: 64,
+        units: 32, // Reduced from 64
         returnSequences: true,
         kernelInitializer: "orthogonal",
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.005 }),
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
         name: "lstm2",
       })
     );
-    model.add(tf.layers.dropout({ rate: 0.3 }));
+    model.add(tf.layers.dropout({ rate: 0.5 }));
 
     model.add(
       tf.layers.lstm({
-        units: 16,
+        units: 8, // Reduced from 16
         returnSequences: true,
         kernelInitializer: "orthogonal",
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.005 }),
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
         name: "lstm3",
       })
     );
-    model.add(tf.layers.dropout({ rate: 0.3 }));
+    model.add(tf.layers.dropout({ rate: 0.5 }));
 
     model.add(
       tf.layers.timeDistributed({
@@ -85,11 +85,11 @@ export default class TradeModelFactory {
         units: 24,
         activation: "relu",
         kernelInitializer: "heNormal",
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.005 }),
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.01 }),
         name: "dense",
       })
     );
-    model.add(tf.layers.dropout({ rate: 0.3 }));
+    model.add(tf.layers.dropout({ rate: 0.5 }));
 
     model.add(
       tf.layers.dense({

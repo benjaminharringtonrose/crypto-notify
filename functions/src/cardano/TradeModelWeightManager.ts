@@ -26,7 +26,7 @@ export class ModelWeightManager {
       console.warn(
         "Invalid weights detected, falling back to random initialization."
       );
-      this.weights = null; // Trigger random initialization in model
+      this.weights = null;
     }
   }
 
@@ -48,31 +48,25 @@ export class ModelWeightManager {
         tf.tensor3d(this.weights.conv2Weights, [3, 12, 24]),
         tf.tensor1d(this.weights.conv2Bias),
       ]);
-    model
-      .getLayer("lstm1")
-      .setWeights([
-        tf.tensor2d(this.weights.lstm1Weights, [24, 512]),
-        tf.tensor2d(this.weights.lstm1RecurrentWeights, [128, 512]),
-        tf.tensor1d(this.weights.lstm1Bias),
-      ]);
-    model
-      .getLayer("lstm2")
-      .setWeights([
-        tf.tensor2d(this.weights.lstm2Weights, [128, 256]),
-        tf.tensor2d(this.weights.lstm2RecurrentWeights, [64, 256]),
-        tf.tensor1d(this.weights.lstm2Bias),
-      ]);
-    model
-      .getLayer("lstm3")
-      .setWeights([
-        tf.tensor2d(this.weights.lstm3Weights, [64, 64]),
-        tf.tensor2d(this.weights.lstm3RecurrentWeights, [16, 64]),
-        tf.tensor1d(this.weights.lstm3Bias),
-      ]);
+    model.getLayer("lstm1").setWeights([
+      tf.tensor2d(this.weights.lstm1Weights, [24, 256]), // 64 units * 4 = 256
+      tf.tensor2d(this.weights.lstm1RecurrentWeights, [64, 256]),
+      tf.tensor1d(this.weights.lstm1Bias),
+    ]);
+    model.getLayer("lstm2").setWeights([
+      tf.tensor2d(this.weights.lstm2Weights, [64, 128]), // 32 units * 4 = 128
+      tf.tensor2d(this.weights.lstm2RecurrentWeights, [32, 128]),
+      tf.tensor1d(this.weights.lstm2Bias),
+    ]);
+    model.getLayer("lstm3").setWeights([
+      tf.tensor2d(this.weights.lstm3Weights, [32, 32]), // 8 units * 4 = 32
+      tf.tensor2d(this.weights.lstm3RecurrentWeights, [8, 32]),
+      tf.tensor1d(this.weights.lstm3Bias),
+    ]);
     model
       .getLayer("time_distributed")
       .setWeights([
-        tf.tensor2d(this.weights.timeDistributedWeights, [16, 16]),
+        tf.tensor2d(this.weights.timeDistributedWeights, [8, 16]),
         tf.tensor1d(this.weights.timeDistributedBias),
       ]);
     model

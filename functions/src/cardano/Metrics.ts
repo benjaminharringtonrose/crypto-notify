@@ -1,9 +1,13 @@
 import * as tf from "@tensorflow/tfjs-node";
 
 export class Metrics {
-  static focalLoss(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
-    const gamma = 1.5;
-    const alpha = tf.tensor1d([0.75, 0.25]);
+  static focalLoss(
+    yTrue: tf.Tensor,
+    yPred: tf.Tensor,
+    gamma: number = 2.0,
+    alphaArr: [number, number] = [0.6, 0.4]
+  ): tf.Scalar {
+    const alpha = tf.tensor1d(alphaArr);
     const ce = tf.losses.sigmoidCrossEntropy(yTrue, yPred);
     const pt = yTrue.mul(yPred).sum(-1).clipByValue(0, 1);
     const focalWeight = tf.pow(tf.sub(1, pt), gamma);

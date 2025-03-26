@@ -50,7 +50,7 @@ export class DataProcessor {
         );
         return null;
       }
-      const scale = 0.975 + Math.random() * 0.05;
+      const scale = 0.9 + Math.random() * 0.2; // Increased range
       const noisyFeatures = [
         ...this.addNoise(adaFeatures, scale),
         ...this.addNoise(btcFeatures, scale),
@@ -97,7 +97,7 @@ export class DataProcessor {
   }
 
   private addNoise(features: number[], scale: number): number[] {
-    return features.map((f) => f * scale + (Math.random() - 0.5) * 0.05);
+    return features.map((f) => f * scale + (Math.random() - 0.5) * 0.1); // Increased noise
   }
 
   private adjustSequenceLength(sequence: number[][]): number[][] {
@@ -149,7 +149,7 @@ export class DataProcessor {
     stds.forEach((sum, i) => (stds[i] = Math.sqrt(sum / features.length) || 1));
     console.log(`Feature means: ${means.slice(0, 5)}...`);
     console.log(`Feature stds: ${stds.slice(0, 5)}...`);
-    return { mean: means, std: stds };
+    return { mean: means, std: means };
   }
 
   private labelData({

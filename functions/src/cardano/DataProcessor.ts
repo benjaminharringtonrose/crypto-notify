@@ -155,8 +155,8 @@ export class DataProcessor {
   private labelData({
     prices,
     dayIndex,
-    threshold = 0.03,
-    horizon = 10,
+    threshold = 0.025,
+    horizon = 5,
   }: {
     prices: number[];
     dayIndex: number;

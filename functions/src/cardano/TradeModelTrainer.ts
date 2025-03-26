@@ -139,6 +139,10 @@ export class TradeModelTrainer {
 
       await Metrics.evaluateModel(this.model, X_normalized, y_tensor);
 
+      console.log(
+        `Training Buy Ratio: ${y.filter((l) => l === 1).length / y.length}`
+      );
+
       return { X_mean, X_std };
     } finally {
       X_tensor.dispose();
@@ -236,9 +240,13 @@ export class TradeModelTrainer {
 
   public async train(): Promise<void> {
     try {
+      const startTime = performance.now();
       const { X, y, featureStats } = await this.dataProcessor.prepareData();
       const { X_mean, X_std } = await this.trainModel(X, y);
       await this.saveModelWeights(featureStats, X_mean, X_std);
+      const endTime = performance.now();
+      const executionTime = (endTime - startTime) / 1000;
+      console.log(`Execution time: ${executionTime} milliseconds`);
     } catch (error) {
       console.error("Training failed:", error);
       throw error;

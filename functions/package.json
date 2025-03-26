@@ -17,7 +17,7 @@
   "engines": {
     "node": "20"
   },
-  "main": "lib/functions/src/index.js",
+  "main": "lib/index.js",
   "dependencies": {
     "@google-cloud/storage": "^7.15.2",
     "@tensorflow/tfjs-layers": "^4.22.0",

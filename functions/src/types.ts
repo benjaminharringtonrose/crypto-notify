@@ -189,7 +189,7 @@ export interface FeatureStats {
 }
 
 export interface Trade {
-  type: "buy" | "sell";
+  type: Recommendation;
   price: number;
   timestamp: string;
   adaAmount: number;

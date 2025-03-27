@@ -1,395 +1,250 @@
 import * as tf from "@tensorflow/tfjs-node";
+import { TradeModelPredictor } from "./TradeModelPredictor";
 import { getHistoricalData } from "../api/getHistoricalData";
-import { FIVE_YEARS_IN_DAYS } from "../constants";
-import { BacktestResult, Trade } from "../types";
-import TradeModelFactory from "./TradeModelFactory";
-import { ModelWeightManager } from "./TradeModelWeightManager";
-import { FeatureSequenceGenerator } from "./FeatureSequenceGenerator";
+import { BacktestResult, Trade, Recommendation } from "../types";
 import { FirebaseService } from "../api/FirebaseService";
 
 FirebaseService.getInstance();
 
 export class TradeModelBacktester {
-  private TRANSACTION_FEE = 0.002;
-  private INITIAL_USD = 1000;
-  private MIN_TRADE_USD = 100;
-  private CASH_RESERVE = 25;
-  private STOP_LOSS_THRESHOLD = -0.015; // Tightened from -0.03
-  private TAKE_PROFIT_THRESHOLD = 0.1;
-  private MAX_TRADES_PER_WEEK = 3;
-  private COOLDOWN_AFTER_LOSS = 3;
-  private MIN_PROFIT_FILTER = 0.02;
-
-  private startDaysAgo: number;
-  private endDaysAgo: number;
-  private stepDays: number;
-  private readonly timesteps = 30;
-  private weightManager = new ModelWeightManager();
-  private sequenceGenerator = new FeatureSequenceGenerator(this.timesteps);
+  private predictor: TradeModelPredictor;
+  private initialCapital: number;
+  private basePositionSize: number;
+  private slippage: number;
+  private commission: number;
+  private buyThreshold: number;
+  private sellThreshold: number;
+  private stopLossMultiplier: number;
+  private trailingStop: number;
+  private minHoldDays: number;
+  private minConfidence: number;
 
   constructor(
-    startDaysAgo: number = 450,
-    endDaysAgo: number = 1,
-    stepDays: number = 1
+    initialCapital: number = 10000,
+    basePositionSize: number = 0.1, // V6 value
+    slippage: number = 0.001,
+    commission: number = 0.1,
+    buyThreshold: number = 0.75, // V6 value
+    sellThreshold: number = 0.65, // V6 value
+    stopLossMultiplier: number = 1.5, // V6 value
+    trailingStop: number = 0.05, // V6 value
+    minHoldDays: number = 2, // V6 value
+    minConfidence: number = 0.7 // V6 value
   ) {
-    this.startDaysAgo = startDaysAgo;
-    this.endDaysAgo = endDaysAgo;
-    this.stepDays = stepDays;
+    this.predictor = new TradeModelPredictor();
+    this.initialCapital = initialCapital;
+    this.basePositionSize = basePositionSize;
+    this.slippage = slippage;
+    this.commission = commission;
+    this.buyThreshold = buyThreshold;
+    this.sellThreshold = sellThreshold;
+    this.stopLossMultiplier = stopLossMultiplier;
+    this.trailingStop = trailingStop;
+    this.minHoldDays = minHoldDays;
+    this.minConfidence = minConfidence;
   }
 
-  private async fetchHistoricalData(): Promise<{
-    adaPrices: number[];
-    adaVolumes: number[];
-    btcPrices: number[];
-    btcVolumes: number[];
-  }> {
-    const { prices: adaPrices, volumes: adaVolumes } = await getHistoricalData(
-      "ADA",
-      Math.min(this.startDaysAgo, FIVE_YEARS_IN_DAYS)
-    );
-    const { prices: btcPrices, volumes: btcVolumes } = await getHistoricalData(
-      "BTC",
-      Math.min(this.startDaysAgo, FIVE_YEARS_IN_DAYS)
-    );
-    return { adaPrices, adaVolumes, btcPrices, btcVolumes };
-  }
-
-  private async batchPredict(
-    adaPrices: number[],
-    adaVolumes: number[],
-    btcPrices: number[],
-    btcVolumes: number[],
-    startIndex: number,
-    endIndex: number
-  ): Promise<number[][]> {
-    const expectedSequences = Math.floor(
-      (endIndex - startIndex) / this.stepDays
-    );
-    console.log(
-      `Expected sequences: ${expectedSequences}, startIndex: ${startIndex}, endIndex: ${endIndex}`
+  public async backtest(
+    startDate: Date,
+    endDate: Date,
+    adaSymbol: string = "ADA",
+    btcSymbol: string = "BTC"
+  ): Promise<BacktestResult> {
+    const days = Math.ceil(
+      (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
     );
 
-    await this.weightManager.loadWeights();
-    const factory = new TradeModelFactory(this.timesteps, 61);
-    const model = factory.createModel();
-    this.weightManager.setWeights(model);
+    const adaData = await getHistoricalData(adaSymbol, days);
+    const btcData = await getHistoricalData(btcSymbol, days);
 
-    const sequences = this.sequenceGenerator.generateBatchSequences(
-      adaPrices,
-      adaVolumes,
-      btcPrices,
-      btcVolumes,
-      startIndex,
-      endIndex,
-      this.stepDays
-    );
-
-    if (sequences.length === 0) {
-      throw new Error("No sequences generated for backtest");
+    if (adaData.prices.length !== btcData.prices.length) {
+      throw new Error("Mismatch in ADA and BTC historical data lengths");
     }
 
-    console.log(`Generated sequences: ${sequences.length}`);
-    const means = this.weightManager.getFeatureMeans();
-    const stds = this.weightManager.getFeatureStds();
-    if (means.length !== 61 || stds.length !== 61) {
-      throw new Error("Feature means or stds length mismatch");
-    }
-    const features = tf.tensor3d(sequences, [
-      sequences.length,
-      this.timesteps,
-      61,
-    ]);
-    const featuresNormalized = features
-      .sub(tf.tensor1d(means))
-      .div(tf.tensor1d(stds));
-    const logits = model.predict(featuresNormalized) as tf.Tensor2D;
-    console.log(`Batch Raw Logits: ${logits.dataSync()}`);
-    const scaledLogits = logits.mul(tf.scalar(2));
-    const buyLogits = scaledLogits.slice([0, 1], [-1, 1]).sigmoid();
-    const sellLogits = scaledLogits.slice([0, 0], [-1, 1]).sigmoid();
-    const buyProbs = buyLogits.arraySync() as number[];
-    const sellProbs = sellLogits.arraySync() as number[];
-    const result = buyProbs.map((buy, i) => {
-      let buyProb = Math.min(buy, 0.9);
-      let sellProb = Math.min(sellProbs[i], 0.9);
-      const total = buyProb + sellProb;
-      if (!isFinite(total) || total <= 0) {
-        console.warn(
-          `Invalid total at index ${i}: buy=${buyProb}, sell=${sellProb}, total=${total}. Using fallback.`
-        );
-        buyProb = 0.5;
-        sellProb = 0.5;
-      } else {
-        buyProb /= total;
-        sellProb /= total;
-      }
-      return [sellProb, buyProb];
-    });
-    console.log(
-      `Batch Pre-Adjusted Probs: ${result
-        .map(([s, b]) => `Sell=${s.toFixed(3)}, Buy=${b.toFixed(3)}`)
-        .join(", ")}`
-    );
-    features.dispose();
-    featuresNormalized.dispose();
-    logits.dispose();
-    scaledLogits.dispose();
-    buyLogits.dispose();
-    sellLogits.dispose();
-    return result;
-  }
-
-  private calculateSharpeRatio(returns: number[]): number {
-    const meanReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
-    const stdDev =
-      Math.sqrt(
-        returns.reduce((a, b) => a + Math.pow(b - meanReturn, 2), 0) /
-          (returns.length - 1)
-      ) || 1;
-    return (meanReturn / stdDev) * Math.sqrt(365);
-  }
-
-  private calculateMaxDrawdown(portfolioValues: number[]): number {
-    let maxDD = 0;
-    let peak = portfolioValues[0];
-    for (const value of portfolioValues) {
-      if (value > peak) peak = value;
-      const dd = (peak - value) / peak;
-      if (dd > maxDD) maxDD = dd;
-    }
-    return maxDD * 100;
-  }
-
-  public async run(): Promise<BacktestResult> {
-    console.log("Starting backtest...");
-
-    const { adaPrices, adaVolumes, btcPrices, btcVolumes } =
-      await this.fetchHistoricalData();
-    console.log(
-      `ADA data points: ${adaPrices.length}, BTC data points: ${btcPrices.length}`
-    );
-
-    const startIndex = Math.max(0, adaPrices.length - this.startDaysAgo);
-    const endIndex = Math.max(0, adaPrices.length - this.endDaysAgo);
-    const backtestStart = this.timesteps + 4;
-    const backtestEnd = endIndex - 5;
-
-    const predictions = await this.batchPredict(
-      adaPrices,
-      adaVolumes,
-      btcPrices,
-      btcVolumes,
-      backtestStart,
-      backtestEnd
-    );
-
-    let usdBalance = this.INITIAL_USD;
-    let adaBalance = 0;
-    let avgBuyPrice = 0;
-    let peakPrice = 0;
-    let cooldown = 0;
-    let weeklyTradeCount = 0;
-    let lastTradeDay = 0;
-    let lastTradeProfit = 0;
-    let isFirstTrade = true;
-
+    let capital = this.initialCapital;
+    let adaHoldings = 0;
     const trades: Trade[] = [];
     const portfolioHistory: { timestamp: string; value: number }[] = [];
-    const dailyReturns: number[] = [];
-    let wins = 0;
-    let completedCycles = 0;
+    const returns: number[] = [];
+    let consecutiveBuys = 0;
+    let lastBuyPrice: number | undefined;
+    let peakPrice: number | undefined;
+    let buyTimestamp: string | undefined;
 
-    let predIndex = 0;
-    for (let i = backtestStart; i < backtestEnd; i += this.stepDays) {
-      const currentAdaPrice = adaPrices[i];
+    console.log(`Starting Capital: $${capital.toFixed(2)}`);
+
+    for (let i = this.predictor["timesteps"]; i < adaData.prices.length; i++) {
       const timestamp = new Date(
-        Date.now() - (adaPrices.length - startIndex - i) * 24 * 60 * 60 * 1000
+        startDate.getTime() + i * 24 * 60 * 60 * 1000
       ).toISOString();
-      let [sellProbRaw, buyProbRaw] = predictions[predIndex++];
+      const adaSlice = adaData.prices.slice(0, i + 1);
+      const adaVolSlice = adaData.volumes.slice(0, i + 1);
+      const btcSlice = btcData.prices.slice(0, i + 1);
+      const btcVolSlice = btcData.volumes.slice(0, i + 1);
+      const currentPrice = adaSlice[adaSlice.length - 1];
 
-      const sma7 =
-        adaPrices.slice(Math.max(0, i - 6), i + 1).reduce((a, b) => a + b, 0) /
-        7;
-      const sma50 =
-        adaPrices.slice(Math.max(0, i - 49), i + 1).reduce((a, b) => a + b, 0) /
-        50;
-      const rsi = this.calculateRSI(
-        adaPrices.slice(Math.max(0, i - 14), i + 1)
+      const portfolioValue = capital + adaHoldings * currentPrice;
+      portfolioHistory.push({ timestamp, value: portfolioValue });
+
+      const { buyProb, sellProb, confidence } = await this.predictor.predict(
+        adaSlice,
+        adaVolSlice,
+        btcSlice,
+        btcVolSlice
       );
-      const momentum =
-        i > 0 ? (currentAdaPrice - adaPrices[i - 1]) / adaPrices[i - 1] : 0;
-      const isUptrend = sma7 > sma50;
+      const atr = this.predictor["calculateATR"](
+        adaSlice.slice(-this.predictor["timesteps"]).map((p) => [p])
+      );
 
-      if (!isUptrend && (rsi >= 35 || momentum <= 0.05)) buyProbRaw = 0;
-      if (rsi > 75 || (sma7 < sma50 && momentum < 0)) sellProbRaw = 0.9;
-
-      const buyProb = Math.min(Math.max(buyProbRaw, 0), 0.9);
-      const sellProb = Math.min(Math.max(sellProbRaw, 0), 0.9);
-
-      const atr =
-        adaPrices
-          .slice(Math.max(0, i - 14), i + 1)
-          .reduce(
-            (a, b, idx, arr) => a + (idx > 0 ? Math.abs(b - arr[idx - 1]) : 0),
-            0
-          ) / 14;
-      const confidenceThreshold = 0.45 + atr * 2; // Dynamic threshold
-      const confidence = Math.max(buyProb, sellProb);
-      const portfolioValue = usdBalance + adaBalance * currentAdaPrice;
-      const unrealizedProfit =
-        adaBalance > 0 ? (currentAdaPrice - avgBuyPrice) / avgBuyPrice : 0;
-      const trailingStopPrice =
-        adaBalance > 0 ? peakPrice * (1 - (3.0 * atr) / currentAdaPrice) : 0;
-      const trailingStopTriggered =
-        adaBalance > 0 && currentAdaPrice <= trailingStopPrice;
-
-      const weekNumber = Math.floor((i - backtestStart) / 7);
-      if (weekNumber !== Math.floor((lastTradeDay - backtestStart) / 7))
-        weeklyTradeCount = 0;
-
-      let buyCondition =
-        buyProb > confidenceThreshold &&
-        usdBalance > this.CASH_RESERVE + this.MIN_TRADE_USD &&
-        cooldown === 0 &&
-        weeklyTradeCount < this.MAX_TRADES_PER_WEEK &&
-        (lastTradeProfit <= 0 ||
-          lastTradeProfit / (adaBalance * avgBuyPrice) >=
-            this.MIN_PROFIT_FILTER);
-      const sellCondition =
-        (sellProb > confidenceThreshold && adaBalance > 0) ||
-        (adaBalance > 0 &&
-          (unrealizedProfit <= this.STOP_LOSS_THRESHOLD ||
-            unrealizedProfit >= this.TAKE_PROFIT_THRESHOLD ||
-            trailingStopTriggered));
-
-      if (isFirstTrade && i === backtestStart) {
-        buyCondition = true;
-        isFirstTrade = false;
+      if (adaHoldings > 0) {
+        peakPrice = Math.max(peakPrice || lastBuyPrice!, currentPrice);
       }
 
-      console.log(
-        `Day ${i - (this.timesteps + 3)}: Price ${currentAdaPrice.toFixed(
-          4
-        )}, Buy Prob: ${buyProb.toFixed(3)}, Sell Prob: ${sellProb.toFixed(
-          3
-        )}, Confidence: ${confidence.toFixed(3)}, ATR: ${atr.toFixed(
-          4
-        )}, RSI: ${rsi.toFixed(2)}, Momentum: ${momentum.toFixed(
-          4
-        )}, Weekly Trades: ${weeklyTradeCount}, Trend: ${
-          sma7 > sma50 ? "Up" : "Down"
-        }`
-      );
-      if (adaBalance > 0) {
-        console.log(`Unrealized Profit: ${unrealizedProfit.toFixed(4)}`);
-      }
+      if (adaHoldings > 0 && lastBuyPrice && peakPrice && buyTimestamp) {
+        const priceChange = (currentPrice - lastBuyPrice) / lastBuyPrice;
+        const stopLossLevel =
+          this.stopLossMultiplier * atr * (confidence / 0.75);
+        const trailingStopLevel = peakPrice * (1 - this.trailingStop);
 
-      if (buyCondition) {
-        const atrFactor = Math.min(1, 1.5 / atr);
-        const positionSize = Math.min(0.25, confidence * atrFactor); // Kelly-like sizing
-        const usdToSpend = isFirstTrade
-          ? usdBalance * 0.05 * (1 - this.TRANSACTION_FEE)
-          : Math.max(
-              this.MIN_TRADE_USD,
-              usdBalance * positionSize * (1 - this.TRANSACTION_FEE)
-            );
-        if (usdBalance - usdToSpend < this.CASH_RESERVE) continue;
-        const adaBought = usdToSpend / currentAdaPrice;
-        adaBalance += adaBought;
-        avgBuyPrice =
-          adaBalance > 0
-            ? (avgBuyPrice * (adaBalance - adaBought) +
-                currentAdaPrice * adaBought) /
-              adaBalance
-            : currentAdaPrice;
-        usdBalance -= usdToSpend / (1 - this.TRANSACTION_FEE);
-        peakPrice = currentAdaPrice;
-        trades.push({
-          type: "buy",
-          price: currentAdaPrice,
-          timestamp,
-          adaAmount: adaBought,
-          usdValue: usdToSpend,
-        });
-        weeklyTradeCount++;
-        lastTradeDay = i;
-        console.log(
-          `Buy at $${currentAdaPrice.toFixed(4)}, ADA: ${adaBought.toFixed(
-            2
-          )}, USD: ${usdToSpend.toFixed(2)}, Condition: ${
-            isFirstTrade ? "Initial Buy" : `Confidence=${confidence.toFixed(3)}`
-          }`
-        );
-      } else if (sellCondition) {
-        const adaToSell = adaBalance;
-        const usdReceived =
-          adaToSell * currentAdaPrice * (1 - this.TRANSACTION_FEE);
-        usdBalance += usdReceived;
-        adaBalance -= adaToSell;
-        lastTradeProfit = usdReceived - adaToSell * avgBuyPrice;
-        trades.push({
-          type: "sell",
-          price: currentAdaPrice,
-          timestamp,
-          adaAmount: adaToSell,
-          usdValue: usdReceived,
-          buyPrice: avgBuyPrice,
-        });
-        console.log(
-          `Sell at $${currentAdaPrice.toFixed(4)}, ADA: ${adaToSell.toFixed(
-            2
-          )}, USD: ${usdReceived.toFixed(
-            2
-          )}, Unrealized Profit: ${unrealizedProfit.toFixed(4)}, Condition: ${
-            sellProb > confidenceThreshold
-              ? "Sell Prob"
-              : trailingStopTriggered
-              ? "Trailing Stop"
-              : "Threshold"
-          }`
-        );
-        if (usdReceived > adaToSell * avgBuyPrice) wins++;
-        if (adaBalance === 0) {
-          completedCycles++;
-          avgBuyPrice = 0;
-          peakPrice = 0;
-          cooldown = lastTradeProfit < 0 ? this.COOLDOWN_AFTER_LOSS : 1;
-          weeklyTradeCount++;
-          lastTradeDay = i;
+        if (
+          priceChange <= -stopLossLevel ||
+          currentPrice <= trailingStopLevel
+        ) {
+          const effectivePrice = currentPrice * (1 - this.slippage);
+          const usdReceived = adaHoldings * effectivePrice - this.commission;
+          capital += usdReceived;
+          const profitLoss = usdReceived - adaHoldings * lastBuyPrice;
+          trades.push({
+            type: Recommendation.Sell,
+            price: effectivePrice,
+            timestamp,
+            adaAmount: adaHoldings,
+            usdValue: usdReceived,
+            buyPrice: lastBuyPrice,
+          });
+          console.log(
+            `Sell Triggered: Price: $${effectivePrice.toFixed(
+              4
+            )}, P/L: $${profitLoss.toFixed(2)}, Buy Signal: ${buyProb.toFixed(
+              2
+            )}, Sell Signal: ${sellProb.toFixed(
+              2
+            )}, Confidence: ${confidence.toFixed(2)}`
+          );
+          adaHoldings = 0;
+          consecutiveBuys = 0;
+          lastBuyPrice = undefined;
+          peakPrice = undefined;
+          buyTimestamp = undefined;
         }
       }
 
-      portfolioHistory.push({ timestamp, value: portfolioValue });
-      dailyReturns.push(
-        portfolioHistory.length > 1
-          ? (portfolioValue -
-              portfolioHistory[portfolioHistory.length - 2].value) /
-              portfolioHistory[portfolioHistory.length - 2].value
-          : 0
-      );
-      if (cooldown > 0) cooldown--;
-      if (adaBalance > 0 && currentAdaPrice > peakPrice)
-        peakPrice = currentAdaPrice;
+      if (
+        buyProb >= this.buyThreshold &&
+        confidence >= this.minConfidence &&
+        capital > 0 &&
+        consecutiveBuys < 2
+      ) {
+        const positionSize = this.basePositionSize * (buyProb / 0.75);
+        const tradeAmount = Math.min(capital * positionSize, capital);
+        const effectivePrice = currentPrice * (1 + this.slippage);
+        const adaBought = (tradeAmount - this.commission) / effectivePrice;
+        capital -= tradeAmount;
+        adaHoldings += adaBought;
+        lastBuyPrice = effectivePrice;
+        peakPrice = effectivePrice;
+        consecutiveBuys++;
+        buyTimestamp = timestamp;
+
+        trades.push({
+          type: Recommendation.Buy,
+          price: effectivePrice,
+          timestamp,
+          adaAmount: adaBought,
+          usdValue: tradeAmount,
+        });
+        console.log(
+          `Buy Executed: Price: $${effectivePrice.toFixed(
+            4
+          )}, Amount: ${adaBought.toFixed(
+            2
+          )} ADA, Buy Signal: ${buyProb.toFixed(
+            2
+          )}, Confidence: ${confidence.toFixed(2)}`
+        );
+      } else if (
+        sellProb >= this.sellThreshold &&
+        confidence >= this.minConfidence &&
+        adaHoldings > 0 &&
+        buyTimestamp &&
+        (new Date(timestamp).getTime() - new Date(buyTimestamp).getTime()) /
+          (1000 * 60 * 60 * 24) >=
+          this.minHoldDays
+      ) {
+        const effectivePrice = currentPrice * (1 - this.slippage);
+        const usdReceived = adaHoldings * effectivePrice - this.commission;
+        capital += usdReceived;
+        const profitLoss = usdReceived - adaHoldings * lastBuyPrice!;
+        trades.push({
+          type: Recommendation.Sell,
+          price: effectivePrice,
+          timestamp,
+          adaAmount: adaHoldings,
+          usdValue: usdReceived,
+          buyPrice: lastBuyPrice,
+        });
+        console.log(
+          `Sell Triggered: Price: $${effectivePrice.toFixed(
+            4
+          )}, P/L: $${profitLoss.toFixed(2)}, Buy Signal: ${buyProb.toFixed(
+            2
+          )}, Sell Signal: ${sellProb.toFixed(
+            2
+          )}, Confidence: ${confidence.toFixed(2)}`
+        );
+        adaHoldings = 0;
+        consecutiveBuys = 0;
+        lastBuyPrice = undefined;
+        peakPrice = undefined;
+        buyTimestamp = undefined;
+      }
+
+      if (i > this.predictor["timesteps"]) {
+        const prevValue = portfolioHistory[portfolioHistory.length - 2].value;
+        returns.push((portfolioValue - prevValue) / prevValue);
+      }
     }
 
-    const finalValue = usdBalance + adaBalance * adaPrices[backtestEnd - 6];
+    const finalValue =
+      capital + adaHoldings * adaData.prices[adaData.prices.length - 1];
+    console.log(`Ending Capital: $${finalValue.toFixed(2)}`);
     const totalReturn =
-      ((finalValue - this.INITIAL_USD) / this.INITIAL_USD) * 100;
+      (finalValue - this.initialCapital) / this.initialCapital;
     const totalTrades = trades.length;
-    const winRate = completedCycles > 0 ? (wins / completedCycles) * 100 : 0;
-    const sharpeRatio = this.calculateSharpeRatio(dailyReturns);
-    const maxDrawdown = this.calculateMaxDrawdown(
-      portfolioHistory.map((h) => h.value)
-    );
+    const wins = trades.filter(
+      (t) => t.type === Recommendation.Sell && t.price > (t.buyPrice || 0)
+    ).length;
+    const winRate = totalTrades > 0 ? wins / (totalTrades / 2) : 0;
 
-    console.log(`Backtest completed:
-      Initial USD: $${this.INITIAL_USD}
-      Final Value: $${finalValue.toFixed(2)}
-      Total Return: ${totalReturn.toFixed(2)}%
-      Total Trades: ${totalTrades}
-      Win Rate: ${winRate.toFixed(2)}%
-      Sharpe Ratio: ${sharpeRatio.toFixed(2)}
-      Max Drawdown: ${maxDrawdown.toFixed(2)}%`);
+    const sharpeRatio = this.calculateSharpeRatio(returns);
+    const maxDrawdown = this.calculateMaxDrawdown(portfolioHistory);
+
+    const avgTradeDuration =
+      trades.length > 1
+        ? trades
+            .filter((t) => t.type === Recommendation.Sell)
+            .reduce((sum, sellTrade, idx) => {
+              const buyTrade = trades[idx * 2];
+              return (
+                sum +
+                (new Date(sellTrade.timestamp).getTime() -
+                  new Date(buyTrade.timestamp).getTime()) /
+                  (1000 * 60 * 60 * 24)
+              );
+            }, 0) /
+          (totalTrades / 2)
+        : 0;
+    console.log(`Average Trade Duration: ${avgTradeDuration.toFixed(2)} days`);
 
     return {
       totalReturn,
@@ -402,35 +257,30 @@ export class TradeModelBacktester {
     };
   }
 
-  private calculateRSI(prices: number[]): number {
-    if (prices.length < 14) return 50;
-    let gains = 0,
-      losses = 0;
-    for (let i = 1; i < prices.length; i++) {
-      const diff = prices[i] - prices[i - 1];
-      if (diff > 0) gains += diff;
-      else losses -= diff;
-    }
-    const avgGain = gains / 14;
-    const avgLoss = losses / 14;
-    const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-    return 100 - 100 / (1 + rs);
+  private calculateSharpeRatio(returns: number[]): number {
+    if (returns.length === 0) return 0;
+    const returnsTensor = tf.tensor1d(returns);
+    const mean = tf.mean(returnsTensor).dataSync()[0];
+    const meanTensor = tf.scalar(mean);
+    const squaredDiffs = tf.square(returnsTensor.sub(meanTensor));
+    const variance = tf.mean(squaredDiffs).dataSync()[0];
+    const std = Math.sqrt(variance);
+    returnsTensor.dispose();
+    meanTensor.dispose();
+    squaredDiffs.dispose();
+    return std === 0 ? 0 : (mean / std) * Math.sqrt(252);
   }
 
-  public static async runWithTimeout(
-    startDaysAgo?: number,
-    endDaysAgo?: number,
-    stepDays?: number
-  ): Promise<BacktestResult> {
-    const backtester = new TradeModelBacktester(
-      startDaysAgo,
-      endDaysAgo,
-      stepDays
-    );
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        backtester.run().then(resolve).catch(reject);
-      }, 5000);
-    });
+  private calculateMaxDrawdown(
+    history: { timestamp: string; value: number }[]
+  ): number {
+    let maxPeak = -Infinity;
+    let maxDrawdown = 0;
+    for (const { value } of history) {
+      maxPeak = Math.max(maxPeak, value);
+      const drawdown = (maxPeak - value) / maxPeak;
+      maxDrawdown = Math.max(maxDrawdown, drawdown);
+    }
+    return maxDrawdown;
   }
 }

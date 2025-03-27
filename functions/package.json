@@ -10,8 +10,8 @@
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
     "test": "npx ts-node src/test.ts",
-    "train": "npx ts-node src/scripts/trainTradeModel.ts",
-    "backtest": "npx ts-node src/scripts/backtestTradeModel.ts",
+    "train": "npx ts-node src/scripts/train.ts",
+    "backtest": "npx ts-node src/scripts/backtest.ts",
     "train:full": "npm run train && npm run backtest"
   },
   "engines": {

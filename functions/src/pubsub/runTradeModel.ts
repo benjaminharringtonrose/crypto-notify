@@ -10,31 +10,63 @@ import {
 } from "../types";
 import { sendSMS, formatAnalysisResults } from "../utils";
 import { getFirestore } from "firebase-admin/firestore";
-import TradePredictor from "../cardano/TradeModelPredictor";
+import { TradeModelPredictor } from "../cardano/TradeModelPredictor"; // Updated import
+import { getHistoricalData } from "../api/getHistoricalData"; // Add this import
 
 dotenv.config();
 
 /**
- * Scheduled function that runs a trading model for Cardano cryptocurrency every minute.
+ * Scheduled function that runs a trading model for Cardano cryptocurrency every 5 minutes.
  * Analyzes trading conditions, generates recommendations, and sends SMS notifications
  * when trading conditions change or probabilities increase.
  */
-
 export const runTradeModel = onSchedule(RUN_TRADE_MODEL_CONFIG, async () => {
   try {
-    const predictor = new TradePredictor();
+    const predictor = new TradeModelPredictor();
 
-    const { currentPrice, probabilities, recommendation, metConditions } =
-      await predictor.predict();
+    // Fetch historical data for the last 31 days (timesteps + 1 for current price)
+    const days = 31;
+    const adaData = await getHistoricalData("ADA", days);
+    const btcData = await getHistoricalData("BTC", days);
+
+    if (adaData.prices.length < 30 || btcData.prices.length < 30) {
+      throw new Error("Insufficient historical data for prediction");
+    }
+
+    // Predict using the new method
+    const { buyProb, sellProb, confidence } = await predictor.predict(
+      adaData.prices,
+      adaData.volumes,
+      btcData.prices,
+      btcData.volumes
+    );
+
+    // Map to previous format
+    const currentPrice = adaData.prices[adaData.prices.length - 1];
+    const probabilities = {
+      buy: buyProb,
+      sell: sellProb,
+      hold: 1 - Math.max(buyProb, sellProb), // Simple heuristic for hold probability
+    };
+
+    // Determine recommendation based on thresholds
+    const buyThreshold = 0.85; // Match V3 backtester
+    const sellThreshold = 0.75; // Match V3 backtester
+    let recommendation: Recommendation;
+    if (buyProb >= buyThreshold && confidence >= 0.8) {
+      recommendation = Recommendation.Buy;
+    } else if (sellProb >= sellThreshold && confidence >= 0.8) {
+      recommendation = Recommendation.Sell;
+    } else {
+      recommendation = Recommendation.Hold; // Default to Hold if no strong signal
+    }
 
     const db = getFirestore();
-
     const recommendationRef = db
       .collection(Collections.TradeRecommendations)
       .doc(Docs.Cardano);
 
     const previousDoc = await recommendationRef.get();
-
     const previous = (previousDoc.exists ? previousDoc.data() : undefined) as
       | TradeRecommendation
       | undefined;
@@ -44,7 +76,7 @@ export const runTradeModel = onSchedule(RUN_TRADE_MODEL_CONFIG, async () => {
       currentPrice,
       probabilities,
       recommendation,
-      metConditions,
+      metConditions: [],
     });
 
     console.log(analysisResults);
@@ -70,7 +102,6 @@ export const runTradeModel = onSchedule(RUN_TRADE_MODEL_CONFIG, async () => {
           });
           return;
         case Recommendation.Hold:
-        case Recommendation.HoldBasedOnBuyPrice:
           await recommendationRef.set({
             recommendation,
             probability: probabilities.hold,
@@ -101,7 +132,6 @@ export const runTradeModel = onSchedule(RUN_TRADE_MODEL_CONFIG, async () => {
           });
           return;
         case Recommendation.Hold:
-        case Recommendation.HoldBasedOnBuyPrice:
           return;
         default:
           console.log("Recommendation unexpected");
@@ -137,7 +167,6 @@ export const runTradeModel = onSchedule(RUN_TRADE_MODEL_CONFIG, async () => {
           }
           return;
         case Recommendation.Hold:
-        case Recommendation.HoldBasedOnBuyPrice:
           return;
         default:
           console.log("Recommendation unexpected");

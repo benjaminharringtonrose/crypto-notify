@@ -145,7 +145,6 @@ export enum Recommendation {
   Buy = "BUY",
   Hold = "HOLD",
   Sell = "SELL",
-  HoldBasedOnBuyPrice = "HOLD_BASED_ON_BUY_PRICE",
 }
 
 export enum CryptoIds {

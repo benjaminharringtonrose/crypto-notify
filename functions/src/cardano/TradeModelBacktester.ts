@@ -28,12 +28,12 @@ export class TradeModelBacktester {
     commission: number = 0.1,
     stopLossMultiplier: number = 4.0,
     trailingStop: number = 0.08,
-    minHoldDays: number = 4, // Adjusted to 4
-    minConfidence: number = 0.6, // Increased to 0.6
-    profitTakeMultiplier: number = 3.0,
+    minHoldDays: number = 4,
+    minConfidence: number = 0.58, // Reduced to 0.58
+    profitTakeMultiplier: number = 3.5, // Increased to 3.5
     logitThreshold: number = 0.1,
-    buyProbThreshold: number = 0.55, // Increased to 0.55
-    sellProbThreshold: number = 0.35 // Reduced to 0.35
+    buyProbThreshold: number = 0.52, // Reduced to 0.52
+    sellProbThreshold: number = 0.33 // Reduced to 0.33
   ) {
     this.predictor = new TradeModelPredictor();
     this.initialCapital = initialCapital;
@@ -106,13 +106,20 @@ export class TradeModelBacktester {
       const portfolioValue = capital + adaHoldings * currentPrice;
       portfolioHistory.push({ timestamp, value: portfolioValue });
 
-      const { buyLogit, sellLogit, buyProb, sellProb, confidence, momentum } =
-        await this.predictor.predict(
-          adaSlice,
-          adaVolSlice,
-          btcSlice,
-          btcVolSlice
-        );
+      const {
+        buyLogit,
+        sellLogit,
+        buyProb,
+        sellProb,
+        confidence,
+        momentum,
+        trendSlope,
+      } = await this.predictor.predict(
+        adaSlice,
+        adaVolSlice,
+        btcSlice,
+        btcVolSlice
+      );
       const atr = this.calculateATR(
         adaSlice.slice(-this.predictor["timesteps"])
       );
@@ -120,8 +127,10 @@ export class TradeModelBacktester {
         atr > 0.02 ? this.stopLossMultiplier * 0.8 : this.stopLossMultiplier;
       const dynamicTrailingStop =
         atr > 0.02 ? this.trailingStop * 1.2 : this.trailingStop;
-      const dynamicProfitTake =
-        this.profitTakeMultiplier * (momentum > 0.1 ? 1.2 : 1.0); // Trend-adjusted
+      const dynamicProfitTake = Math.min(
+        this.profitTakeMultiplier * (momentum > 0.1 ? 1.2 : 1.0),
+        4.0
+      ); // Capped at 4.0
 
       console.log(
         `Logit check: BuyLogit=${buyLogit.toFixed(
@@ -151,7 +160,7 @@ export class TradeModelBacktester {
           if (
             (sellLogit > buyLogit + this.logitThreshold &&
               sellProb > this.sellProbThreshold) ||
-            (momentum < -0.03 && sellProb > 0.3) // Tightened momentum trigger
+            (momentum < -0.05 && sellProb > 0.3 && trendSlope < 0) // Relaxed momentum, added trend check
           ) {
             const effectivePrice = currentPrice * (1 - this.slippage);
             const usdReceived = adaHoldings * effectivePrice - this.commission;
@@ -167,11 +176,13 @@ export class TradeModelBacktester {
             });
             console.log(
               `Sell Triggered (${
-                momentum < -0.03 ? "Momentum" : "Signal"
+                momentum < -0.05 ? "Momentum" : "Signal"
               }): Price: $${effectivePrice.toFixed(
                 4
               )}, P/L: $${profitLoss.toFixed(2)}, ` +
-                `Confidence: ${confidence.toFixed(2)}, ATR: ${atr.toFixed(4)}`
+                `Confidence: ${confidence.toFixed(2)}, ATR: ${atr.toFixed(
+                  4
+                )}, Trend Slope: ${trendSlope.toFixed(4)}`
             );
             if (profitLoss > 0) winStreak++, (lossStreak = 0);
             else lossStreak++, (winStreak = 0);
@@ -212,7 +223,10 @@ export class TradeModelBacktester {
                   2
                 )}, Confidence: ${confidence.toFixed(2)}, ATR: ${atr.toFixed(
                   4
-                )}`
+                )}, ` +
+                `Profit Take Multiplier: ${dynamicProfitTake.toFixed(
+                  2
+                )}, Trend Slope: ${trendSlope.toFixed(4)}`
             );
             if (profitLoss > 0) winStreak++, (lossStreak = 0);
             else lossStreak++, (winStreak = 0);
@@ -234,12 +248,15 @@ export class TradeModelBacktester {
         const volatilityAdjustedSize = Math.min(
           this.basePositionSize / (atr > 0 ? atr : 0.01),
           0.15
-        ); // Increased cap to 15%
+        );
+        const trendAdjustedSize =
+          trendSlope > 0.01
+            ? volatilityAdjustedSize * 1.2
+            : volatilityAdjustedSize; // Boost in uptrends
         const positionSize = Math.min(
-          volatilityAdjustedSize *
-            Math.min(buyProb / this.buyProbThreshold, 2.0),
+          trendAdjustedSize * Math.min(buyProb / this.buyProbThreshold, 2.0),
           0.15
-        ); // Increased scaling
+        );
         const tradeAmount = Math.min(capital * positionSize, capital);
         const effectivePrice = currentPrice * (1 + this.slippage);
         const adaBought = (tradeAmount - this.commission) / effectivePrice;
@@ -265,7 +282,7 @@ export class TradeModelBacktester {
           )} ADA, Confidence: ${confidence.toFixed(2)}, ` +
             `Position Size: ${(positionSize * 100).toFixed(
               1
-            )}%, ATR: ${atr.toFixed(4)}`
+            )}%, ATR: ${atr.toFixed(4)}, Trend Slope: ${trendSlope.toFixed(4)}`
         );
       } else if (buyProb > 0.5 && confidence < this.minConfidence) {
         console.log(

@@ -12,39 +12,42 @@ export class TradeModelBacktester {
   private basePositionSize: number;
   private slippage: number;
   private commission: number;
-  private buyThreshold: number;
-  private sellThreshold: number;
   private stopLossMultiplier: number;
   private trailingStop: number;
   private minHoldDays: number;
   private minConfidence: number;
   private profitTakeMultiplier: number;
+  private logitThreshold: number;
+  private buyProbThreshold: number;
+  private sellProbThreshold: number;
 
   constructor(
     initialCapital: number = 10000,
     basePositionSize: number = 0.05,
     slippage: number = 0.001,
     commission: number = 0.1,
-    buyThreshold: number = 0.7, // Lowered from 0.85
-    sellThreshold: number = 0.65, // Lowered from 0.75
-    stopLossMultiplier: number = 2.0,
-    trailingStop: number = 0.05,
-    minHoldDays: number = 2,
-    minConfidence: number = 0.7, // Lowered from 0.8
-    profitTakeMultiplier: number = 3.0
+    stopLossMultiplier: number = 5.0, // Increased from 4.0
+    trailingStop: number = 0.1, // Increased from 0.07
+    minHoldDays: number = 5,
+    minConfidence: number = 0.5,
+    profitTakeMultiplier: number = 3.0,
+    logitThreshold: number = 0.1, // Lowered from 0.2
+    buyProbThreshold: number = 0.5, // New
+    sellProbThreshold: number = 0.6 // New
   ) {
     this.predictor = new TradeModelPredictor();
     this.initialCapital = initialCapital;
     this.basePositionSize = basePositionSize;
     this.slippage = slippage;
     this.commission = commission;
-    this.buyThreshold = buyThreshold;
-    this.sellThreshold = sellThreshold;
     this.stopLossMultiplier = stopLossMultiplier;
     this.trailingStop = trailingStop;
     this.minHoldDays = minHoldDays;
     this.minConfidence = minConfidence;
     this.profitTakeMultiplier = profitTakeMultiplier;
+    this.logitThreshold = logitThreshold;
+    this.buyProbThreshold = buyProbThreshold;
+    this.sellProbThreshold = sellProbThreshold;
   }
 
   private calculateATR(prices: number[], period: number = 14): number {
@@ -104,23 +107,26 @@ export class TradeModelBacktester {
       const portfolioValue = capital + adaHoldings * currentPrice;
       portfolioHistory.push({ timestamp, value: portfolioValue });
 
-      const { buyProb, sellProb, confidence } = await this.predictor.predict(
-        adaSlice,
-        adaVolSlice,
-        btcSlice,
-        btcVolSlice
-      );
+      const { buyLogit, sellLogit, buyProb, sellProb, confidence } =
+        await this.predictor.predict(
+          adaSlice,
+          adaVolSlice,
+          btcSlice,
+          btcVolSlice
+        );
       const atr = this.calculateATR(
         adaSlice.slice(-this.predictor["timesteps"])
       );
 
-      // Log threshold comparison
       console.log(
-        `Threshold check: BuyProb=${buyProb.toFixed(4)} vs ${
-          this.buyThreshold
-        }, SellProb=${sellProb.toFixed(4)} vs ${
-          this.sellThreshold
-        }, Confidence=${confidence.toFixed(4)} vs ${this.minConfidence}`
+        `Logit check: BuyLogit=${buyLogit.toFixed(
+          4
+        )}, SellLogit=${sellLogit.toFixed(4)}, Diff=${(
+          buyLogit - sellLogit
+        ).toFixed(4)} vs ${this.logitThreshold}, ` +
+          `BuyProb=${buyProb.toFixed(4)} vs ${
+            this.buyProbThreshold
+          }, SellProb=${sellProb.toFixed(4)} vs ${this.sellProbThreshold}`
       );
 
       if (adaHoldings > 0) {
@@ -128,12 +134,18 @@ export class TradeModelBacktester {
       }
 
       if (adaHoldings > 0 && lastBuyPrice && peakPrice && buyTimestamp) {
+        const daysHeld =
+          (new Date(timestamp).getTime() - new Date(buyTimestamp).getTime()) /
+          (1000 * 60 * 60 * 24);
         const priceChange = (currentPrice - lastBuyPrice) / lastBuyPrice;
         const stopLossLevel = this.stopLossMultiplier * atr;
         const profitTakeLevel = lastBuyPrice + this.profitTakeMultiplier * atr;
         const trailingStopLevel = peakPrice * (1 - this.trailingStop);
 
         if (
+          (daysHeld >= this.minHoldDays &&
+            sellLogit > buyLogit + this.logitThreshold &&
+            sellProb > this.sellProbThreshold) || // Signal-based sell priority
           priceChange <= -stopLossLevel ||
           currentPrice <= trailingStopLevel ||
           currentPrice >= profitTakeLevel
@@ -152,7 +164,10 @@ export class TradeModelBacktester {
           });
           console.log(
             `Sell Triggered (${
-              priceChange <= -stopLossLevel
+              sellLogit > buyLogit + this.logitThreshold &&
+              sellProb > this.sellProbThreshold
+                ? "Signal"
+                : priceChange <= -stopLossLevel
                 ? "Stop"
                 : currentPrice >= profitTakeLevel
                 ? "Profit"
@@ -180,13 +195,15 @@ export class TradeModelBacktester {
       }
 
       if (
-        buyProb >= this.buyThreshold &&
+        buyLogit > sellLogit + this.logitThreshold &&
+        buyProb > this.buyProbThreshold &&
         confidence >= this.minConfidence &&
         capital > 0 &&
-        consecutiveBuys < 2
+        consecutiveBuys < 1
       ) {
         const positionSize =
-          this.basePositionSize * Math.min(buyProb / this.buyThreshold, 1.5);
+          this.basePositionSize *
+          Math.min(buyProb / this.buyProbThreshold, 1.5);
         const tradeAmount = Math.min(capital * positionSize, capital);
         const effectivePrice = currentPrice * (1 + this.slippage);
         const adaBought = (tradeAmount - this.commission) / effectivePrice;
@@ -211,51 +228,6 @@ export class TradeModelBacktester {
             )} ADA, Confidence: ${confidence.toFixed(2)}, ` +
             `Position Size: ${(positionSize * 100).toFixed(1)}%`
         );
-      } else if (
-        sellProb >= this.sellThreshold &&
-        confidence >= this.minConfidence &&
-        adaHoldings > 0 &&
-        buyTimestamp &&
-        (new Date(timestamp).getTime() - new Date(buyTimestamp).getTime()) /
-          (1000 * 60 * 60 * 24) >=
-          this.minHoldDays
-      ) {
-        const effectivePrice = currentPrice * (1 - this.slippage);
-        const usdReceived = adaHoldings * effectivePrice - this.commission;
-        capital += usdReceived;
-        const profitLoss = usdReceived - adaHoldings * lastBuyPrice!;
-        trades.push({
-          type: Recommendation.Sell,
-          price: effectivePrice,
-          timestamp,
-          adaAmount: adaHoldings,
-          usdValue: usdReceived,
-          buyPrice: lastBuyPrice,
-        });
-        console.log(
-          `Sell Triggered (Signal): Price: $${effectivePrice.toFixed(4)}, ` +
-            `P/L: $${profitLoss.toFixed(2)}, Confidence: ${confidence.toFixed(
-              2
-            )}, ` +
-            `Holding Days: ${(
-              (new Date(timestamp).getTime() -
-                new Date(buyTimestamp).getTime()) /
-              (1000 * 60 * 60 * 24)
-            ).toFixed(1)}`
-        );
-        if (profitLoss > 0) {
-          winStreak++;
-          lossStreak = 0;
-        } else {
-          lossStreak++;
-          winStreak = 0;
-        }
-        console.log(`Win Streak: ${winStreak}, Loss Streak: ${lossStreak}`);
-        adaHoldings = 0;
-        consecutiveBuys = 0;
-        lastBuyPrice = undefined;
-        peakPrice = undefined;
-        buyTimestamp = undefined;
       }
 
       if (i > this.predictor["timesteps"]) {

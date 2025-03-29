@@ -10,7 +10,6 @@ export class TradeModelPredictor {
   private timesteps = 30;
   private model: tf.LayersModel;
   private isWeightsLoaded = false;
-  private temperature = 0.5; // Reduced for stronger signals
 
   constructor() {
     this.weightManager = new ModelWeightManager();
@@ -38,7 +37,13 @@ export class TradeModelPredictor {
     adaVolumes: number[],
     btcPrices: number[],
     btcVolumes: number[]
-  ): Promise<{ buyProb: number; sellProb: number; confidence: number }> {
+  ): Promise<{
+    buyLogit: number;
+    sellLogit: number;
+    buyProb: number;
+    sellProb: number;
+    confidence: number;
+  }> {
     if (!this.isWeightsLoaded) {
       console.log("Weights not yet loaded, awaiting load...");
       await this.loadWeightsAsync();
@@ -46,7 +51,6 @@ export class TradeModelPredictor {
 
     const startTime = performance.now();
 
-    // Log input data stats for debugging
     console.log(
       `Input stats - ADA Prices: min=${Math.min(...adaPrices).toFixed(
         4
@@ -79,42 +83,52 @@ export class TradeModelPredictor {
     const featuresNormalized = features.sub(means).div(stds.add(1e-6));
 
     const logits = this.model.predict(featuresNormalized) as tf.Tensor2D;
-    const scaledLogits = logits.div(tf.scalar(this.temperature));
-    const probs = scaledLogits.softmax();
-
+    const logitsArray = await logits.data();
+    const [rawSellLogit, rawBuyLogit] = [logitsArray[0], logitsArray[1]];
+    const sellLogit = rawSellLogit - 0.7; // Stronger sell reduction
+    const buyLogit = rawBuyLogit + 0.3; // Boost buy signal
+    const adjustedLogits = tf.tensor2d([[sellLogit, buyLogit]]);
+    const probs = adjustedLogits.softmax();
     const probArray = await probs.data();
     const [sellProb, buyProb] = [probArray[0], probArray[1]];
     const confidence = Math.max(buyProb, sellProb);
 
-    const moments = tf.moments(logits);
-    const variance = moments.variance.dataSync()[0];
+    const priceChange =
+      endIndex > startIndex
+        ? (adaPrices[endIndex] - adaPrices[startIndex]) / adaPrices[startIndex]
+        : 0;
 
     const endTime = performance.now();
     console.log(
       `Prediction executed in ${(endTime - startTime).toFixed(2)} ms`
     );
     console.log(
-      `Raw logits: [Sell: ${sellProb.toFixed(4)}, Buy: ${buyProb.toFixed(4)}]`
+      `Raw logits: [Sell: ${rawSellLogit.toFixed(
+        4
+      )}, Buy: ${rawBuyLogit.toFixed(4)}]`
     );
     console.log(
-      `Calibrated probs: [Sell: ${sellProb.toFixed(4)}, Buy: ${buyProb.toFixed(
+      `Adjusted logits: [Sell: ${sellLogit.toFixed(4)}, Buy: ${buyLogit.toFixed(
         4
       )}]`
     );
     console.log(
-      `Confidence: ${confidence.toFixed(4)}, Variance: ${variance.toFixed(4)}`
+      `Probs: [Sell: ${sellProb.toFixed(4)}, Buy: ${buyProb.toFixed(4)}]`
+    );
+    console.log(
+      `Confidence: ${confidence.toFixed(
+        4
+      )}, Price Change: ${priceChange.toFixed(4)}`
     );
 
     features.dispose();
     featuresNormalized.dispose();
     logits.dispose();
-    scaledLogits.dispose();
+    adjustedLogits.dispose();
     probs.dispose();
     means.dispose();
     stds.dispose();
-    moments.mean.dispose();
-    moments.variance.dispose();
 
-    return { buyProb, sellProb, confidence };
+    return { buyLogit, sellLogit, buyProb, sellProb, confidence };
   }
 }

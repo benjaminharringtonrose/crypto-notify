@@ -26,14 +26,14 @@ export class TradeModelBacktester {
     basePositionSize: number = 0.05,
     slippage: number = 0.001,
     commission: number = 0.1,
-    stopLossMultiplier: number = 5.0, // Increased from 4.0
-    trailingStop: number = 0.1, // Increased from 0.08
-    minHoldDays: number = 5,
-    minConfidence: number = 0.5,
+    stopLossMultiplier: number = 4.0,
+    trailingStop: number = 0.08,
+    minHoldDays: number = 4, // Adjusted to 4
+    minConfidence: number = 0.6, // Increased to 0.6
     profitTakeMultiplier: number = 3.0,
     logitThreshold: number = 0.1,
-    buyProbThreshold: number = 0.5,
-    sellProbThreshold: number = 0.45 // Lowered from 0.5
+    buyProbThreshold: number = 0.55, // Increased to 0.55
+    sellProbThreshold: number = 0.35 // Reduced to 0.35
   ) {
     this.predictor = new TradeModelPredictor();
     this.initialCapital = initialCapital;
@@ -69,7 +69,6 @@ export class TradeModelBacktester {
     const days = Math.ceil(
       (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
     );
-
     const adaData = await getHistoricalData(adaSymbol, days);
     const btcData = await getHistoricalData(btcSymbol, days);
 
@@ -107,7 +106,7 @@ export class TradeModelBacktester {
       const portfolioValue = capital + adaHoldings * currentPrice;
       portfolioHistory.push({ timestamp, value: portfolioValue });
 
-      const { buyLogit, sellLogit, buyProb, sellProb, confidence } =
+      const { buyLogit, sellLogit, buyProb, sellProb, confidence, momentum } =
         await this.predictor.predict(
           adaSlice,
           adaVolSlice,
@@ -119,6 +118,10 @@ export class TradeModelBacktester {
       );
       const dynamicStopLossMultiplier =
         atr > 0.02 ? this.stopLossMultiplier * 0.8 : this.stopLossMultiplier;
+      const dynamicTrailingStop =
+        atr > 0.02 ? this.trailingStop * 1.2 : this.trailingStop;
+      const dynamicProfitTake =
+        this.profitTakeMultiplier * (momentum > 0.1 ? 1.2 : 1.0); // Trend-adjusted
 
       console.log(
         `Logit check: BuyLogit=${buyLogit.toFixed(
@@ -141,13 +144,14 @@ export class TradeModelBacktester {
           (1000 * 60 * 60 * 24);
         const priceChange = (currentPrice - lastBuyPrice) / lastBuyPrice;
         const stopLossLevel = dynamicStopLossMultiplier * atr;
-        const profitTakeLevel = lastBuyPrice + this.profitTakeMultiplier * atr;
-        const trailingStopLevel = peakPrice * (1 - this.trailingStop);
+        const profitTakeLevel = lastBuyPrice + dynamicProfitTake * atr;
+        const trailingStopLevel = peakPrice * (1 - dynamicTrailingStop);
 
         if (daysHeld >= this.minHoldDays) {
           if (
-            sellLogit > buyLogit + this.logitThreshold &&
-            sellProb > this.sellProbThreshold
+            (sellLogit > buyLogit + this.logitThreshold &&
+              sellProb > this.sellProbThreshold) ||
+            (momentum < -0.03 && sellProb > 0.3) // Tightened momentum trigger
           ) {
             const effectivePrice = currentPrice * (1 - this.slippage);
             const usdReceived = adaHoldings * effectivePrice - this.commission;
@@ -162,7 +166,9 @@ export class TradeModelBacktester {
               buyPrice: lastBuyPrice,
             });
             console.log(
-              `Sell Triggered (Signal): Price: $${effectivePrice.toFixed(
+              `Sell Triggered (${
+                momentum < -0.03 ? "Momentum" : "Signal"
+              }): Price: $${effectivePrice.toFixed(
                 4
               )}, P/L: $${profitLoss.toFixed(2)}, ` +
                 `Confidence: ${confidence.toFixed(2)}, ATR: ${atr.toFixed(4)}`
@@ -202,8 +208,11 @@ export class TradeModelBacktester {
               }): ` +
                 `Price: $${effectivePrice.toFixed(
                   4
-                )}, P/L: $${profitLoss.toFixed(2)}, ` +
-                `Confidence: ${confidence.toFixed(2)}, ATR: ${atr.toFixed(4)}`
+                )}, P/L: $${profitLoss.toFixed(
+                  2
+                )}, Confidence: ${confidence.toFixed(2)}, ATR: ${atr.toFixed(
+                  4
+                )}`
             );
             if (profitLoss > 0) winStreak++, (lossStreak = 0);
             else lossStreak++, (winStreak = 0);
@@ -215,20 +224,22 @@ export class TradeModelBacktester {
             buyTimestamp = undefined;
           }
         }
-      }
-
-      if (
+      } else if (
         buyLogit > sellLogit + this.logitThreshold &&
         buyProb > this.buyProbThreshold &&
         confidence >= this.minConfidence &&
         capital > 0 &&
         consecutiveBuys < 1
       ) {
+        const volatilityAdjustedSize = Math.min(
+          this.basePositionSize / (atr > 0 ? atr : 0.01),
+          0.15
+        ); // Increased cap to 15%
         const positionSize = Math.min(
-          this.basePositionSize *
-            Math.min(buyProb / this.buyProbThreshold, 1.5),
-          0.1
-        ); // Cap at 10%
+          volatilityAdjustedSize *
+            Math.min(buyProb / this.buyProbThreshold, 2.0),
+          0.15
+        ); // Increased scaling
         const tradeAmount = Math.min(capital * positionSize, capital);
         const effectivePrice = currentPrice * (1 + this.slippage);
         const adaBought = (tradeAmount - this.commission) / effectivePrice;
@@ -247,11 +258,20 @@ export class TradeModelBacktester {
           usdValue: tradeAmount,
         });
         console.log(
-          `Buy Executed: Price: $${effectivePrice.toFixed(4)}, ` +
-            `Amount: ${adaBought.toFixed(
-              2
-            )} ADA, Confidence: ${confidence.toFixed(2)}, ` +
-            `Position Size: ${(positionSize * 100).toFixed(1)}%`
+          `Buy Executed: Price: $${effectivePrice.toFixed(
+            4
+          )}, Amount: ${adaBought.toFixed(
+            2
+          )} ADA, Confidence: ${confidence.toFixed(2)}, ` +
+            `Position Size: ${(positionSize * 100).toFixed(
+              1
+            )}%, ATR: ${atr.toFixed(4)}`
+        );
+      } else if (buyProb > 0.5 && confidence < this.minConfidence) {
+        console.log(
+          `Buy Rejected: Below Confidence Threshold (${confidence.toFixed(
+            2
+          )} < ${this.minConfidence})`
         );
       }
 

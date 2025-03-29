@@ -15,7 +15,7 @@ export class TradeModelPredictor {
     this.weightManager = new ModelWeightManager();
     this.sequenceGenerator = new FeatureSequenceGenerator(this.timesteps);
     FirebaseService.getInstance();
-    const factory = new TradeModelFactory(this.timesteps, 61);
+    const factory = new TradeModelFactory(this.timesteps, 61); // Adjust feature count if adding RSI/MACD
     this.model = factory.createModel();
     this.loadWeightsAsync();
   }
@@ -43,6 +43,7 @@ export class TradeModelPredictor {
     buyProb: number;
     sellProb: number;
     confidence: number;
+    momentum: number;
   }> {
     if (!this.isWeightsLoaded) {
       console.log("Weights not yet loaded, awaiting load...");
@@ -85,13 +86,20 @@ export class TradeModelPredictor {
     const logits = this.model.predict(featuresNormalized) as tf.Tensor2D;
     const logitsArray = await logits.data();
     const [rawSellLogit, rawBuyLogit] = [logitsArray[0], logitsArray[1]];
-    const sellLogit = rawSellLogit - 0.9; // Further reduce sell bias
-    const buyLogit = rawBuyLogit + 0.5; // Stronger buy boost
+    const sellLogit = rawSellLogit - 0.3; // Further reduced bias
+    const buyLogit = rawBuyLogit + 0.2; // Further reduced boost
     const adjustedLogits = tf.tensor2d([[sellLogit, buyLogit]]);
     const probs = adjustedLogits.softmax();
     const probArray = await probs.data();
     const [sellProb, buyProb] = [probArray[0], probArray[1]];
     const confidence = Math.max(buyProb, sellProb);
+
+    const momentumWindow = adaPrices.slice(-5);
+    const momentum =
+      momentumWindow.length >= 2
+        ? (momentumWindow[momentumWindow.length - 1] - momentumWindow[0]) /
+          momentumWindow[0]
+        : 0;
 
     const priceChange =
       endIndex > startIndex
@@ -118,7 +126,9 @@ export class TradeModelPredictor {
     console.log(
       `Confidence: ${confidence.toFixed(
         4
-      )}, Price Change: ${priceChange.toFixed(4)}`
+      )}, Price Change: ${priceChange.toFixed(4)}, Momentum: ${momentum.toFixed(
+        4
+      )}`
     );
 
     features.dispose();
@@ -129,6 +139,6 @@ export class TradeModelPredictor {
     means.dispose();
     stds.dispose();
 
-    return { buyLogit, sellLogit, buyProb, sellProb, confidence };
+    return { buyLogit, sellLogit, buyProb, sellProb, confidence, momentum };
   }
 }

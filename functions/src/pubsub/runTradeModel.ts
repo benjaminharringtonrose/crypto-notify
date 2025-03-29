@@ -11,8 +11,8 @@ import {
 } from "../types";
 import { sendSMS, formatAnalysisResults } from "../utils";
 import { getFirestore } from "firebase-admin/firestore";
-import { TradeModelPredictor } from "../cardano/TradeModelPredictor"; // Updated import
-import { getHistoricalData } from "../api/getHistoricalData"; // Add this import
+import { TradeModelPredictor } from "../cardano/TradeModelPredictor";
+import { getHistoricalData } from "../api/getHistoricalData";
 import { getCurrentPrice } from "../api/getCurrentPrice";
 
 dotenv.config();
@@ -26,8 +26,7 @@ export const runTradeModel = onSchedule(RUN_TRADE_MODEL_CONFIG, async () => {
   try {
     const predictor = new TradeModelPredictor();
 
-    // Fetch historical data for the last 31 days (timesteps + 1 for current price)
-    const days = 31;
+    const days = 30;
     const adaData = await getHistoricalData("ADA", days);
     const btcData = await getHistoricalData("BTC", days);
     const currentPrice = await getCurrentPrice({
@@ -47,23 +46,21 @@ export const runTradeModel = onSchedule(RUN_TRADE_MODEL_CONFIG, async () => {
       btcData.volumes
     );
 
-    // Map to previous format
     const probabilities = {
       buy: buyProb,
       sell: sellProb,
-      hold: 1 - Math.max(buyProb, sellProb), // Simple heuristic for hold probability
+      hold: 1 - Math.max(buyProb, sellProb),
     };
 
-    // Determine recommendation based on thresholds
-    const buyThreshold = 0.85; // Match V3 backtester
-    const sellThreshold = 0.75; // Match V3 backtester
+    const buyThreshold = 0.65;
+    const sellThreshold = 0.65;
     let recommendation: Recommendation;
     if (buyProb >= buyThreshold && confidence >= 0.8) {
       recommendation = Recommendation.Buy;
     } else if (sellProb >= sellThreshold && confidence >= 0.8) {
       recommendation = Recommendation.Sell;
     } else {
-      recommendation = Recommendation.Hold; // Default to Hold if no strong signal
+      recommendation = Recommendation.Hold;
     }
 
     const db = getFirestore();

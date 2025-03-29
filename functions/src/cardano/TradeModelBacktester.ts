@@ -22,16 +22,16 @@ export class TradeModelBacktester {
 
   constructor(
     initialCapital: number = 10000,
-    basePositionSize: number = 0.05, // Reduced from 0.1
+    basePositionSize: number = 0.05,
     slippage: number = 0.001,
     commission: number = 0.1,
-    buyThreshold: number = 0.85, // Increased from 0.75
-    sellThreshold: number = 0.75, // Increased from 0.65
-    stopLossMultiplier: number = 2.0, // Adjusted from 1.5
+    buyThreshold: number = 0.7, // Lowered from 0.85
+    sellThreshold: number = 0.65, // Lowered from 0.75
+    stopLossMultiplier: number = 2.0,
     trailingStop: number = 0.05,
     minHoldDays: number = 2,
-    minConfidence: number = 0.8, // Increased from 0.7
-    profitTakeMultiplier: number = 3.0 // New: Take profit at 3x ATR
+    minConfidence: number = 0.7, // Lowered from 0.8
+    profitTakeMultiplier: number = 3.0
   ) {
     this.predictor = new TradeModelPredictor();
     this.initialCapital = initialCapital;
@@ -112,6 +112,15 @@ export class TradeModelBacktester {
       );
       const atr = this.calculateATR(
         adaSlice.slice(-this.predictor["timesteps"])
+      );
+
+      // Log threshold comparison
+      console.log(
+        `Threshold check: BuyProb=${buyProb.toFixed(4)} vs ${
+          this.buyThreshold
+        }, SellProb=${sellProb.toFixed(4)} vs ${
+          this.sellThreshold
+        }, Confidence=${confidence.toFixed(4)} vs ${this.minConfidence}`
       );
 
       if (adaHoldings > 0) {

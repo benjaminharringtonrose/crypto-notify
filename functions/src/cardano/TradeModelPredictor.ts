@@ -10,7 +10,7 @@ export class TradeModelPredictor {
   private timesteps = 30;
   private model: tf.LayersModel;
   private isWeightsLoaded = false;
-  private temperature = 1.5; // Temperature scaling for calibration
+  private temperature = 0.5; // Reduced for stronger signals
 
   constructor() {
     this.weightManager = new ModelWeightManager();
@@ -29,6 +29,7 @@ export class TradeModelPredictor {
       console.log("Weights loaded successfully");
     } catch (error) {
       console.error("Failed to load weights:", error);
+      throw error;
     }
   }
 
@@ -44,6 +45,22 @@ export class TradeModelPredictor {
     }
 
     const startTime = performance.now();
+
+    // Log input data stats for debugging
+    console.log(
+      `Input stats - ADA Prices: min=${Math.min(...adaPrices).toFixed(
+        4
+      )}, max=${Math.max(...adaPrices).toFixed(4)}, mean=${(
+        adaPrices.reduce((a, b) => a + b, 0) / adaPrices.length
+      ).toFixed(4)}`
+    );
+    console.log(
+      `Input stats - BTC Prices: min=${Math.min(...btcPrices).toFixed(
+        4
+      )}, max=${Math.max(...btcPrices).toFixed(4)}, mean=${(
+        btcPrices.reduce((a, b) => a + b, 0) / btcPrices.length
+      ).toFixed(4)}`
+    );
 
     const startIndex = Math.max(0, adaPrices.length - this.timesteps - 1);
     const endIndex = adaPrices.length - 1;
@@ -62,17 +79,15 @@ export class TradeModelPredictor {
     const featuresNormalized = features.sub(means).div(stds.add(1e-6));
 
     const logits = this.model.predict(featuresNormalized) as tf.Tensor2D;
-    const scaledLogits = logits.div(tf.scalar(this.temperature)); // Temperature scaling
+    const scaledLogits = logits.div(tf.scalar(this.temperature));
     const probs = scaledLogits.softmax();
 
-    // Correctly handle TypedArray output from probs.data()
-    const probArray = await probs.data(); // Returns Float32Array or similar
-    const [sellProb, buyProb] = [probArray[0], probArray[1]]; // Extract as numbers
+    const probArray = await probs.data();
+    const [sellProb, buyProb] = [probArray[0], probArray[1]];
     const confidence = Math.max(buyProb, sellProb);
 
-    // Manually compute variance of logits
     const moments = tf.moments(logits);
-    const variance = moments.variance.dataSync()[0]; // Variance as a scalar
+    const variance = moments.variance.dataSync()[0];
 
     const endTime = performance.now();
     console.log(

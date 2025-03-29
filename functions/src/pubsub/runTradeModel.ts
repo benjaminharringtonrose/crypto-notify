@@ -76,7 +76,6 @@ export const runTradeModel = onSchedule(RUN_TRADE_MODEL_CONFIG, async () => {
       currentPrice,
       probabilities,
       recommendation,
-      confidence,
     });
 
     console.log(analysisResults);

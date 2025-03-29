@@ -28,13 +28,11 @@ export const formatAnalysisResults = ({
   currentPrice,
   probabilities,
   recommendation,
-  confidence,
 }: {
   cryptoSymbol: string;
   currentPrice: number;
   probabilities: Probabilities;
   recommendation: Recommendation;
-  confidence: number;
 }) => {
   const symbol = cryptoSymbol.toUpperCase();
   const price = formatCurrency(currentPrice);
@@ -42,9 +40,8 @@ export const formatAnalysisResults = ({
   const sellProb = `${(probabilities.sell * 100).toFixed(3)}%`;
   const holdProb = `${(probabilities.hold * 100).toFixed(3)}%`;
   const rec = recommendation.charAt(0).toUpperCase() + recommendation.slice(1);
-  const conf = `${(confidence * 100).toFixed(3)}%`;
 
-  return `${symbol}: ${price}\n\nBuy Probability: ${buyProb}\nSell Probability: ${sellProb}\nHold Probability: ${holdProb}\n\nRecommendation: ${rec}\n\nConfidence: ${conf}\n\nThe probability is the model’s confidence in a near-term price drop exceeding 5% over 7 days.\n\nReply with a cryptocurrency to run the analysis again`;
+  return `${symbol}: ${price}\n\nBuy Probability: ${buyProb}\nSell Probability: ${sellProb}\nHold Probability: ${holdProb}\n\nRecommendation: ${rec}\n\nThe probability is the model’s confidence in a near-term price drop exceeding 5% over 7 days.\n\nReply with a cryptocurrency to run the analysis again`;
 };
 
 export const fetchCardanoPriceErrorMessage = (error: any) => {

@@ -62,7 +62,6 @@ export const receiveSMS = https.onRequest(
         currentPrice,
         probabilities,
         recommendation,
-        confidence,
       });
 
       await sendSMS(smsMessage);

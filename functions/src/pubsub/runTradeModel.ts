@@ -52,12 +52,10 @@ export const runTradeModel = onSchedule(RUN_TRADE_MODEL_CONFIG, async () => {
       hold: 1 - Math.max(buyProb, sellProb),
     };
 
-    const buyThreshold = 0.65;
-    const sellThreshold = 0.65;
     let recommendation: Recommendation;
-    if (buyProb >= buyThreshold && confidence >= 0.8) {
+    if (buyProb > sellProb && confidence >= 0.8) {
       recommendation = Recommendation.Buy;
-    } else if (sellProb >= sellThreshold && confidence >= 0.8) {
+    } else if (sellProb > buyProb && confidence >= 0.8) {
       recommendation = Recommendation.Sell;
     } else {
       recommendation = Recommendation.Hold;

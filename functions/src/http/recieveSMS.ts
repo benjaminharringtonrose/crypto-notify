@@ -46,19 +46,16 @@ export const receiveSMS = https.onRequest(
       const probabilities = {
         buy: buyProb,
         sell: sellProb,
-        hold: 1 - Math.max(buyProb, sellProb), // Simple heuristic for hold probability
+        hold: 1 - Math.max(buyProb, sellProb),
       };
 
-      // Determine recommendation based on thresholds
-      const buyThreshold = 0.85; // Match V3 backtester
-      const sellThreshold = 0.75; // Match V3 backtester
       let recommendation: Recommendation;
-      if (buyProb >= buyThreshold && confidence >= 0.8) {
+      if (buyProb > sellProb && confidence >= 0.8) {
         recommendation = Recommendation.Buy;
-      } else if (sellProb >= sellThreshold && confidence >= 0.8) {
+      } else if (sellProb > buyProb && confidence >= 0.8) {
         recommendation = Recommendation.Sell;
       } else {
-        recommendation = Recommendation.Hold; // Default to Hold if no strong signal
+        recommendation = Recommendation.Hold;
       }
 
       const smsMessage = formatAnalysisResults({

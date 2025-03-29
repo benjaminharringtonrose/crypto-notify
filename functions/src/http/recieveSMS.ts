@@ -1,9 +1,15 @@
 import { https } from "firebase-functions";
-import { CryptoIds, RecieveSMSRequest, Recommendation } from "../types";
+import {
+  CryptoIds,
+  Currencies,
+  RecieveSMSRequest,
+  Recommendation,
+} from "../types";
 import { formatAnalysisResults, sendSMS } from "../utils";
 import { TradeModelPredictor } from "../cardano/TradeModelPredictor";
 import { MEMORY } from "../constants";
 import { getHistoricalData } from "../api/getHistoricalData";
+import { getCurrentPrice } from "../api/getCurrentPrice";
 
 export const receiveSMS = https.onRequest(
   { memory: MEMORY },
@@ -21,6 +27,10 @@ export const receiveSMS = https.onRequest(
       const days = 31;
       const adaData = await getHistoricalData("ADA", days);
       const btcData = await getHistoricalData("BTC", days);
+      const currentPrice = await getCurrentPrice({
+        id: CryptoIds.Cardano,
+        currency: Currencies.USD,
+      });
 
       if (adaData.prices.length < 30 || btcData.prices.length < 30) {
         throw new Error("Insufficient historical data for prediction");
@@ -33,7 +43,6 @@ export const receiveSMS = https.onRequest(
         btcData.volumes
       );
 
-      const currentPrice = adaData.prices[adaData.prices.length - 1];
       const probabilities = {
         buy: buyProb,
         sell: sellProb,

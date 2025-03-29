@@ -4,6 +4,7 @@ import { RUN_TRADE_MODEL_CONFIG } from "../constants";
 import {
   Collections,
   CryptoIds,
+  Currencies,
   Docs,
   Recommendation,
   TradeRecommendation,
@@ -12,6 +13,7 @@ import { sendSMS, formatAnalysisResults } from "../utils";
 import { getFirestore } from "firebase-admin/firestore";
 import { TradeModelPredictor } from "../cardano/TradeModelPredictor"; // Updated import
 import { getHistoricalData } from "../api/getHistoricalData"; // Add this import
+import { getCurrentPrice } from "../api/getCurrentPrice";
 
 dotenv.config();
 
@@ -28,6 +30,10 @@ export const runTradeModel = onSchedule(RUN_TRADE_MODEL_CONFIG, async () => {
     const days = 31;
     const adaData = await getHistoricalData("ADA", days);
     const btcData = await getHistoricalData("BTC", days);
+    const currentPrice = await getCurrentPrice({
+      id: CryptoIds.Cardano,
+      currency: Currencies.USD,
+    });
 
     if (adaData.prices.length < 30 || btcData.prices.length < 30) {
       throw new Error("Insufficient historical data for prediction");
@@ -42,7 +48,6 @@ export const runTradeModel = onSchedule(RUN_TRADE_MODEL_CONFIG, async () => {
     );
 
     // Map to previous format
-    const currentPrice = adaData.prices[adaData.prices.length - 1];
     const probabilities = {
       buy: buyProb,
       sell: sellProb,

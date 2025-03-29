@@ -85,8 +85,8 @@ export class TradeModelPredictor {
     const logits = this.model.predict(featuresNormalized) as tf.Tensor2D;
     const logitsArray = await logits.data();
     const [rawSellLogit, rawBuyLogit] = [logitsArray[0], logitsArray[1]];
-    const sellLogit = rawSellLogit - 0.7; // Stronger sell reduction
-    const buyLogit = rawBuyLogit + 0.3; // Boost buy signal
+    const sellLogit = rawSellLogit - 0.9; // Further reduce sell bias
+    const buyLogit = rawBuyLogit + 0.5; // Stronger buy boost
     const adjustedLogits = tf.tensor2d([[sellLogit, buyLogit]]);
     const probs = adjustedLogits.softmax();
     const probArray = await probs.data();

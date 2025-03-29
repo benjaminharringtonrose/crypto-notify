@@ -27,13 +27,13 @@ export class TradeModelBacktester {
     slippage: number = 0.001,
     commission: number = 0.1,
     stopLossMultiplier: number = 5.0, // Increased from 4.0
-    trailingStop: number = 0.1, // Increased from 0.07
+    trailingStop: number = 0.1, // Increased from 0.08
     minHoldDays: number = 5,
     minConfidence: number = 0.5,
     profitTakeMultiplier: number = 3.0,
-    logitThreshold: number = 0.1, // Lowered from 0.2
-    buyProbThreshold: number = 0.5, // New
-    sellProbThreshold: number = 0.6 // New
+    logitThreshold: number = 0.1,
+    buyProbThreshold: number = 0.5,
+    sellProbThreshold: number = 0.45 // Lowered from 0.5
   ) {
     this.predictor = new TradeModelPredictor();
     this.initialCapital = initialCapital;
@@ -117,6 +117,8 @@ export class TradeModelBacktester {
       const atr = this.calculateATR(
         adaSlice.slice(-this.predictor["timesteps"])
       );
+      const dynamicStopLossMultiplier =
+        atr > 0.02 ? this.stopLossMultiplier * 0.8 : this.stopLossMultiplier;
 
       console.log(
         `Logit check: BuyLogit=${buyLogit.toFixed(
@@ -138,59 +140,80 @@ export class TradeModelBacktester {
           (new Date(timestamp).getTime() - new Date(buyTimestamp).getTime()) /
           (1000 * 60 * 60 * 24);
         const priceChange = (currentPrice - lastBuyPrice) / lastBuyPrice;
-        const stopLossLevel = this.stopLossMultiplier * atr;
+        const stopLossLevel = dynamicStopLossMultiplier * atr;
         const profitTakeLevel = lastBuyPrice + this.profitTakeMultiplier * atr;
         const trailingStopLevel = peakPrice * (1 - this.trailingStop);
 
-        if (
-          (daysHeld >= this.minHoldDays &&
+        if (daysHeld >= this.minHoldDays) {
+          if (
             sellLogit > buyLogit + this.logitThreshold &&
-            sellProb > this.sellProbThreshold) || // Signal-based sell priority
-          priceChange <= -stopLossLevel ||
-          currentPrice <= trailingStopLevel ||
-          currentPrice >= profitTakeLevel
-        ) {
-          const effectivePrice = currentPrice * (1 - this.slippage);
-          const usdReceived = adaHoldings * effectivePrice - this.commission;
-          capital += usdReceived;
-          const profitLoss = usdReceived - adaHoldings * lastBuyPrice;
-          trades.push({
-            type: Recommendation.Sell,
-            price: effectivePrice,
-            timestamp,
-            adaAmount: adaHoldings,
-            usdValue: usdReceived,
-            buyPrice: lastBuyPrice,
-          });
-          console.log(
-            `Sell Triggered (${
-              sellLogit > buyLogit + this.logitThreshold &&
-              sellProb > this.sellProbThreshold
-                ? "Signal"
-                : priceChange <= -stopLossLevel
-                ? "Stop"
-                : currentPrice >= profitTakeLevel
-                ? "Profit"
-                : "Trailing"
-            }): ` +
-              `Price: $${effectivePrice.toFixed(4)}, P/L: $${profitLoss.toFixed(
-                2
-              )}, ` +
-              `Confidence: ${confidence.toFixed(2)}, ATR: ${atr.toFixed(4)}`
-          );
-          if (profitLoss > 0) {
-            winStreak++;
-            lossStreak = 0;
-          } else {
-            lossStreak++;
-            winStreak = 0;
+            sellProb > this.sellProbThreshold
+          ) {
+            const effectivePrice = currentPrice * (1 - this.slippage);
+            const usdReceived = adaHoldings * effectivePrice - this.commission;
+            capital += usdReceived;
+            const profitLoss = usdReceived - adaHoldings * lastBuyPrice;
+            trades.push({
+              type: Recommendation.Sell,
+              price: effectivePrice,
+              timestamp,
+              adaAmount: adaHoldings,
+              usdValue: usdReceived,
+              buyPrice: lastBuyPrice,
+            });
+            console.log(
+              `Sell Triggered (Signal): Price: $${effectivePrice.toFixed(
+                4
+              )}, P/L: $${profitLoss.toFixed(2)}, ` +
+                `Confidence: ${confidence.toFixed(2)}, ATR: ${atr.toFixed(4)}`
+            );
+            if (profitLoss > 0) winStreak++, (lossStreak = 0);
+            else lossStreak++, (winStreak = 0);
+            console.log(`Win Streak: ${winStreak}, Loss Streak: ${lossStreak}`);
+            adaHoldings = 0;
+            consecutiveBuys = 0;
+            lastBuyPrice = undefined;
+            peakPrice = undefined;
+            buyTimestamp = undefined;
+          } else if (
+            priceChange <= -stopLossLevel ||
+            currentPrice <= trailingStopLevel ||
+            currentPrice >= profitTakeLevel
+          ) {
+            const effectivePrice = currentPrice * (1 - this.slippage);
+            const usdReceived = adaHoldings * effectivePrice - this.commission;
+            capital += usdReceived;
+            const profitLoss = usdReceived - adaHoldings * lastBuyPrice;
+            trades.push({
+              type: Recommendation.Sell,
+              price: effectivePrice,
+              timestamp,
+              adaAmount: adaHoldings,
+              usdValue: usdReceived,
+              buyPrice: lastBuyPrice,
+            });
+            console.log(
+              `Sell Triggered (${
+                priceChange <= -stopLossLevel
+                  ? "Stop"
+                  : currentPrice >= profitTakeLevel
+                  ? "Profit"
+                  : "Trailing"
+              }): ` +
+                `Price: $${effectivePrice.toFixed(
+                  4
+                )}, P/L: $${profitLoss.toFixed(2)}, ` +
+                `Confidence: ${confidence.toFixed(2)}, ATR: ${atr.toFixed(4)}`
+            );
+            if (profitLoss > 0) winStreak++, (lossStreak = 0);
+            else lossStreak++, (winStreak = 0);
+            console.log(`Win Streak: ${winStreak}, Loss Streak: ${lossStreak}`);
+            adaHoldings = 0;
+            consecutiveBuys = 0;
+            lastBuyPrice = undefined;
+            peakPrice = undefined;
+            buyTimestamp = undefined;
           }
-          console.log(`Win Streak: ${winStreak}, Loss Streak: ${lossStreak}`);
-          adaHoldings = 0;
-          consecutiveBuys = 0;
-          lastBuyPrice = undefined;
-          peakPrice = undefined;
-          buyTimestamp = undefined;
         }
       }
 
@@ -201,9 +224,11 @@ export class TradeModelBacktester {
         capital > 0 &&
         consecutiveBuys < 1
       ) {
-        const positionSize =
+        const positionSize = Math.min(
           this.basePositionSize *
-          Math.min(buyProb / this.buyProbThreshold, 1.5);
+            Math.min(buyProb / this.buyProbThreshold, 1.5),
+          0.1
+        ); // Cap at 10%
         const tradeAmount = Math.min(capital * positionSize, capital);
         const effectivePrice = currentPrice * (1 + this.slippage);
         const adaBought = (tradeAmount - this.commission) / effectivePrice;

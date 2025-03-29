@@ -23,8 +23,7 @@ export const receiveSMS = https.onRequest(
 
       const predictor = new TradeModelPredictor();
 
-      // Fetch historical data for the last 31 days (timesteps + 1 for current price)
-      const days = 31;
+      const days = 30;
       const adaData = await getHistoricalData("ADA", days);
       const btcData = await getHistoricalData("BTC", days);
       const currentPrice = await getCurrentPrice({

@@ -49,9 +49,9 @@ export const receiveSMS = https.onRequest(
       };
 
       let recommendation: Recommendation;
-      if (buyProb > sellProb && confidence >= 0.8) {
+      if (buyProb > sellProb && confidence >= 0.7) {
         recommendation = Recommendation.Buy;
-      } else if (sellProb > buyProb && confidence >= 0.8) {
+      } else if (sellProb > buyProb && confidence >= 0.7) {
         recommendation = Recommendation.Sell;
       } else {
         recommendation = Recommendation.Hold;
@@ -62,7 +62,7 @@ export const receiveSMS = https.onRequest(
         currentPrice,
         probabilities,
         recommendation,
-        metConditions: [],
+        confidence,
       });
 
       await sendSMS(smsMessage);

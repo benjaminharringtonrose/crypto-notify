@@ -53,9 +53,9 @@ export const runTradeModel = onSchedule(RUN_TRADE_MODEL_CONFIG, async () => {
     };
 
     let recommendation: Recommendation;
-    if (buyProb > sellProb && confidence >= 0.8) {
+    if (buyProb > sellProb && confidence >= 0.7) {
       recommendation = Recommendation.Buy;
-    } else if (sellProb > buyProb && confidence >= 0.8) {
+    } else if (sellProb > buyProb && confidence >= 0.7) {
       recommendation = Recommendation.Sell;
     } else {
       recommendation = Recommendation.Hold;
@@ -76,7 +76,7 @@ export const runTradeModel = onSchedule(RUN_TRADE_MODEL_CONFIG, async () => {
       currentPrice,
       probabilities,
       recommendation,
-      metConditions: [],
+      confidence,
     });
 
     console.log(analysisResults);

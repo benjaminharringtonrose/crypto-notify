@@ -19,7 +19,7 @@ const runTraining = async () => {
 
 export const runModelTrainingADA = onSchedule(
   {
-    schedule: `*/30 * * * *`,
+    schedule: "0 0,12 * * *", // run once at midnight and once at noon
     memory: "4GiB",
     timeoutSeconds: 540,
   },
@@ -27,7 +27,10 @@ export const runModelTrainingADA = onSchedule(
 );
 
 export const triggerTrainingNow = onRequest(
-  { memory: "4GiB", timeoutSeconds: 540 },
+  {
+    memory: "4GiB",
+    timeoutSeconds: 540,
+  },
   async (req, res) => {
     await runTraining();
     res.send("Training triggered successfully.");

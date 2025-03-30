@@ -1,4 +1,5 @@
 import * as functions from "firebase-functions";
+import { https } from "firebase-functions";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { CoinbaseTradeExecutor } from "../cardano/CoinbaseTradeExecutor";
 import { TradingStrategy } from "../cardano/TradingStrategy";
@@ -74,7 +75,7 @@ export const executeDailyTrade = onSchedule("every 24 hours", async () => {
 });
 
 // HTTP-triggered function for manual execution (optional)
-export const executeTradeNow = functions.https.onRequest(async (req, res) => {
+export const executeTradeNow = https.onRequest(async (req, res) => {
   const config = {
     apiKey: process.env.COINBASE_API_KEY ?? "",
     apiSecret: process.env.COINBASE_API_SECRET ?? "",

@@ -26,7 +26,10 @@ export const runModelTrainingADA = onSchedule(
   runTraining
 );
 
-export const triggerTrainingNow = onRequest(async (req, res) => {
-  await runTraining();
-  res.send("Training triggered successfully.");
-});
+export const triggerTrainingNow = onRequest(
+  { memory: "4GiB", timeoutSeconds: 540 },
+  async (req, res) => {
+    await runTraining();
+    res.send("Training triggered successfully.");
+  }
+);

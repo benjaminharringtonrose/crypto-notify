@@ -18,7 +18,6 @@ export const TIME_ZONE = "America/New_York";
 export const LOW_MEMORY = "512MiB";
 export const HIGH_MEMORY = "8GiB";
 export const NOTIFICATION_COOLDOWN = 30 * 60 * 1000; // 30 mins
-export const AVERAGE_BUY_PRICE = 0.72;
 export const TRADE_PREDICTOR_WEIGHTS = "tradePredictorWeights.json";
 
 export const FIVE_YEARS_IN_DAYS = 1826;

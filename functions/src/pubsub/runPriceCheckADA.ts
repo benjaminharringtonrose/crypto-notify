@@ -13,50 +13,58 @@ import { Collections, CryptoIds, Currencies, Docs } from "../types";
 
 dotenv.config();
 
-export const runPriceCheckADA = onSchedule("*/10 * * * *", async () => {
-  try {
-    const coinGecko = new CoinGeckoService({
-      id: CryptoIds.Cardano,
-      currency: Currencies.USD,
-    });
+export const runPriceCheckADA = onSchedule(
+  {
+    schedule: "*/10 * * * *",
+    memory: "512MiB",
+  },
+  async () => {
+    try {
+      const coinGecko = new CoinGeckoService({
+        id: CryptoIds.Cardano,
+        currency: Currencies.USD,
+      });
 
-    const currentPrice = await coinGecko.getCurrentPrice();
+      const currentPrice = await coinGecko.getCurrentPrice();
 
-    console.log(`Current Cardano price: $${currentPrice}`);
+      console.log(`Current Cardano price: $${currentPrice}`);
 
-    const db = firestore();
-    const configDocRef = db.collection(Collections.Config).doc(Docs.PriceAlert);
+      const db = firestore();
+      const configDocRef = db
+        .collection(Collections.Config)
+        .doc(Docs.PriceAlert);
 
-    const configDoc = await configDocRef.get();
-    const config = configDoc.exists ? configDoc.data() : {};
+      const configDoc = await configDocRef.get();
+      const config = configDoc.exists ? configDoc.data() : {};
 
-    const lastNotified = config?.lastNotified?.toDate() || new Date(0);
-    const lastNotifiedThreshold = config?.lastNotifiedThreshold || 0;
+      const lastNotified = config?.lastNotified?.toDate() || new Date(0);
+      const lastNotifiedThreshold = config?.lastNotifiedThreshold || 0;
 
-    const now = new Date();
-    const timeSinceLastNotification = now.getTime() - lastNotified.getTime();
-    const cooldownActive = timeSinceLastNotification <= NOTIFICATION_COOLDOWN;
+      const now = new Date();
+      const timeSinceLastNotification = now.getTime() - lastNotified.getTime();
+      const cooldownActive = timeSinceLastNotification <= NOTIFICATION_COOLDOWN;
 
-    const exceededThreshold = isAboveThreshold({
-      prices: PRICES,
-      currentPrice,
-    });
+      const exceededThreshold = isAboveThreshold({
+        prices: PRICES,
+        currentPrice,
+      });
 
-    if (
-      exceededThreshold &&
-      exceededThreshold > lastNotifiedThreshold &&
-      !cooldownActive
-    ) {
-      await sendSMS(priceAlertTextMessage(exceededThreshold, currentPrice));
+      if (
+        exceededThreshold &&
+        exceededThreshold > lastNotifiedThreshold &&
+        !cooldownActive
+      ) {
+        await sendSMS(priceAlertTextMessage(exceededThreshold, currentPrice));
 
-      const lastNotifiedPayload = {
-        lastNotified: firestore.FieldValue.serverTimestamp(),
-        lastNotifiedThreshold: exceededThreshold,
-      };
+        const lastNotifiedPayload = {
+          lastNotified: firestore.FieldValue.serverTimestamp(),
+          lastNotifiedThreshold: exceededThreshold,
+        };
 
-      await configDocRef.set(lastNotifiedPayload, MERGE_PAYLOAD);
+        await configDocRef.set(lastNotifiedPayload, MERGE_PAYLOAD);
+      }
+    } catch (error) {
+      console.log(checkCardanoPriceErrorMessage(error));
     }
-  } catch (error) {
-    console.log(checkCardanoPriceErrorMessage(error));
   }
-});
+);

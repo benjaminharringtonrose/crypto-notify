@@ -2,12 +2,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { firestore } from "firebase-admin";
 import dotenv from "dotenv";
 import { getCurrentPrice } from "../api/getCurrentPrice";
-import {
-  MERGE_PAYLOAD,
-  NOTIFICATION_COOLDOWN,
-  EVERY_TEN_MINS,
-  PRICES,
-} from "../constants";
+import { MERGE_PAYLOAD, NOTIFICATION_COOLDOWN, PRICES } from "../constants";
 import {
   sendSMS,
   checkCardanoPriceErrorMessage,
@@ -18,7 +13,7 @@ import { Collections, CryptoIds, Currencies, Docs } from "../types";
 
 dotenv.config();
 
-export const runPriceCheckADA = onSchedule(EVERY_TEN_MINS, async () => {
+export const runPriceCheckADA = onSchedule(`*/10 * * * *`, async () => {
   try {
     const currentPrice = await getCurrentPrice({
       id: CryptoIds.Cardano,

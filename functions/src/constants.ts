@@ -1,5 +1,4 @@
 import { firestore } from "firebase-admin";
-import { ScheduleOptions } from "firebase-functions/scheduler";
 
 export const TEXTBELT_API_URL = "https://textbelt.com";
 export const COINGECKO_API_URL = "https://api.coingecko.com/api/v3";
@@ -11,26 +10,11 @@ export const CARDANO_30_DAY_HISTORICAL_URL = `${COINGECKO_API_URL}/coins/cardano
 export const BITCOIN_30_DAY_HISTORICAL_URL = `${COINGECKO_API_URL}/coins/bitcoin/market_chart?vs_currency=usd&days=30`;
 
 export const PRICES = [0.8, 0.9, 1.0, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
-export const EVERY_TEN_MINS = `*/10 * * * *`; // every 10 mins
-export const EVERY_THIRTY_MINS = `*/30 * * * *`; // every 30 mins
-export const EVERYDAY_AT_NOON = `26 10 * * *`; // every day at 10:26am ET
-export const TIME_ZONE = "America/New_York";
-export const LOW_MEMORY = "512MiB";
-export const HIGH_MEMORY = "8GiB";
+
 export const NOTIFICATION_COOLDOWN = 30 * 60 * 1000; // 30 mins
 export const TRADE_PREDICTOR_WEIGHTS = "tradePredictorWeights.json";
 
 export const FIVE_YEARS_IN_DAYS = 1826;
-
-export const TRAINING_CONFIG: ScheduleOptions = {
-  schedule: EVERY_THIRTY_MINS,
-  memory: HIGH_MEMORY,
-};
-
-export const RUN_TRADE_MODEL_CONFIG: ScheduleOptions = {
-  schedule: EVERY_TEN_MINS,
-  memory: LOW_MEMORY,
-};
 
 export const RUNNING_ANALYSIS_MODEL_MESSAGE = "Running analysis model...";
 

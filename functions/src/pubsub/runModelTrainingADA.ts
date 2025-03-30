@@ -1,9 +1,17 @@
+import dotenv from "dotenv";
 import { onSchedule } from "firebase-functions/scheduler";
 import { TradeModelTrainer } from "../cardano/TradeModelTrainer";
-import { TRAINING_CONFIG } from "../constants";
 
-export const runModelTrainingADA = onSchedule(TRAINING_CONFIG, async () => {
-  console.log("Training started...");
-  const trainer = new TradeModelTrainer();
-  await trainer.train();
-});
+dotenv.config();
+
+export const runModelTrainingADA = onSchedule(
+  {
+    schedule: `*/30 * * * *`,
+    memory: "4GiB",
+  },
+  async () => {
+    console.log("Training started...");
+    const trainer = new TradeModelTrainer();
+    await trainer.train();
+  }
+);

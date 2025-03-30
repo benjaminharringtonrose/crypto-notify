@@ -1,26 +1,15 @@
 import { https } from "firebase-functions";
-import {
-  CryptoIds,
-  Currencies,
-  RecieveSMSRequest,
-  Recommendation,
-} from "../types";
+import { CryptoIds, Currencies, Recommendation } from "../types";
 import { formatAnalysisResults, sendSMS } from "../utils";
 import { TradeModelPredictor } from "../cardano/TradeModelPredictor";
-import { MEMORY } from "../constants";
+import { LOW_MEMORY } from "../constants";
 import { getHistoricalData } from "../api/getHistoricalData";
 import { getCurrentPrice } from "../api/getCurrentPrice";
 
-export const receiveSMS = https.onRequest(
-  { memory: MEMORY },
-  async (request: RecieveSMSRequest, response) => {
+export const receiveTextADA = https.onRequest(
+  { memory: LOW_MEMORY },
+  async (_, response) => {
     try {
-      const replyText = request.body.text || "No message";
-
-      if (replyText.trim().toLowerCase() !== "cardano") {
-        return;
-      }
-
       const predictor = new TradeModelPredictor();
 
       const days = 30;

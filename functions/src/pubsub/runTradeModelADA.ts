@@ -22,7 +22,7 @@ dotenv.config();
  * Analyzes trading conditions, generates recommendations, and sends SMS notifications
  * when trading conditions change or probabilities increase.
  */
-export const runTradeModel = onSchedule(RUN_TRADE_MODEL_CONFIG, async () => {
+export const runTradeModelADA = onSchedule(RUN_TRADE_MODEL_CONFIG, async () => {
   try {
     const predictor = new TradeModelPredictor();
 

@@ -122,12 +122,6 @@ export interface TradeDecision {
   momentum: number;
 }
 
-export interface RecieveSMSRequest {
-  body: {
-    text: string;
-  };
-}
-
 export interface TradeRecommendation {
   probability: number;
   recommendation: Recommendation;

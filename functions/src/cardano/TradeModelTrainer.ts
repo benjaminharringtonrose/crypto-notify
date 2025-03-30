@@ -90,12 +90,7 @@ export class TradeModelTrainer {
       this.model = factory.createModel();
 
       const bestWeightsCallback = new BestWeightsCallback();
-      const predictionLoggerCallback = new PredictionLoggerCallback(
-        X_val,
-        X_train,
-        y_train,
-        this.lossFn
-      );
+      const predictionLoggerCallback = new PredictionLoggerCallback(X_val);
       const cyclicLRCallback = new CyclicLearningRateCallback(
         0.00005,
         this.config.initialLearningRate,
@@ -141,6 +136,12 @@ export class TradeModelTrainer {
 
       console.log(
         `Training Buy Ratio: ${y.filter((l) => l === 1).length / y.length}`
+      );
+
+      console.log(
+        "Memory after training:",
+        tf.memory().numBytes / 1024 / 1024,
+        "MB"
       );
 
       return { X_mean, X_std };

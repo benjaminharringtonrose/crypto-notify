@@ -104,6 +104,7 @@ export class TradeModelBacktester {
         peakPrice,
         buyTimestamp,
         currentTimestamp,
+        winStreak,
       });
 
       if (trade) {

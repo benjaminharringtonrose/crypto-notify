@@ -29,8 +29,8 @@ export class TradingStrategy {
   private minHoldDays: number;
   private minConfidence: number;
   private profitTakeMultiplier: number;
-  private buyProbThreshold: number; // Added
-  private sellProbThreshold: number; // Added
+  private buyProbThreshold: number;
+  private sellProbThreshold: number;
   private smaPeriod: number;
   private breakoutThreshold: number;
 
@@ -47,7 +47,7 @@ export class TradingStrategy {
     buyProbThreshold = MODEL_CONSTANTS.BUY_PROB_THRESHOLD_DEFAULT,
     sellProbThreshold = MODEL_CONSTANTS.SELL_PROB_THRESHOLD_DEFAULT,
     smaPeriod = 20,
-    breakoutThreshold = 1.1,
+    breakoutThreshold = 1.0,
   }: TradingStrategyParams = {}) {
     this.predictor = new TradeModelPredictor();
     this.strategyType = strategyType;
@@ -72,6 +72,15 @@ export class TradingStrategy {
       : prices[prices.length - 1];
   }
 
+  private calculateEMA(prices: number[], period: number): number {
+    const k = 2 / (period + 1);
+    let ema = prices[0];
+    for (let i = 1; i < prices.length && i < period; i++) {
+      ema = prices[i] * k + ema * (1 - k);
+    }
+    return ema;
+  }
+
   public async decideTrade({
     adaPrices,
     adaVolumes,
@@ -83,6 +92,7 @@ export class TradingStrategy {
     peakPrice,
     buyTimestamp,
     currentTimestamp,
+    winStreak = 0,
   }: {
     adaPrices: number[];
     adaVolumes: number[];
@@ -94,8 +104,10 @@ export class TradingStrategy {
     peakPrice: number | undefined;
     buyTimestamp: string | undefined;
     currentTimestamp: string;
+    winStreak?: number;
   }): Promise<{ trade: Trade | null; confidence: number }> {
     const currentPrice = adaPrices[adaPrices.length - 1];
+    const currentVolume = adaVolumes[adaVolumes.length - 1];
     const prediction = await this.predictor.predict(
       adaPrices,
       adaVolumes,
@@ -115,6 +127,14 @@ export class TradingStrategy {
       trendStrength,
       atrBreakout,
     } = prediction;
+
+    const daysSinceLastTrade = buyTimestamp
+      ? (new Date(currentTimestamp).getTime() -
+          new Date(buyTimestamp).getTime()) /
+        (1000 * 60 * 60 * 24)
+      : Infinity;
+    const dynamicBreakoutThreshold =
+      daysSinceLastTrade > 30 ? 0.8 : this.breakoutThreshold;
 
     const dynamicStopLossMultiplier =
       confidence > 0.7
@@ -192,7 +212,9 @@ export class TradingStrategy {
         volatilityAdjustedMomentum,
         trendStrength,
         atrBreakout,
-        adaPrices
+        adaPrices,
+        adaVolumes,
+        dynamicBreakoutThreshold
       );
       if (buyConditions && capital > 0) {
         const volatilityAdjustedSize = Math.min(
@@ -204,9 +226,14 @@ export class TradingStrategy {
             ? volatilityAdjustedSize * 1.2
             : volatilityAdjustedSize;
         const confidenceBoost = confidence > 0.7 ? 1.2 : 1.0;
+        const winStreakBoost =
+          this.strategyType === StrategyType.Momentum && winStreak > 1
+            ? 1 + winStreak * 0.15
+            : 1.0; // Increased scaling
         const positionSize = Math.min(
           trendAdjustedSize *
             confidenceBoost *
+            winStreakBoost *
             Math.min(buyProb / this.buyProbThreshold, 2.0),
           0.25
         );
@@ -225,12 +252,16 @@ export class TradingStrategy {
             4
           )}, Trend Strength=${trendStrength.toFixed(
             4
-          )}, ATR Breakout=${atrBreakout.toFixed(4)}`
+          )}, ATR Breakout=${atrBreakout.toFixed(
+            4
+          )}, Volume=${currentVolume.toFixed(2)}`
         );
         console.log(
           `Position Size: ${positionSize.toFixed(4)}, ATR: ${atr.toFixed(
             4
-          )}, MinConfidence: ${this.minConfidence.toFixed(2)}`
+          )}, MinConfidence: ${this.minConfidence.toFixed(
+            2
+          )}, WinStreakBoost: ${winStreakBoost.toFixed(2)}`
         );
         return {
           trade: {
@@ -256,7 +287,9 @@ export class TradingStrategy {
             4
           )}, Trend Strength=${trendStrength.toFixed(
             4
-          )}, ATR Breakout=${atrBreakout.toFixed(4)}`
+          )}, ATR Breakout=${atrBreakout.toFixed(
+            4
+          )}, Volume=${currentVolume.toFixed(2)}`
         );
       }
     }
@@ -273,16 +306,25 @@ export class TradingStrategy {
     volatilityAdjustedMomentum: number,
     trendStrength: number,
     atrBreakout: number,
-    prices: number[]
+    prices: number[],
+    volumes: number[],
+    dynamicBreakoutThreshold: number
   ): boolean {
+    const currentVolume = volumes[volumes.length - 1];
+    const avgVolume =
+      volumes.slice(-this.smaPeriod).reduce((sum, v) => sum + v, 0) /
+      Math.min(volumes.length, this.smaPeriod);
+
     switch (this.strategyType) {
       case StrategyType.Momentum:
         return (
           buyProb > this.buyProbThreshold &&
           confidence >= this.minConfidence &&
           shortMomentum > 0.01 &&
-          volatilityAdjustedMomentum > 0 &&
-          trendStrength > 0.005
+          volatilityAdjustedMomentum > 0.3 && // Lowered from 0.5
+          trendStrength > 0.005 &&
+          atrBreakout > dynamicBreakoutThreshold &&
+          currentVolume > avgVolume * 1.2 // Added volume sensitivity
         );
 
       case StrategyType.MeanReversion:
@@ -291,7 +333,7 @@ export class TradingStrategy {
         return (
           buyProb > this.buyProbThreshold &&
           confidence >= this.minConfidence &&
-          deviation < -0.02 &&
+          deviation < -0.015 &&
           shortMomentum > -0.01 &&
           momentumDivergence > 0
         );
@@ -300,21 +342,25 @@ export class TradingStrategy {
         return (
           buyProb > this.buyProbThreshold &&
           confidence >= this.minConfidence &&
-          atrBreakout > this.breakoutThreshold &&
+          atrBreakout > dynamicBreakoutThreshold &&
           shortMomentum > 0.01 &&
-          trendSlope > 0.005
+          trendSlope > 0.005 &&
+          currentVolume > avgVolume * 1.3 // Lowered from 1.5
         );
 
       case StrategyType.TrendFollowing:
-        const smaLong = this.calculateSMA(prices, this.smaPeriod);
-        const smaShort = this.calculateSMA(
-          prices,
+        const emaLong = this.calculateEMA(
+          prices.slice(-this.smaPeriod),
+          this.smaPeriod
+        );
+        const emaShort = this.calculateEMA(
+          prices.slice(-Math.floor(this.smaPeriod / 2)),
           Math.floor(this.smaPeriod / 2)
         );
         return (
           buyProb > this.buyProbThreshold &&
           confidence >= this.minConfidence &&
-          smaShort > smaLong &&
+          emaShort > emaLong &&
           trendSlope > 0.005 &&
           trendStrength > 0.01
         );
@@ -351,7 +397,7 @@ export class TradingStrategy {
         return (
           sellProb > this.sellProbThreshold ||
           momentum > 0.03 ||
-          priceChange >= 0.02 ||
+          priceChange >= 0.015 ||
           priceChange <= -stopLossLevel ||
           currentPrice <= trailingStopLevel
         );

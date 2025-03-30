@@ -18,8 +18,8 @@ FirebaseService.getInstance();
 export class TradeModelTrainer {
   private readonly config: ModelConfig = {
     timesteps: 30,
-    epochs: 55,
-    batchSize: 256,
+    epochs: 50,
+    batchSize: 128,
     initialLearningRate: 0.0008,
   };
   private bucket = admin.storage().bucket();
@@ -79,6 +79,7 @@ export class TradeModelTrainer {
         .shuffle(trainSize)
         .batch(this.config.batchSize)
         .prefetch(2);
+
       const valDataset = tf.data
         .zip({
           xs: tf.data.array(X_val.arraySync() as number[][][]),

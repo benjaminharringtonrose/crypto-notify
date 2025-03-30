@@ -34,8 +34,13 @@ export const triggerTrainingNow = onRequest(
   },
   async (req, res) => {
     try {
+      const startTime = performance.now();
       await runTraining();
-      res.send("Training triggered successfully.");
+      const endTime = performance.now();
+      const executionTime = (endTime - startTime) / 1000;
+      res.send(
+        `Training triggered successfully. Execution time: ${executionTime} milliseconds`
+      );
     } catch (error) {
       res.status(504);
       console.log("Error training: ", JSON.stringify(error));

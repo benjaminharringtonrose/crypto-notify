@@ -1,11 +1,8 @@
 import * as functions from "firebase-functions";
-import * as admin from "firebase-admin";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { CoinbaseTradeExecutor } from "../cardano/CoinbaseTradeExecutor";
 import { TradingStrategy } from "../cardano/TradingStrategy";
 import { sendSMS } from "../utils";
-
-admin.initializeApp();
 
 const strategy = new TradingStrategy();
 

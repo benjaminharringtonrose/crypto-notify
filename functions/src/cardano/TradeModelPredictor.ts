@@ -3,7 +3,7 @@ import { ModelWeightManager } from "./TradeModelWeightManager";
 import TradeModelFactory from "./TradeModelFactory";
 import { FeatureSequenceGenerator } from "./FeatureSequenceGenerator";
 import { FirebaseService } from "../api/FirebaseService";
-import { MODEL_CONSTANTS } from "../constants";
+import { MODEL_CONSTANTS, PERIODS } from "../constants";
 
 export class TradeModelPredictor {
   private weightManager: ModelWeightManager;
@@ -52,7 +52,9 @@ export class TradeModelPredictor {
     trendSlope: number;
     atr: number;
     momentumDivergence: number;
-    volatilityAdjustedMomentum: number; // New: Momentum/ATR
+    volatilityAdjustedMomentum: number;
+    trendStrength: number;
+    atrBreakout: number;
   }> {
     if (!this.isWeightsLoaded) {
       console.log("Weights not yet loaded, awaiting load...");
@@ -126,7 +128,15 @@ export class TradeModelPredictor {
         : 0;
 
     const momentumDivergence = shortMomentum - momentum;
-    const volatilityAdjustedMomentum = momentum / (atr || 0.01); // New: Adjust for volatility
+    const volatilityAdjustedMomentum = momentum / (atr || 0.01);
+    const trendStrength = trendSlope * volatilityAdjustedMomentum;
+
+    const atrWindow = sequence.slice(-PERIODS.ATR_BREAKOUT).map((s) => s[11]);
+    const atrSma =
+      atrWindow.length >= PERIODS.ATR_BREAKOUT
+        ? atrWindow.reduce((sum, val) => sum + val, 0) / atrWindow.length
+        : atr;
+    const atrBreakout = atr / atrSma;
 
     const endTime = performance.now();
     console.log(
@@ -150,7 +160,11 @@ export class TradeModelPredictor {
         4
       )}, Momentum Divergence: ${momentumDivergence.toFixed(
         4
-      )}, Vol-Adj Momentum: ${volatilityAdjustedMomentum.toFixed(4)}`
+      )}, Vol-Adj Momentum: ${volatilityAdjustedMomentum.toFixed(
+        4
+      )}, Trend Strength: ${trendStrength.toFixed(
+        4
+      )}, ATR Breakout: ${atrBreakout.toFixed(4)}`
     );
 
     features.dispose();
@@ -172,6 +186,8 @@ export class TradeModelPredictor {
       atr,
       momentumDivergence,
       volatilityAdjustedMomentum,
+      trendStrength,
+      atrBreakout,
     };
   }
 }

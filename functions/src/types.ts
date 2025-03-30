@@ -199,3 +199,10 @@ export interface BacktestResult {
   portfolioHistory: { timestamp: string; value: number }[];
   trades: Trade[];
 }
+
+export enum StrategyType {
+  Momentum = "momentum",
+  MeanReversion = "mean_reversion",
+  Breakout = "breakout",
+  TrendFollowing = "trend_following",
+}

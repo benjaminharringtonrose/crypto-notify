@@ -1,15 +1,15 @@
 import * as tf from "@tensorflow/tfjs-node";
-import { BacktestResult, Trade, Recommendation } from "../types";
+import { BacktestResult, Trade, Recommendation, StrategyType } from "../types";
 import { FirebaseService } from "../api/FirebaseService";
 import { CryptoCompareService } from "../api/CryptoCompareService";
-import { TradingBot } from "./TradingBot";
+import { TradingStrategy } from "./TradingStrategy";
 import { MODEL_CONSTANTS } from "../constants";
 
 FirebaseService.getInstance();
 const cryptoCompare = new CryptoCompareService();
 
 export class TradeModelBacktester {
-  private bot: TradingBot;
+  private strategy: TradingStrategy;
   private initialCapital: number;
 
   constructor(
@@ -22,11 +22,11 @@ export class TradeModelBacktester {
     minHoldDays: number = MODEL_CONSTANTS.MIN_HOLD_DAYS_DEFAULT,
     minConfidence: number = MODEL_CONSTANTS.MIN_CONFIDENCE_DEFAULT,
     profitTakeMultiplier: number = MODEL_CONSTANTS.PROFIT_TAKE_MULTIPLIER_DEFAULT,
-    logitThreshold: number = MODEL_CONSTANTS.LOGIT_THRESHOLD_DEFAULT,
     buyProbThreshold: number = MODEL_CONSTANTS.BUY_PROB_THRESHOLD_DEFAULT,
     sellProbThreshold: number = MODEL_CONSTANTS.SELL_PROB_THRESHOLD_DEFAULT
   ) {
-    this.bot = new TradingBot({
+    this.strategy = new TradingStrategy({
+      strategyType: StrategyType.Momentum,
       basePositionSize,
       slippage,
       commission,
@@ -35,7 +35,6 @@ export class TradeModelBacktester {
       minHoldDays,
       minConfidence,
       profitTakeMultiplier,
-      logitThreshold,
       buyProbThreshold,
       sellProbThreshold,
     });
@@ -94,7 +93,7 @@ export class TradeModelBacktester {
         value: portfolioValue,
       });
 
-      const { trade, confidence } = await this.bot.decideTrade({
+      const { trade, confidence } = await this.strategy.decideTrade({
         adaPrices,
         adaVolumes,
         btcPrices,
@@ -111,12 +110,12 @@ export class TradeModelBacktester {
         if (trade.type === Recommendation.Buy && consecutiveBuys < 4) {
           const minConfidence =
             consecutiveBuys === 0
-              ? 0.55 // Relaxed from 0.6
+              ? 0.5
               : consecutiveBuys === 1
-              ? 0.6 // Relaxed from 0.65
+              ? 0.55
               : consecutiveBuys === 2
-              ? 0.65 // Relaxed from 0.7
-              : 0.7; // Relaxed from 0.75
+              ? 0.6
+              : 0.65;
           if (confidence >= minConfidence) {
             capital -= trade.usdValue;
             holdings += trade.adaAmount;
@@ -182,7 +181,7 @@ export class TradeModelBacktester {
             ).toFixed(2)}%, Rolling Sharpe (30d): ${this.calculateRollingSharpe(
               returns.slice(-30),
               30
-            ).toFixed(2)}`
+            ).toFixed(2)}, Win Streak: ${winStreak}, Loss Streak: ${lossStreak}`
           );
         }
       }
@@ -238,6 +237,11 @@ export class TradeModelBacktester {
     );
     console.log(
       `Avg Win: $${avgWin.toFixed(2)}, Avg Loss: $${avgLoss.toFixed(2)}`
+    );
+    console.log(
+      `Total Trades: ${totalTrades}, Wins: ${wins}, Losses: ${
+        totalTrades / 2 - wins
+      }`
     );
 
     return {
@@ -314,5 +318,9 @@ export class TradeModelBacktester {
           }, 0) /
           (trades.length / 2)
       : 0;
+  }
+
+  public setStrategy(strategyType: StrategyType): void {
+    this.strategy.setStrategy(strategyType);
   }
 }

@@ -11,8 +11,8 @@ import {
 import { sendSMS, formatAnalysisResults } from "../utils";
 import { getFirestore } from "firebase-admin/firestore";
 import { TradeModelPredictor } from "../cardano/TradeModelPredictor";
-import { getHistoricalData } from "../api/getHistoricalData";
-import { getCurrentPrice } from "../api/getCurrentPrice";
+import { CoinGeckoService } from "../api/CoinGeckoService";
+import { CryptoCompareService } from "../api/CryptoCompareService";
 
 dotenv.config();
 
@@ -29,14 +29,17 @@ export const runTradeModelADA = onSchedule(
   async () => {
     try {
       const predictor = new TradeModelPredictor();
-
-      const days = 30;
-      const adaData = await getHistoricalData("ADA", days);
-      const btcData = await getHistoricalData("BTC", days);
-      const currentPrice = await getCurrentPrice({
+      const cryptoCompare = new CryptoCompareService();
+      const coinGecko = new CoinGeckoService({
         id: CryptoIds.Cardano,
         currency: Currencies.USD,
       });
+
+      const days = 30;
+
+      const adaData = await cryptoCompare.getHistoricalData("ADA", days);
+      const btcData = await cryptoCompare.getHistoricalData("BTC", days);
+      const currentPrice = await coinGecko.getCurrentPrice();
 
       if (adaData.prices.length < 30 || btcData.prices.length < 30) {
         throw new Error("Insufficient historical data for prediction");

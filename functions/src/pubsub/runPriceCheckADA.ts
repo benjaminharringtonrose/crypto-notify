@@ -1,7 +1,7 @@
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { firestore } from "firebase-admin";
 import dotenv from "dotenv";
-import { getCurrentPrice } from "../api/getCurrentPrice";
+import { CoinGeckoService } from "../api/CoinGeckoService";
 import { MERGE_PAYLOAD, NOTIFICATION_COOLDOWN, PRICES } from "../constants";
 import {
   sendSMS,
@@ -15,10 +15,12 @@ dotenv.config();
 
 export const runPriceCheckADA = onSchedule(`*/10 * * * *`, async () => {
   try {
-    const currentPrice = await getCurrentPrice({
+    const coinGecko = new CoinGeckoService({
       id: CryptoIds.Cardano,
       currency: Currencies.USD,
     });
+
+    const currentPrice = await coinGecko.getCurrentPrice();
 
     console.log(`Current Cardano price: $${currentPrice}`);
 

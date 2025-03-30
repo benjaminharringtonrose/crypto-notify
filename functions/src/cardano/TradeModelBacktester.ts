@@ -1,10 +1,12 @@
 import * as tf from "@tensorflow/tfjs-node";
 import { TradeModelPredictor } from "./TradeModelPredictor";
-import { getHistoricalData } from "../api/getHistoricalData";
 import { BacktestResult, Trade, Recommendation } from "../types";
 import { FirebaseService } from "../api/FirebaseService";
+import { CryptoCompareService } from "../api/CryptoCompareService";
 
 FirebaseService.getInstance();
+
+const cryptoCompare = new CryptoCompareService();
 
 export class TradeModelBacktester {
   private predictor: TradeModelPredictor;
@@ -69,8 +71,8 @@ export class TradeModelBacktester {
     const days = Math.ceil(
       (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
     );
-    const adaData = await getHistoricalData(adaSymbol, days);
-    const btcData = await getHistoricalData(btcSymbol, days);
+    const adaData = await cryptoCompare.getHistoricalData(adaSymbol, days);
+    const btcData = await cryptoCompare.getHistoricalData(btcSymbol, days);
 
     if (adaData.prices.length !== btcData.prices.length) {
       throw new Error("Mismatch in ADA and BTC historical data lengths");

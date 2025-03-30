@@ -1,8 +1,9 @@
+import { CryptoCompareService } from "../api/CryptoCompareService";
 import { TradeModelBacktester } from "../cardano/TradeModelBacktester";
-import { getHistoricalData } from "../api/getHistoricalData";
 
 async function runMultiPeriodBacktest() {
   const backtester = new TradeModelBacktester();
+  const cryptoCompare = new CryptoCompareService();
   const results: { period: string; result: any }[] = [];
 
   const startYear = 2020;
@@ -26,7 +27,7 @@ async function runMultiPeriodBacktest() {
       const result = await backtester.backtest(startDate, endDate);
 
       const adaPrices = (
-        await getHistoricalData(
+        await cryptoCompare.getHistoricalData(
           "ADA",
           Math.ceil(
             (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)

@@ -1,6 +1,8 @@
-import { getHistoricalData } from "../api/getHistoricalData";
+import { CryptoCompareService } from "../api/CryptoCompareService";
 import { HistoricalData, ModelConfig } from "../types";
 import FeatureCalculator from "./FeatureCalculator";
+
+const cryptoCompare = new CryptoCompareService();
 
 export class DataProcessor {
   private readonly config: ModelConfig;
@@ -23,9 +25,9 @@ export class DataProcessor {
   }> {
     const startDaysAgo = this.backtestStartDays + this.trainingPeriodDays;
     console.log("Fetching historical data...");
-    const adaData = await getHistoricalData("ADA", startDaysAgo);
+    const adaData = await cryptoCompare.getHistoricalData("ADA", startDaysAgo);
     await new Promise((resolve) => setTimeout(resolve, 50));
-    const btcData = await getHistoricalData("BTC", startDaysAgo);
+    const btcData = await cryptoCompare.getHistoricalData("BTC", startDaysAgo);
     console.log(
       `ADA data length: ${adaData.prices.length}, BTC data length: ${btcData.prices.length}`
     );

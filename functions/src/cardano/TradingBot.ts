@@ -98,6 +98,7 @@ export class TradingBot {
       trendSlope,
       atr,
       momentumDivergence,
+      volatilityAdjustedMomentum,
     } = prediction;
 
     const dynamicStopLossMultiplier =
@@ -112,7 +113,7 @@ export class TradingBot {
     );
 
     if (atr > MODEL_CONSTANTS.MAX_ATR_THRESHOLD) {
-      console.log(`ATR ${atr.toFixed(4)} exceeds threshold, skipping trade`);
+      console.log(`Trade skipped: ATR ${atr.toFixed(4)} exceeds threshold`);
       return { trade: null, confidence };
     }
 
@@ -125,7 +126,7 @@ export class TradingBot {
       const stopLossLevel = dynamicStopLossMultiplier * atr;
       const profitTakeLevel = lastBuyPrice + dynamicProfitTake * atr;
       const trailingStopLevel =
-        priceChange >= MODEL_CONSTANTS.MIN_PROFIT_THRESHOLD // Only activate after min profit
+        priceChange >= MODEL_CONSTANTS.MIN_PROFIT_THRESHOLD
           ? (peakPrice || lastBuyPrice) * (1 - dynamicTrailingStop)
           : Infinity;
 
@@ -134,7 +135,7 @@ export class TradingBot {
           (sellLogit > buyLogit + this.logitThreshold &&
             sellProb > this.sellProbThreshold) ||
           (momentum < -0.03 && shortMomentum < -0.01) ||
-          (momentumDivergence < -0.05 && momentum < 0) || // New: Exit on divergence
+          (momentumDivergence < -0.05 && momentum < 0) ||
           priceChange <= -stopLossLevel ||
           currentPrice <= trailingStopLevel ||
           currentPrice >= profitTakeLevel
@@ -167,9 +168,10 @@ export class TradingBot {
       buyLogit > sellLogit + this.logitThreshold &&
       buyProb > this.buyProbThreshold &&
       confidence >= this.minConfidence &&
-      shortMomentum > 0.01 && // Relaxed from 0.015
-      trendSlope > 0.01 && // Relaxed from 0.015
-      momentumDivergence > -0.05 && // New: Avoid weakening trends
+      shortMomentum > 0.005 && // Relaxed from 0.01
+      trendSlope > 0.005 && // Relaxed from 0.01
+      momentumDivergence > -0.03 && // Relaxed from -0.05
+      volatilityAdjustedMomentum > -1.0 && // New: Ensure momentum isn’t too weak relative to volatility
       capital > 0
     ) {
       const volatilityAdjustedSize = Math.min(
@@ -196,7 +198,9 @@ export class TradingBot {
           4
         )}, TrendSlope=${trendSlope.toFixed(
           4
-        )}, Divergence=${momentumDivergence.toFixed(4)}`
+        )}, Divergence=${momentumDivergence.toFixed(
+          4
+        )}, Vol-Adj Momentum=${volatilityAdjustedMomentum.toFixed(4)}`
       );
       console.log(
         `Position Size: ${positionSize.toFixed(4)}, ATR: ${atr.toFixed(
@@ -213,6 +217,18 @@ export class TradingBot {
         },
         confidence,
       };
+    } else {
+      console.log(
+        `Trade skipped: Confidence=${confidence.toFixed(
+          4
+        )}, ShortMomentum=${shortMomentum.toFixed(
+          4
+        )}, TrendSlope=${trendSlope.toFixed(
+          4
+        )}, Divergence=${momentumDivergence.toFixed(
+          4
+        )}, Vol-Adj Momentum=${volatilityAdjustedMomentum.toFixed(4)}`
+      );
     }
 
     return { trade: null, confidence };

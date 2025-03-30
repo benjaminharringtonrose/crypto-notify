@@ -111,12 +111,12 @@ export class TradeModelBacktester {
         if (trade.type === Recommendation.Buy && consecutiveBuys < 4) {
           const minConfidence =
             consecutiveBuys === 0
-              ? 0.6
+              ? 0.55 // Relaxed from 0.6
               : consecutiveBuys === 1
-              ? 0.65
+              ? 0.6 // Relaxed from 0.65
               : consecutiveBuys === 2
-              ? 0.7
-              : 0.75;
+              ? 0.65 // Relaxed from 0.7
+              : 0.7; // Relaxed from 0.75
           if (confidence >= minConfidence) {
             capital -= trade.usdValue;
             holdings += trade.adaAmount;
@@ -173,14 +173,16 @@ export class TradeModelBacktester {
         const prevValue = portfolioHistory[portfolioHistory.length - 2].value;
         returns.push((portfolioValue - prevValue) / prevValue);
         if (i % 30 === 0) {
-          // Log every 30 days
           console.log(
             `Portfolio Trend at ${currentTimestamp}: Value: $${portfolioValue.toFixed(
               2
             )}, Change: ${(
               ((portfolioValue - prevValue) / prevValue) *
               100
-            ).toFixed(2)}%`
+            ).toFixed(2)}%, Rolling Sharpe (30d): ${this.calculateRollingSharpe(
+              returns.slice(-30),
+              30
+            ).toFixed(2)}`
           );
         }
       }

@@ -51,7 +51,8 @@ export class TradeModelPredictor {
     shortMomentum: number;
     trendSlope: number;
     atr: number;
-    momentumDivergence: number; // New: Short vs. long momentum
+    momentumDivergence: number;
+    volatilityAdjustedMomentum: number; // New: Momentum/ATR
   }> {
     if (!this.isWeightsLoaded) {
       console.log("Weights not yet loaded, awaiting load...");
@@ -124,7 +125,8 @@ export class TradeModelPredictor {
           (trendWindow.length - 1)
         : 0;
 
-    const momentumDivergence = shortMomentum - momentum; // New: Divergence check
+    const momentumDivergence = shortMomentum - momentum;
+    const volatilityAdjustedMomentum = momentum / (atr || 0.01); // New: Adjust for volatility
 
     const endTime = performance.now();
     console.log(
@@ -146,7 +148,9 @@ export class TradeModelPredictor {
         4
       )}, Trend Slope: ${trendSlope.toFixed(
         4
-      )}, Momentum Divergence: ${momentumDivergence.toFixed(4)}`
+      )}, Momentum Divergence: ${momentumDivergence.toFixed(
+        4
+      )}, Vol-Adj Momentum: ${volatilityAdjustedMomentum.toFixed(4)}`
     );
 
     features.dispose();
@@ -167,6 +171,7 @@ export class TradeModelPredictor {
       trendSlope,
       atr,
       momentumDivergence,
+      volatilityAdjustedMomentum,
     };
   }
 }

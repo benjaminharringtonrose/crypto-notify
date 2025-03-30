@@ -8,6 +8,7 @@ export const runModelTrainingADA = onSchedule(
   {
     schedule: `*/30 * * * *`,
     memory: "4GiB",
+    timeoutSeconds: 540,
   },
   async () => {
     console.log("Training started...");

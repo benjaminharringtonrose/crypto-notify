@@ -69,6 +69,13 @@ export class TradeModelBacktester {
     let maxLossStreak = 0;
     let winStreak = 0;
     let lossStreak = 0;
+    let cumulativePL = 0;
+    const strategyCount: { [key in StrategyType]: number } = {
+      [StrategyType.Momentum]: 0,
+      [StrategyType.MeanReversion]: 0,
+      [StrategyType.Breakout]: 0,
+      [StrategyType.TrendFollowing]: 0,
+    };
 
     console.log(`Starting Capital: $${capital.toFixed(2)}`);
     console.log(
@@ -79,7 +86,6 @@ export class TradeModelBacktester {
       const currentTimestamp = new Date(
         startDate.getTime() + i * 24 * 60 * 60 * 1000
       ).toISOString();
-
       const adaPrices = adaData.prices.slice(0, i + 1);
       const adaVolumes = adaData.volumes.slice(0, i + 1);
       const btcPrices = btcData.prices.slice(0, i + 1);
@@ -105,6 +111,8 @@ export class TradeModelBacktester {
         currentTimestamp,
         winStreak,
       });
+
+      strategyCount[this.strategy.getCurrentStrategy()]++;
 
       if (trade) {
         if (trade.type === Recommendation.Buy && consecutiveBuys < 4) {
@@ -136,6 +144,7 @@ export class TradeModelBacktester {
           }
         } else if (trade.type === Recommendation.Sell) {
           const profitLoss = trade.usdValue - holdings * (lastBuyPrice || 0);
+          cumulativePL += profitLoss;
           capital += trade.usdValue;
           trades.push(trade);
           console.log(
@@ -146,6 +155,7 @@ export class TradeModelBacktester {
             )}, Confidence: ${confidence.toFixed(2)}`
           );
           console.log(`Trade Success: ${profitLoss > 0 ? "Win" : "Loss"}`);
+          console.log(`Cumulative P/L: $${cumulativePL.toFixed(2)}`);
           if (profitLoss > 0) {
             winStreak++;
             lossStreak = 0;
@@ -242,6 +252,18 @@ export class TradeModelBacktester {
       `Total Trades: ${totalTrades}, Wins: ${wins}, Losses: ${
         totalTrades / 2 - wins
       }`
+    );
+    console.log(
+      "Strategy Usage:",
+      Object.fromEntries(
+        Object.entries(strategyCount).map(([k, v]) => [
+          k,
+          `${(
+            (v / (adaData.prices.length - MODEL_CONSTANTS.TIMESTEPS)) *
+            100
+          ).toFixed(2)}%`,
+        ])
+      )
     );
 
     return {

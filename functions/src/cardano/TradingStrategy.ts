@@ -19,7 +19,7 @@ interface TradingStrategyParams {
 
 export class TradingStrategy {
   private predictor: TradeModelPredictor;
-  private currentStrategy: StrategyType; // Tracks the dynamically selected strategy
+  private currentStrategy: StrategyType;
   private basePositionSize: number;
   private slippage: number;
   private commission: number;
@@ -45,10 +45,10 @@ export class TradingStrategy {
     buyProbThreshold = MODEL_CONSTANTS.BUY_PROB_THRESHOLD_DEFAULT,
     sellProbThreshold = MODEL_CONSTANTS.SELL_PROB_THRESHOLD_DEFAULT,
     smaPeriod = 20,
-    breakoutThreshold = 1.0,
+    breakoutThreshold = 0.8, // Reduced from 1.0
   }: TradingStrategyParams = {}) {
     this.predictor = new TradeModelPredictor();
-    this.currentStrategy = StrategyType.Momentum; // Default
+    this.currentStrategy = StrategyType.Momentum;
     this.basePositionSize = basePositionSize;
     this.slippage = slippage;
     this.commission = commission;
@@ -106,7 +106,16 @@ export class TradingStrategy {
       Math.floor(this.smaPeriod / 2)
     );
 
-    // Momentum: Strong short-term momentum and volatility
+    if (
+      shortMomentum > 0.02 &&
+      volatilityAdjustedMomentum > 0.2 &&
+      trendStrength > 0.005 &&
+      emaShort > emaLong
+    ) {
+      console.log("Selected Strategy: MomentumTrendHybrid");
+      return StrategyType.Momentum; // Hybrid approach
+    }
+
     if (
       shortMomentum > 0.02 &&
       volatilityAdjustedMomentum > 0.2 &&
@@ -116,7 +125,6 @@ export class TradingStrategy {
       return StrategyType.Momentum;
     }
 
-    // Mean Reversion: Significant deviation from mean, low momentum
     if (
       Math.abs(deviation) > 0.02 &&
       Math.abs(momentum) < 0.01 &&
@@ -126,7 +134,6 @@ export class TradingStrategy {
       return StrategyType.MeanReversion;
     }
 
-    // Breakout: High ATR breakout and volume spike
     if (
       atrBreakout > this.breakoutThreshold &&
       currentVolume > avgVolume * 1.3 &&
@@ -136,7 +143,6 @@ export class TradingStrategy {
       return StrategyType.Breakout;
     }
 
-    // Trend Following: Strong trend and EMA crossover
     if (
       Math.abs(trendSlope) > 0.01 &&
       emaShort > emaLong &&
@@ -146,7 +152,6 @@ export class TradingStrategy {
       return StrategyType.TrendFollowing;
     }
 
-    // Default to Momentum if no clear condition
     console.log("Selected Strategy: Momentum (default)");
     return StrategyType.Momentum;
   }
@@ -198,7 +203,6 @@ export class TradingStrategy {
       atrBreakout,
     } = prediction;
 
-    // Dynamically select strategy
     this.currentStrategy = this.selectStrategy(
       shortMomentum,
       momentum,
@@ -218,7 +222,6 @@ export class TradingStrategy {
       : Infinity;
     const dynamicBreakoutThreshold =
       daysSinceLastTrade > 15 ? 0.7 : this.breakoutThreshold;
-
     const dynamicStopLossMultiplier =
       confidence > 0.7
         ? this.stopLossMultiplier * 0.8
@@ -320,7 +323,7 @@ export class TradingStrategy {
             confidenceBoost *
             winStreakBoost *
             Math.min(buyProb / this.buyProbThreshold, 2.0),
-          0.25
+          confidence > 0.7 && trendStrength > 0.1 ? 0.35 : 0.25 // Dynamic max size
         );
         const tradeAmount = Math.min(capital * positionSize, capital);
         const effectivePrice = currentPrice * (1 + this.slippage);
@@ -360,26 +363,6 @@ export class TradingStrategy {
           },
           confidence,
         };
-      } else {
-        console.log(
-          `Trade skipped: Confidence=${confidence.toFixed(
-            4
-          )}, ShortMomentum=${shortMomentum.toFixed(
-            4
-          )}, TrendSlope=${trendSlope.toFixed(
-            4
-          )}, Divergence=${momentumDivergence.toFixed(
-            4
-          )}, Vol-Adj Momentum=${volatilityAdjustedMomentum.toFixed(
-            4
-          )}, Trend Strength=${trendStrength.toFixed(
-            4
-          )}, ATR Breakout=${atrBreakout.toFixed(
-            4
-          )}, Volume=${currentVolume.toFixed(2)}, Strategy=${
-            this.currentStrategy
-          }`
-        );
       }
     }
 
@@ -421,7 +404,6 @@ export class TradingStrategy {
           (atrBreakout > dynamicBreakoutThreshold || trendReversal) &&
           currentVolume > avgVolume * 1.2
         );
-
       case StrategyType.MeanReversion:
         const sma = this.calculateSMA(prices, this.smaPeriod);
         const deviation = (prices[prices.length - 1] - sma) / sma;
@@ -432,7 +414,6 @@ export class TradingStrategy {
           shortMomentum > -0.01 &&
           momentumDivergence > 0
         );
-
       case StrategyType.Breakout:
         return (
           buyProb > this.buyProbThreshold &&
@@ -442,7 +423,6 @@ export class TradingStrategy {
           trendSlope > 0.005 &&
           currentVolume > avgVolume * 1.3
         );
-
       case StrategyType.TrendFollowing:
         const emaLong = this.calculateEMA(
           prices.slice(-this.smaPeriod),
@@ -459,7 +439,6 @@ export class TradingStrategy {
           trendSlope > 0.005 &&
           trendStrength > 0.01
         );
-
       default:
         throw new Error(`Unknown strategy type: ${this.currentStrategy}`);
     }
@@ -487,7 +466,6 @@ export class TradingStrategy {
           currentPrice <= trailingStopLevel ||
           currentPrice >= profitTakeLevel
         );
-
       case StrategyType.MeanReversion:
         return (
           sellProb > this.sellProbThreshold ||
@@ -496,7 +474,6 @@ export class TradingStrategy {
           priceChange <= -stopLossLevel ||
           currentPrice <= trailingStopLevel
         );
-
       case StrategyType.Breakout:
         return (
           sellProb > this.sellProbThreshold ||
@@ -505,7 +482,6 @@ export class TradingStrategy {
           currentPrice <= trailingStopLevel ||
           currentPrice >= profitTakeLevel
         );
-
       case StrategyType.TrendFollowing:
         return (
           sellProb > this.sellProbThreshold ||
@@ -515,7 +491,6 @@ export class TradingStrategy {
           currentPrice <= trailingStopLevel ||
           currentPrice >= profitTakeLevel
         );
-
       default:
         throw new Error(`Unknown strategy type: ${this.currentStrategy}`);
     }

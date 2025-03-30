@@ -123,7 +123,7 @@ export class TradeModelTrainer {
         epochs: this.config.epochs,
         validationData: valDataset,
         callbacks: [
-          tf.callbacks.earlyStopping({ monitor: "val_loss", patience: 15 }),
+          tf.callbacks.earlyStopping({ monitor: "val_loss", patience: 20 }),
           bestWeightsCallback,
           predictionLoggerCallback,
           cyclicLRCallback,

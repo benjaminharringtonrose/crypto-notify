@@ -25,9 +25,10 @@ export class DataProcessor {
   }> {
     const startDaysAgo = this.backtestStartDays + this.trainingPeriodDays;
     console.log("Fetching historical data...");
-    const adaData = await cryptoCompare.getHistoricalData("ADA", startDaysAgo);
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    const btcData = await cryptoCompare.getHistoricalData("BTC", startDaysAgo);
+    const [adaData, btcData] = await Promise.all([
+      cryptoCompare.getHistoricalData("ADA", startDaysAgo),
+      cryptoCompare.getHistoricalData("BTC", startDaysAgo),
+    ]);
     console.log(
       `ADA data length: ${adaData.prices.length}, BTC data length: ${btcData.prices.length}`
     );
@@ -136,24 +137,6 @@ export class DataProcessor {
     return { X: balancedX, y: balancedY };
   }
 
-  private computeFeatureStats(features: number[][]): {
-    mean: number[];
-    std: number[];
-  } {
-    const numFeatures = features[0].length;
-    const means = Array(numFeatures).fill(0);
-    const stds = Array(numFeatures).fill(0);
-    features.forEach((seq) => seq.forEach((val, i) => (means[i] += val)));
-    means.forEach((sum, i) => (means[i] = sum / features.length));
-    features.forEach((seq) =>
-      seq.forEach((val, i) => (stds[i] += (val - means[i]) ** 2))
-    );
-    stds.forEach((sum, i) => (stds[i] = Math.sqrt(sum / features.length) || 1));
-    console.log(`Feature means: ${means.slice(0, 5)}...`);
-    console.log(`Feature stds: ${stds.slice(0, 5)}...`);
-    return { mean: means, std: means };
-  }
-
   private labelData({
     prices,
     dayIndex,
@@ -173,6 +156,24 @@ export class DataProcessor {
     const priceChangePercent =
       (futureAvg - prices[dayIndex]) / prices[dayIndex];
     return priceChangePercent > threshold ? 1 : 0;
+  }
+
+  public computeFeatureStats(features: number[][]): {
+    mean: number[];
+    std: number[];
+  } {
+    const numFeatures = features[0].length;
+    const means = Array(numFeatures).fill(0);
+    const stds = Array(numFeatures).fill(0);
+    features.forEach((seq) => seq.forEach((val, i) => (means[i] += val)));
+    means.forEach((sum, i) => (means[i] = sum / features.length));
+    features.forEach((seq) =>
+      seq.forEach((val, i) => (stds[i] += (val - means[i]) ** 2))
+    );
+    stds.forEach((sum, i) => (stds[i] = Math.sqrt(sum / features.length) || 1));
+    console.log(`Feature means: ${means.slice(0, 5)}...`);
+    console.log(`Feature stds: ${stds.slice(0, 5)}...`);
+    return { mean: means, std: means };
   }
 
   public async prepareData(): Promise<{

@@ -18,8 +18,8 @@ FirebaseService.getInstance();
 export class TradeModelTrainer {
   private readonly config: ModelConfig = {
     timesteps: 30,
-    epochs: 70,
-    batchSize: 64,
+    epochs: 50,
+    batchSize: 128,
     initialLearningRate: 0.0008,
   };
   private bucket = admin.storage().bucket();
@@ -50,10 +50,10 @@ export class TradeModelTrainer {
       [y.length, 2]
     );
     const X_mean = tf.tensor1d(
-      this.dataProcessor["computeFeatureStats"](X.flat(1)).mean
+      this.dataProcessor.computeFeatureStats(X.flat(1)).mean
     );
     const X_std = tf.tensor1d(
-      this.dataProcessor["computeFeatureStats"](X.flat(1)).std
+      this.dataProcessor.computeFeatureStats(X.flat(1)).std
     );
     const X_normalized = X_tensor.sub(X_mean).div(X_std);
 

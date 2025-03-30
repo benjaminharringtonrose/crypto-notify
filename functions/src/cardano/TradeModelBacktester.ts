@@ -26,7 +26,6 @@ export class TradeModelBacktester {
     sellProbThreshold: number = MODEL_CONSTANTS.SELL_PROB_THRESHOLD_DEFAULT
   ) {
     this.strategy = new TradingStrategy({
-      strategyType: StrategyType.Momentum,
       basePositionSize,
       slippage,
       commission,

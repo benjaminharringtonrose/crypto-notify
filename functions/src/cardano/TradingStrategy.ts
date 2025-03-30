@@ -3,7 +3,6 @@ import { Trade, Recommendation, StrategyType } from "../types";
 import { MODEL_CONSTANTS } from "../constants";
 
 interface TradingStrategyParams {
-  strategyType?: StrategyType;
   basePositionSize?: number;
   slippage?: number;
   commission?: number;
@@ -20,7 +19,7 @@ interface TradingStrategyParams {
 
 export class TradingStrategy {
   private predictor: TradeModelPredictor;
-  private strategyType: StrategyType;
+  private currentStrategy: StrategyType; // Tracks the dynamically selected strategy
   private basePositionSize: number;
   private slippage: number;
   private commission: number;
@@ -35,7 +34,6 @@ export class TradingStrategy {
   private breakoutThreshold: number;
 
   constructor({
-    strategyType = StrategyType.Momentum,
     basePositionSize = MODEL_CONSTANTS.BASE_POSITION_SIZE_DEFAULT,
     slippage = MODEL_CONSTANTS.SLIPPAGE,
     commission = MODEL_CONSTANTS.COMMISSION,
@@ -50,7 +48,7 @@ export class TradingStrategy {
     breakoutThreshold = 1.0,
   }: TradingStrategyParams = {}) {
     this.predictor = new TradeModelPredictor();
-    this.strategyType = strategyType;
+    this.currentStrategy = StrategyType.Momentum; // Default
     this.basePositionSize = basePositionSize;
     this.slippage = slippage;
     this.commission = commission;
@@ -79,6 +77,78 @@ export class TradingStrategy {
       ema = prices[i] * k + ema * (1 - k);
     }
     return ema;
+  }
+
+  private selectStrategy(
+    shortMomentum: number,
+    momentum: number,
+    trendSlope: number,
+    momentumDivergence: number,
+    volatilityAdjustedMomentum: number,
+    trendStrength: number,
+    atrBreakout: number,
+    prices: number[],
+    volumes: number[]
+  ): StrategyType {
+    const currentPrice = prices[prices.length - 1];
+    const currentVolume = volumes[volumes.length - 1];
+    const avgVolume =
+      volumes.slice(-this.smaPeriod).reduce((sum, v) => sum + v, 0) /
+      Math.min(volumes.length, this.smaPeriod);
+    const sma = this.calculateSMA(prices, this.smaPeriod);
+    const deviation = (currentPrice - sma) / sma;
+    const emaLong = this.calculateEMA(
+      prices.slice(-this.smaPeriod),
+      this.smaPeriod
+    );
+    const emaShort = this.calculateEMA(
+      prices.slice(-Math.floor(this.smaPeriod / 2)),
+      Math.floor(this.smaPeriod / 2)
+    );
+
+    // Momentum: Strong short-term momentum and volatility
+    if (
+      shortMomentum > 0.02 &&
+      volatilityAdjustedMomentum > 0.2 &&
+      trendStrength > 0.005
+    ) {
+      console.log("Selected Strategy: Momentum");
+      return StrategyType.Momentum;
+    }
+
+    // Mean Reversion: Significant deviation from mean, low momentum
+    if (
+      Math.abs(deviation) > 0.02 &&
+      Math.abs(momentum) < 0.01 &&
+      momentumDivergence !== 0
+    ) {
+      console.log("Selected Strategy: Mean Reversion");
+      return StrategyType.MeanReversion;
+    }
+
+    // Breakout: High ATR breakout and volume spike
+    if (
+      atrBreakout > this.breakoutThreshold &&
+      currentVolume > avgVolume * 1.3 &&
+      shortMomentum > 0.01
+    ) {
+      console.log("Selected Strategy: Breakout");
+      return StrategyType.Breakout;
+    }
+
+    // Trend Following: Strong trend and EMA crossover
+    if (
+      Math.abs(trendSlope) > 0.01 &&
+      emaShort > emaLong &&
+      trendStrength > 0.01
+    ) {
+      console.log("Selected Strategy: Trend Following");
+      return StrategyType.TrendFollowing;
+    }
+
+    // Default to Momentum if no clear condition
+    console.log("Selected Strategy: Momentum (default)");
+    return StrategyType.Momentum;
   }
 
   public async decideTrade({
@@ -128,13 +198,26 @@ export class TradingStrategy {
       atrBreakout,
     } = prediction;
 
+    // Dynamically select strategy
+    this.currentStrategy = this.selectStrategy(
+      shortMomentum,
+      momentum,
+      trendSlope,
+      momentumDivergence,
+      volatilityAdjustedMomentum,
+      trendStrength,
+      atrBreakout,
+      adaPrices,
+      adaVolumes
+    );
+
     const daysSinceLastTrade = buyTimestamp
       ? (new Date(currentTimestamp).getTime() -
           new Date(buyTimestamp).getTime()) /
         (1000 * 60 * 60 * 24)
       : Infinity;
     const dynamicBreakoutThreshold =
-      daysSinceLastTrade > 30 ? 0.8 : this.breakoutThreshold;
+      daysSinceLastTrade > 15 ? 0.7 : this.breakoutThreshold;
 
     const dynamicStopLossMultiplier =
       confidence > 0.7
@@ -187,7 +270,9 @@ export class TradingStrategy {
               4
             )}, ProfitTake=${profitTakeLevel.toFixed(
               4
-            )}, Trend Strength=${trendStrength.toFixed(4)}`
+            )}, Trend Strength=${trendStrength.toFixed(4)}, Strategy=${
+              this.currentStrategy
+            }`
           );
           return {
             trade: {
@@ -227,9 +312,9 @@ export class TradingStrategy {
             : volatilityAdjustedSize;
         const confidenceBoost = confidence > 0.7 ? 1.2 : 1.0;
         const winStreakBoost =
-          this.strategyType === StrategyType.Momentum && winStreak > 1
-            ? 1 + winStreak * 0.15
-            : 1.0; // Increased scaling
+          this.currentStrategy === StrategyType.Momentum && winStreak > 1
+            ? 1 + winStreak * 0.2
+            : 1.0;
         const positionSize = Math.min(
           trendAdjustedSize *
             confidenceBoost *
@@ -254,7 +339,9 @@ export class TradingStrategy {
             4
           )}, ATR Breakout=${atrBreakout.toFixed(
             4
-          )}, Volume=${currentVolume.toFixed(2)}`
+          )}, Volume=${currentVolume.toFixed(2)}, Strategy=${
+            this.currentStrategy
+          }`
         );
         console.log(
           `Position Size: ${positionSize.toFixed(4)}, ATR: ${atr.toFixed(
@@ -289,7 +376,9 @@ export class TradingStrategy {
             4
           )}, ATR Breakout=${atrBreakout.toFixed(
             4
-          )}, Volume=${currentVolume.toFixed(2)}`
+          )}, Volume=${currentVolume.toFixed(2)}, Strategy=${
+            this.currentStrategy
+          }`
         );
       }
     }
@@ -314,17 +403,23 @@ export class TradingStrategy {
     const avgVolume =
       volumes.slice(-this.smaPeriod).reduce((sum, v) => sum + v, 0) /
       Math.min(volumes.length, this.smaPeriod);
+    const trendReversal =
+      this.currentStrategy === StrategyType.Momentum &&
+      prices.length > this.smaPeriod &&
+      this.calculateSMA(prices.slice(-this.smaPeriod), this.smaPeriod) <
+        prices[prices.length - 1] &&
+      trendSlope > 0;
 
-    switch (this.strategyType) {
+    switch (this.currentStrategy) {
       case StrategyType.Momentum:
         return (
           buyProb > this.buyProbThreshold &&
           confidence >= this.minConfidence &&
           shortMomentum > 0.01 &&
-          volatilityAdjustedMomentum > 0.3 && // Lowered from 0.5
+          volatilityAdjustedMomentum > 0.2 &&
           trendStrength > 0.005 &&
-          atrBreakout > dynamicBreakoutThreshold &&
-          currentVolume > avgVolume * 1.2 // Added volume sensitivity
+          (atrBreakout > dynamicBreakoutThreshold || trendReversal) &&
+          currentVolume > avgVolume * 1.2
         );
 
       case StrategyType.MeanReversion:
@@ -345,7 +440,7 @@ export class TradingStrategy {
           atrBreakout > dynamicBreakoutThreshold &&
           shortMomentum > 0.01 &&
           trendSlope > 0.005 &&
-          currentVolume > avgVolume * 1.3 // Lowered from 1.5
+          currentVolume > avgVolume * 1.3
         );
 
       case StrategyType.TrendFollowing:
@@ -366,7 +461,7 @@ export class TradingStrategy {
         );
 
       default:
-        throw new Error(`Unknown strategy type: ${this.strategyType}`);
+        throw new Error(`Unknown strategy type: ${this.currentStrategy}`);
     }
   }
 
@@ -381,7 +476,7 @@ export class TradingStrategy {
     profitTakeLevel: number,
     currentPrice: number
   ): boolean {
-    switch (this.strategyType) {
+    switch (this.currentStrategy) {
       case StrategyType.Momentum:
         return (
           sellProb > this.sellProbThreshold ||
@@ -422,12 +517,16 @@ export class TradingStrategy {
         );
 
       default:
-        throw new Error(`Unknown strategy type: ${this.strategyType}`);
+        throw new Error(`Unknown strategy type: ${this.currentStrategy}`);
     }
   }
 
   public setStrategy(strategyType: StrategyType): void {
-    this.strategyType = strategyType;
-    console.log(`Strategy set to: ${strategyType}`);
+    this.currentStrategy = strategyType;
+    console.log(`Strategy manually set to: ${strategyType}`);
+  }
+
+  public getCurrentStrategy(): StrategyType {
+    return this.currentStrategy;
   }
 }

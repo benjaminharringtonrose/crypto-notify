@@ -1,17 +1,11 @@
 import { firestore } from "firebase-admin";
 
 export const TEXTBELT_API_URL = "https://textbelt.com";
-export const COINGECKO_API_URL = "https://api.coingecko.com/api/v3";
-export const CRYPTOCOMPARE_API_URL =
-  "https://min-api.cryptocompare.com/data/v2";
-
-export const CARDANO_BITCOIN_PRICE_URL = `${COINGECKO_API_URL}/simple/price?ids=cardano,bitcoin&vs_currencies=usd`;
-export const CARDANO_30_DAY_HISTORICAL_URL = `${COINGECKO_API_URL}/coins/cardano/market_chart?vs_currency=usd&days=30`;
-export const BITCOIN_30_DAY_HISTORICAL_URL = `${COINGECKO_API_URL}/coins/bitcoin/market_chart?vs_currency=usd&days=30`;
 
 export const PRICES = [0.8, 0.9, 1.0, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
 
 export const NOTIFICATION_COOLDOWN = 30 * 60 * 1000; // 30 mins
+
 export const TRADE_PREDICTOR_WEIGHTS = "tradePredictorWeights.json";
 
 export const FIVE_YEARS_IN_DAYS = 1826;

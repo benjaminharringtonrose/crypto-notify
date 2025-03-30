@@ -40,7 +40,7 @@ export class CyclicLearningRateCallback extends tf.CustomCallback {
     const newOptimizer = tf.train.adam(lr);
     this.model.compile({
       optimizer: newOptimizer,
-      loss: this.model.loss!, // Preserve existing loss function
+      loss: this.model.loss, // Preserve existing loss function
       metrics: this.model.metrics as string[], // Preserve metrics
     });
     console.log(`Epoch ${epoch + 1} Learning Rate: ${lr.toFixed(6)}`);

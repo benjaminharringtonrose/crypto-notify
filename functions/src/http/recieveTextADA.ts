@@ -1,9 +1,12 @@
+import dotenv from "dotenv";
 import { https } from "firebase-functions";
 import { CryptoIds, Currencies, Recommendation } from "../types";
 import { formatAnalysisResults, sendSMS } from "../utils";
 import { TradeModelPredictor } from "../cardano/TradeModelPredictor";
 import { CoinGeckoService } from "../api/CoinGeckoService";
 import { CryptoCompareService } from "../api/CryptoCompareService";
+
+dotenv.config();
 
 export const receiveTextADA = https.onRequest(
   { memory: "512MiB" },

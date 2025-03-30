@@ -12,6 +12,7 @@ export const BITCOIN_30_DAY_HISTORICAL_URL = `${COINGECKO_API_URL}/coins/bitcoin
 
 export const PRICES = [0.8, 0.9, 1.0, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
 export const EVERY_TEN_MINS = `*/10 * * * *`; // every 10 mins
+export const EVERY_THIRTY_MINS = `*/10 * * * *`; // every 10 mins
 export const EVERYDAY_AT_NOON = `26 10 * * *`; // every day at 10:26am ET
 export const TIME_ZONE = "America/New_York";
 export const LOW_MEMORY = "512MiB";
@@ -23,7 +24,7 @@ export const TRADE_PREDICTOR_WEIGHTS = "tradePredictorWeights.json";
 export const FIVE_YEARS_IN_DAYS = 1826;
 
 export const TRAINING_CONFIG: ScheduleOptions = {
-  schedule: EVERYDAY_AT_NOON,
+  schedule: EVERY_THIRTY_MINS,
   memory: LOW_MEMORY,
 };
 

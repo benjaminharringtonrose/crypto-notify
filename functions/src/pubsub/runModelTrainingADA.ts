@@ -1,5 +1,4 @@
 import dotenv from "dotenv";
-import * as admin from "firebase-admin";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { TradeModelTrainer } from "../cardano/TradeModelTrainer";
 import { onRequest } from "firebase-functions/https";

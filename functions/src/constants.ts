@@ -16,7 +16,7 @@ export const EVERY_THIRTY_MINS = `*/10 * * * *`; // every 10 mins
 export const EVERYDAY_AT_NOON = `26 10 * * *`; // every day at 10:26am ET
 export const TIME_ZONE = "America/New_York";
 export const LOW_MEMORY = "512MiB";
-export const MEDIUM_MEMORY = "1GiB";
+export const HIGH_MEMORY = "8GiB";
 export const NOTIFICATION_COOLDOWN = 30 * 60 * 1000; // 30 mins
 export const AVERAGE_BUY_PRICE = 0.72;
 export const TRADE_PREDICTOR_WEIGHTS = "tradePredictorWeights.json";
@@ -25,7 +25,7 @@ export const FIVE_YEARS_IN_DAYS = 1826;
 
 export const TRAINING_CONFIG: ScheduleOptions = {
   schedule: EVERY_THIRTY_MINS,
-  memory: MEDIUM_MEMORY,
+  memory: HIGH_MEMORY,
 };
 
 export const RUN_TRADE_MODEL_CONFIG: ScheduleOptions = {

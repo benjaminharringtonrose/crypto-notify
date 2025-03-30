@@ -31,11 +31,11 @@ export class TradeModelBacktester {
     stopLossMultiplier: number = 4.0,
     trailingStop: number = 0.08,
     minHoldDays: number = 4,
-    minConfidence: number = 0.58, // Reduced to 0.58
-    profitTakeMultiplier: number = 3.5, // Increased to 3.5
-    logitThreshold: number = 0.1,
-    buyProbThreshold: number = 0.52, // Reduced to 0.52
-    sellProbThreshold: number = 0.33 // Reduced to 0.33
+    minConfidence: number = 0.55, // Reduced from 0.58
+    profitTakeMultiplier: number = 3.5,
+    logitThreshold: number = 0.05, // Reduced from 0.1
+    buyProbThreshold: number = 0.5, // Reduced from 0.52
+    sellProbThreshold: number = 0.33
   ) {
     this.predictor = new TradeModelPredictor();
     this.initialCapital = initialCapital;
@@ -132,7 +132,7 @@ export class TradeModelBacktester {
       const dynamicProfitTake = Math.min(
         this.profitTakeMultiplier * (momentum > 0.1 ? 1.2 : 1.0),
         4.0
-      ); // Capped at 4.0
+      );
 
       console.log(
         `Logit check: BuyLogit=${buyLogit.toFixed(
@@ -162,7 +162,7 @@ export class TradeModelBacktester {
           if (
             (sellLogit > buyLogit + this.logitThreshold &&
               sellProb > this.sellProbThreshold) ||
-            (momentum < -0.05 && sellProb > 0.3 && trendSlope < 0) // Relaxed momentum, added trend check
+            (momentum < -0.1 && sellProb > 0.3 && trendSlope < -0.01) // Adjusted momentum and added trend check
           ) {
             const effectivePrice = currentPrice * (1 - this.slippage);
             const usdReceived = adaHoldings * effectivePrice - this.commission;
@@ -178,7 +178,7 @@ export class TradeModelBacktester {
             });
             console.log(
               `Sell Triggered (${
-                momentum < -0.05 ? "Momentum" : "Signal"
+                momentum < -0.1 ? "Momentum" : "Signal"
               }): Price: $${effectivePrice.toFixed(
                 4
               )}, P/L: $${profitLoss.toFixed(2)}, ` +
@@ -252,11 +252,14 @@ export class TradeModelBacktester {
           0.15
         );
         const trendAdjustedSize =
-          trendSlope > 0.01
+          trendSlope > 0.02
             ? volatilityAdjustedSize * 1.2
-            : volatilityAdjustedSize; // Boost in uptrends
+            : volatilityAdjustedSize;
+        const confidenceBoost = confidence > 0.65 ? 1.1 : 1.0; // Boost size for high confidence
         const positionSize = Math.min(
-          trendAdjustedSize * Math.min(buyProb / this.buyProbThreshold, 2.0),
+          trendAdjustedSize *
+            confidenceBoost *
+            Math.min(buyProb / this.buyProbThreshold, 2.0),
           0.15
         );
         const tradeAmount = Math.min(capital * positionSize, capital);
@@ -288,9 +291,11 @@ export class TradeModelBacktester {
         );
       } else if (buyProb > 0.5 && confidence < this.minConfidence) {
         console.log(
-          `Buy Rejected: Below Confidence Threshold (${confidence.toFixed(
+          `Missed Buy Opportunity: Price: $${currentPrice.toFixed(
+            4
+          )}, BuyProb: ${buyProb.toFixed(4)}, Confidence: ${confidence.toFixed(
             2
-          )} < ${this.minConfidence})`
+          )} < ${this.minConfidence}`
         );
       }
 

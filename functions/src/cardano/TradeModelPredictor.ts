@@ -15,7 +15,7 @@ export class TradeModelPredictor {
     this.weightManager = new ModelWeightManager();
     this.sequenceGenerator = new FeatureSequenceGenerator(this.timesteps);
     FirebaseService.getInstance();
-    const factory = new TradeModelFactory(this.timesteps, 61); // Update to 63+ with RSI/MACD
+    const factory = new TradeModelFactory(this.timesteps, 61);
     this.model = factory.createModel();
     this.loadWeightsAsync();
   }
@@ -86,11 +86,8 @@ export class TradeModelPredictor {
 
     const logits = this.model.predict(featuresNormalized) as tf.Tensor2D;
     const logitsArray = await logits.data();
-    const [rawSellLogit, rawBuyLogit] = [logitsArray[0], logitsArray[1]];
-    const sellLogit = rawSellLogit; // No adjustment
-    const buyLogit = rawBuyLogit; // No adjustment
-    const adjustedLogits = tf.tensor2d([[sellLogit, buyLogit]]);
-    const probs = adjustedLogits.softmax();
+    const [sellLogit, buyLogit] = [logitsArray[0], logitsArray[1]];
+    const probs = tf.tensor2d([[sellLogit, buyLogit]]).softmax();
     const probArray = await probs.data();
     const [sellProb, buyProb] = [probArray[0], probArray[1]];
     const confidence = Math.max(buyProb, sellProb);
@@ -119,14 +116,7 @@ export class TradeModelPredictor {
       `Prediction executed in ${(endTime - startTime).toFixed(2)} ms`
     );
     console.log(
-      `Raw logits: [Sell: ${rawSellLogit.toFixed(
-        4
-      )}, Buy: ${rawBuyLogit.toFixed(4)}]`
-    );
-    console.log(
-      `Adjusted logits: [Sell: ${sellLogit.toFixed(4)}, Buy: ${buyLogit.toFixed(
-        4
-      )}]`
+      `Logits: [Sell: ${sellLogit.toFixed(4)}, Buy: ${buyLogit.toFixed(4)}]`
     );
     console.log(
       `Probs: [Sell: ${sellProb.toFixed(4)}, Buy: ${buyProb.toFixed(4)}]`
@@ -142,7 +132,6 @@ export class TradeModelPredictor {
     features.dispose();
     featuresNormalized.dispose();
     logits.dispose();
-    adjustedLogits.dispose();
     probs.dispose();
     means.dispose();
     stds.dispose();

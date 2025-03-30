@@ -2,12 +2,11 @@ import { https } from "firebase-functions";
 import { CryptoIds, Currencies, Recommendation } from "../types";
 import { formatAnalysisResults, sendSMS } from "../utils";
 import { TradeModelPredictor } from "../cardano/TradeModelPredictor";
-import { LOW_MEMORY } from "../constants";
 import { getHistoricalData } from "../api/getHistoricalData";
 import { getCurrentPrice } from "../api/getCurrentPrice";
 
 export const receiveTextADA = https.onRequest(
-  { memory: LOW_MEMORY },
+  { memory: "512MiB" },
   async (_, response) => {
     try {
       const predictor = new TradeModelPredictor();

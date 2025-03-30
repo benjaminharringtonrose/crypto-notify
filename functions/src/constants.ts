@@ -36,18 +36,20 @@ export const PERIODS = {
 } as const;
 
 export const MODEL_CONSTANTS = {
-  TIMESTEPS: 30, // Number of timesteps for the sequence
-  FEATURE_COUNT: 61, // Number of features per timestep
-  MIN_CONFIDENCE_DEFAULT: 0.6, // Increased from 0.5 for stronger signals
-  PROFIT_TAKE_MULTIPLIER_DEFAULT: 3.0, // Default profit take multiplier
-  BASE_POSITION_SIZE_DEFAULT: 0.08, // Default base position size
-  SLIPPAGE: 0.001, // Slippage factor
-  COMMISSION: 0.1, // Commission per trade
-  STOP_LOSS_MULTIPLIER_DEFAULT: 3.0, // Tightened from 4.0 for quicker exits
-  TRAILING_STOP_DEFAULT: 0.06, // Default trailing stop percentage
-  MIN_HOLD_DAYS_DEFAULT: 4, // Minimum holding period in days
-  LOGIT_THRESHOLD_DEFAULT: 0.05, // Default logit threshold for trade decisions
-  BUY_PROB_THRESHOLD_DEFAULT: 0.5, // Default buy probability threshold
-  SELL_PROB_THRESHOLD_DEFAULT: 0.33, // Default sell probability threshold
-  MOMENTUM_WINDOW_THRESHOLD: 0.01, // ATR threshold for switching momentum window
+  TIMESTEPS: 30,
+  FEATURE_COUNT: 61,
+  MIN_CONFIDENCE_DEFAULT: 0.6,
+  PROFIT_TAKE_MULTIPLIER_DEFAULT: 3.0,
+  BASE_POSITION_SIZE_DEFAULT: 0.08,
+  SLIPPAGE: 0.001,
+  COMMISSION: 0.1,
+  STOP_LOSS_MULTIPLIER_DEFAULT: 3.0,
+  TRAILING_STOP_DEFAULT: 0.06, // Reverted to 0.06
+  MIN_HOLD_DAYS_DEFAULT: 3,
+  LOGIT_THRESHOLD_DEFAULT: 0.05,
+  BUY_PROB_THRESHOLD_DEFAULT: 0.5,
+  SELL_PROB_THRESHOLD_DEFAULT: 0.33,
+  MOMENTUM_WINDOW_THRESHOLD: 0.01,
+  MAX_ATR_THRESHOLD: 0.1,
+  MIN_PROFIT_THRESHOLD: 0.01, // New: Minimum profit before trailing stop
 };

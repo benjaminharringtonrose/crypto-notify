@@ -108,8 +108,16 @@ export class TradeModelBacktester {
       });
 
       if (trade) {
-        if (trade.type === Recommendation.Buy && consecutiveBuys < 2) {
-          if (confidence >= 0.65 || consecutiveBuys === 0) {
+        if (trade.type === Recommendation.Buy && consecutiveBuys < 4) {
+          const minConfidence =
+            consecutiveBuys === 0
+              ? 0.6
+              : consecutiveBuys === 1
+              ? 0.65
+              : consecutiveBuys === 2
+              ? 0.7
+              : 0.75;
+          if (confidence >= minConfidence) {
             capital -= trade.usdValue;
             holdings += trade.adaAmount;
             lastBuyPrice = trade.price;
@@ -122,7 +130,9 @@ export class TradeModelBacktester {
                 4
               )}, Amount: ${trade.adaAmount.toFixed(
                 2
-              )} ADA, Confidence: ${confidence.toFixed(2)}`
+              )} ADA, Confidence: ${confidence.toFixed(
+                2
+              )}, Consecutive: ${consecutiveBuys}`
             );
           }
         } else if (trade.type === Recommendation.Sell) {
@@ -162,6 +172,17 @@ export class TradeModelBacktester {
       if (i > MODEL_CONSTANTS.TIMESTEPS) {
         const prevValue = portfolioHistory[portfolioHistory.length - 2].value;
         returns.push((portfolioValue - prevValue) / prevValue);
+        if (i % 30 === 0) {
+          // Log every 30 days
+          console.log(
+            `Portfolio Trend at ${currentTimestamp}: Value: $${portfolioValue.toFixed(
+              2
+            )}, Change: ${(
+              ((portfolioValue - prevValue) / prevValue) *
+              100
+            ).toFixed(2)}%`
+          );
+        }
       }
     }
 

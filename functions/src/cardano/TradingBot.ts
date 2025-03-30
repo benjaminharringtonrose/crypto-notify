@@ -97,6 +97,7 @@ export class TradingBot {
       shortMomentum,
       trendSlope,
       atr,
+      momentumDivergence,
     } = prediction;
 
     const dynamicStopLossMultiplier =
@@ -104,11 +105,16 @@ export class TradingBot {
         ? this.stopLossMultiplier * 0.8
         : this.stopLossMultiplier;
     const dynamicTrailingStop =
-      atr > 0.02 ? this.trailingStop * 1.2 : this.trailingStop;
+      momentum > 0.05 ? this.trailingStop * 0.8 : this.trailingStop * 1.2;
     const dynamicProfitTake = Math.min(
       this.profitTakeMultiplier * (momentum > 0.1 ? 1.2 : 1.0),
       4.0
     );
+
+    if (atr > MODEL_CONSTANTS.MAX_ATR_THRESHOLD) {
+      console.log(`ATR ${atr.toFixed(4)} exceeds threshold, skipping trade`);
+      return { trade: null, confidence };
+    }
 
     if (holdings > 0 && lastBuyPrice && buyTimestamp) {
       const daysHeld =
@@ -119,13 +125,16 @@ export class TradingBot {
       const stopLossLevel = dynamicStopLossMultiplier * atr;
       const profitTakeLevel = lastBuyPrice + dynamicProfitTake * atr;
       const trailingStopLevel =
-        (peakPrice || lastBuyPrice) * (1 - dynamicTrailingStop);
+        priceChange >= MODEL_CONSTANTS.MIN_PROFIT_THRESHOLD // Only activate after min profit
+          ? (peakPrice || lastBuyPrice) * (1 - dynamicTrailingStop)
+          : Infinity;
 
       if (daysHeld >= this.minHoldDays) {
         if (
           (sellLogit > buyLogit + this.logitThreshold &&
             sellProb > this.sellProbThreshold) ||
-          (momentum < -0.03 && shortMomentum < -0.01) || // Added shortMomentum
+          (momentum < -0.03 && shortMomentum < -0.01) ||
+          (momentumDivergence < -0.05 && momentum < 0) || // New: Exit on divergence
           priceChange <= -stopLossLevel ||
           currentPrice <= trailingStopLevel ||
           currentPrice >= profitTakeLevel
@@ -137,7 +146,9 @@ export class TradingBot {
               4
             )}, Trailing=${trailingStopLevel.toFixed(
               4
-            )}, ProfitTake=${profitTakeLevel.toFixed(4)}`
+            )}, ProfitTake=${profitTakeLevel.toFixed(
+              4
+            )}, Divergence=${momentumDivergence.toFixed(4)}`
           );
           return {
             trade: {
@@ -156,18 +167,20 @@ export class TradingBot {
       buyLogit > sellLogit + this.logitThreshold &&
       buyProb > this.buyProbThreshold &&
       confidence >= this.minConfidence &&
-      shortMomentum > 0.01 && // Added shortMomentum filter
+      shortMomentum > 0.01 && // Relaxed from 0.015
+      trendSlope > 0.01 && // Relaxed from 0.015
+      momentumDivergence > -0.05 && // New: Avoid weakening trends
       capital > 0
     ) {
       const volatilityAdjustedSize = Math.min(
         this.basePositionSize / (atr > 0 ? atr : 0.01),
-        trendSlope > 0.05 && atr < 0.02 ? 0.25 : 0.2 // Increased max to 25%
+        trendSlope > 0.05 && atr < 0.02 ? 0.25 : 0.2
       );
       const trendAdjustedSize =
         trendSlope > 0.02
           ? volatilityAdjustedSize * 1.2
           : volatilityAdjustedSize;
-      const confidenceBoost = confidence > 0.7 ? 1.2 : 1.0; // More aggressive scaling
+      const confidenceBoost = confidence > 0.7 ? 1.2 : 1.0;
       const positionSize = Math.min(
         trendAdjustedSize *
           confidenceBoost *
@@ -178,6 +191,13 @@ export class TradingBot {
       const effectivePrice = currentPrice * (1 + this.slippage);
       const adaBought = (tradeAmount - this.commission) / effectivePrice;
 
+      console.log(
+        `Buy Trigger: ShortMomentum=${shortMomentum.toFixed(
+          4
+        )}, TrendSlope=${trendSlope.toFixed(
+          4
+        )}, Divergence=${momentumDivergence.toFixed(4)}`
+      );
       console.log(
         `Position Size: ${positionSize.toFixed(4)}, ATR: ${atr.toFixed(
           4

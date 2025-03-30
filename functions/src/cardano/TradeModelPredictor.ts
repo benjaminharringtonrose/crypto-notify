@@ -51,6 +51,7 @@ export class TradeModelPredictor {
     shortMomentum: number;
     trendSlope: number;
     atr: number;
+    momentumDivergence: number; // New: Short vs. long momentum
   }> {
     if (!this.isWeightsLoaded) {
       console.log("Weights not yet loaded, awaiting load...");
@@ -108,7 +109,7 @@ export class TradeModelPredictor {
           momentumWindow[0]
         : 0;
 
-    const shortMomentumWindow = adaPrices.slice(-3); // New 3-day momentum
+    const shortMomentumWindow = adaPrices.slice(-3);
     const shortMomentum =
       shortMomentumWindow.length >= 2
         ? (shortMomentumWindow[shortMomentumWindow.length - 1] -
@@ -122,6 +123,8 @@ export class TradeModelPredictor {
         ? (trendWindow[trendWindow.length - 1] - trendWindow[0]) /
           (trendWindow.length - 1)
         : 0;
+
+    const momentumDivergence = shortMomentum - momentum; // New: Divergence check
 
     const endTime = performance.now();
     console.log(
@@ -141,7 +144,9 @@ export class TradeModelPredictor {
         4
       )}, Short Momentum: ${shortMomentum.toFixed(
         4
-      )}, Trend Slope: ${trendSlope.toFixed(4)}`
+      )}, Trend Slope: ${trendSlope.toFixed(
+        4
+      )}, Momentum Divergence: ${momentumDivergence.toFixed(4)}`
     );
 
     features.dispose();
@@ -161,6 +166,7 @@ export class TradeModelPredictor {
       shortMomentum,
       trendSlope,
       atr,
+      momentumDivergence,
     };
   }
 }

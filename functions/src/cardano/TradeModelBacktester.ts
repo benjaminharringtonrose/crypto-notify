@@ -6,7 +6,6 @@ import { TradingBot } from "./TradingBot";
 import { MODEL_CONSTANTS } from "../constants";
 
 FirebaseService.getInstance();
-
 const cryptoCompare = new CryptoCompareService();
 
 export class TradeModelBacktester {
@@ -109,21 +108,23 @@ export class TradeModelBacktester {
       });
 
       if (trade) {
-        if (trade.type === Recommendation.Buy && consecutiveBuys < 1) {
-          capital -= trade.usdValue;
-          holdings += trade.adaAmount;
-          lastBuyPrice = trade.price;
-          peakPrice = trade.price;
-          consecutiveBuys++;
-          buyTimestamp = currentTimestamp;
-          trades.push(trade);
-          console.log(
-            `Buy Executed: Price: $${trade.price.toFixed(
-              4
-            )}, Amount: ${trade.adaAmount.toFixed(
-              2
-            )} ADA, Confidence: ${confidence.toFixed(2)}`
-          );
+        if (trade.type === Recommendation.Buy && consecutiveBuys < 2) {
+          if (confidence >= 0.65 || consecutiveBuys === 0) {
+            capital -= trade.usdValue;
+            holdings += trade.adaAmount;
+            lastBuyPrice = trade.price;
+            peakPrice = trade.price;
+            consecutiveBuys++;
+            buyTimestamp = currentTimestamp;
+            trades.push(trade);
+            console.log(
+              `Buy Executed: Price: $${trade.price.toFixed(
+                4
+              )}, Amount: ${trade.adaAmount.toFixed(
+                2
+              )} ADA, Confidence: ${confidence.toFixed(2)}`
+            );
+          }
         } else if (trade.type === Recommendation.Sell) {
           const profitLoss = trade.usdValue - holdings * (lastBuyPrice || 0);
           capital += trade.usdValue;
@@ -135,6 +136,7 @@ export class TradeModelBacktester {
               2
             )}, Confidence: ${confidence.toFixed(2)}`
           );
+          console.log(`Trade Success: ${profitLoss > 0 ? "Win" : "Loss"}`);
           if (profitLoss > 0) {
             winStreak++;
             lossStreak = 0;
@@ -195,6 +197,7 @@ export class TradeModelBacktester {
     const sharpeRatio = this.calculateSharpeRatio(returns);
     const sortinoRatio = this.calculateSortinoRatio(returns);
     const maxDrawdown = this.calculateMaxDrawdown(portfolioHistory);
+    const rollingSharpe = this.calculateRollingSharpe(returns, 30);
 
     console.log(
       `Average Trade Duration: ${this.calculateAvgTradeDuration(trades).toFixed(
@@ -204,6 +207,7 @@ export class TradeModelBacktester {
     console.log(`Total Return: ${(totalReturn * 100).toFixed(2)}%`);
     console.log(`Win Rate: ${(winRate * 100).toFixed(2)}%`);
     console.log(`Sharpe Ratio: ${sharpeRatio.toFixed(2)}`);
+    console.log(`Rolling Sharpe (30-day): ${rollingSharpe.toFixed(2)}`);
     console.log(`Sortino Ratio: ${sortinoRatio.toFixed(2)}`);
     console.log(`Max Drawdown: ${(maxDrawdown * 100).toFixed(2)}%`);
     console.log(
@@ -227,6 +231,18 @@ export class TradeModelBacktester {
   private calculateSharpeRatio(returns: number[]): number {
     if (returns.length === 0) return 0;
     const returnsTensor = tf.tensor1d(returns);
+    const mean = tf.mean(returnsTensor).dataSync()[0];
+    const std = tf
+      .sqrt(tf.mean(tf.square(returnsTensor.sub(mean))))
+      .dataSync()[0];
+    returnsTensor.dispose();
+    return std === 0 ? 0 : (mean / std) * Math.sqrt(252);
+  }
+
+  private calculateRollingSharpe(returns: number[], window: number): number {
+    if (returns.length < window) return 0;
+    const recentReturns = returns.slice(-window);
+    const returnsTensor = tf.tensor1d(recentReturns);
     const mean = tf.mean(returnsTensor).dataSync()[0];
     const std = tf
       .sqrt(tf.mean(tf.square(returnsTensor.sub(mean))))

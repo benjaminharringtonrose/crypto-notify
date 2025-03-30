@@ -94,12 +94,15 @@ export class TradingBot {
       sellProb,
       confidence,
       momentum,
+      shortMomentum,
       trendSlope,
       atr,
     } = prediction;
 
     const dynamicStopLossMultiplier =
-      atr > 0.02 ? this.stopLossMultiplier * 0.8 : this.stopLossMultiplier;
+      confidence > 0.7
+        ? this.stopLossMultiplier * 0.8
+        : this.stopLossMultiplier;
     const dynamicTrailingStop =
       atr > 0.02 ? this.trailingStop * 1.2 : this.trailingStop;
     const dynamicProfitTake = Math.min(
@@ -122,7 +125,7 @@ export class TradingBot {
         if (
           (sellLogit > buyLogit + this.logitThreshold &&
             sellProb > this.sellProbThreshold) ||
-          (momentum < -0.03 && trendSlope < 0) || // Version 3 momentum exit
+          (momentum < -0.03 && shortMomentum < -0.01) || // Added shortMomentum
           priceChange <= -stopLossLevel ||
           currentPrice <= trailingStopLevel ||
           currentPrice >= profitTakeLevel
@@ -153,22 +156,23 @@ export class TradingBot {
       buyLogit > sellLogit + this.logitThreshold &&
       buyProb > this.buyProbThreshold &&
       confidence >= this.minConfidence &&
+      shortMomentum > 0.01 && // Added shortMomentum filter
       capital > 0
     ) {
       const volatilityAdjustedSize = Math.min(
         this.basePositionSize / (atr > 0 ? atr : 0.01),
-        trendSlope > 0.05 && atr < 0.02 ? 0.2 : 0.15
+        trendSlope > 0.05 && atr < 0.02 ? 0.25 : 0.2 // Increased max to 25%
       );
       const trendAdjustedSize =
         trendSlope > 0.02
           ? volatilityAdjustedSize * 1.2
           : volatilityAdjustedSize;
-      const confidenceBoost = confidence > 0.65 ? 1.1 : 1.0;
+      const confidenceBoost = confidence > 0.7 ? 1.2 : 1.0; // More aggressive scaling
       const positionSize = Math.min(
         trendAdjustedSize *
           confidenceBoost *
           Math.min(buyProb / this.buyProbThreshold, 2.0),
-        0.2
+        0.25
       );
       const tradeAmount = Math.min(capital * positionSize, capital);
       const effectivePrice = currentPrice * (1 + this.slippage);

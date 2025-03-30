@@ -48,6 +48,7 @@ export class TradeModelPredictor {
     sellProb: number;
     confidence: number;
     momentum: number;
+    shortMomentum: number;
     trendSlope: number;
     atr: number;
   }> {
@@ -57,30 +58,19 @@ export class TradeModelPredictor {
     }
 
     const startTime = performance.now();
-
     const startIndex = Math.max(0, adaPrices.length - this.timesteps - 1);
     const endIndex = adaPrices.length - 1;
-    const sequenceRaw = this.sequenceGenerator.generateSequence(
-      adaPrices,
-      adaVolumes,
-      btcPrices,
-      btcVolumes,
-      startIndex,
-      endIndex
-    );
+    const sequence = this.sequenceGenerator
+      .generateSequence(
+        adaPrices,
+        adaVolumes,
+        btcPrices,
+        btcVolumes,
+        startIndex,
+        endIndex
+      )
+      .slice(-this.timesteps);
 
-    console.log(
-      `Raw sequence length: ${sequenceRaw.length}, features per timestep: ${
-        sequenceRaw[0]?.length || 0
-      }`
-    );
-    console.log(
-      `Total values in sequence: ${
-        sequenceRaw.length * (sequenceRaw[0]?.length || 0)
-      }`
-    );
-
-    const sequence = sequenceRaw.slice(-this.timesteps);
     if (
       sequence.length !== MODEL_CONSTANTS.TIMESTEPS ||
       sequence[0].length !== MODEL_CONSTANTS.FEATURE_COUNT
@@ -105,7 +95,7 @@ export class TradeModelPredictor {
     const [sellLogit, buyLogit] = [logitsArray[0], logitsArray[1]];
     const probs = tf.tensor2d([[sellLogit, buyLogit]]).softmax();
     const probArray = await probs.data();
-    let [sellProb, buyProb] = [probArray[0], probArray[1]];
+    const [sellProb, buyProb] = [probArray[0], probArray[1]];
     const confidence = Math.max(buyProb, sellProb);
 
     const atr = sequence[sequence.length - 1][11];
@@ -116,6 +106,14 @@ export class TradeModelPredictor {
       momentumWindow.length >= 2
         ? (momentumWindow[momentumWindow.length - 1] - momentumWindow[0]) /
           momentumWindow[0]
+        : 0;
+
+    const shortMomentumWindow = adaPrices.slice(-3); // New 3-day momentum
+    const shortMomentum =
+      shortMomentumWindow.length >= 2
+        ? (shortMomentumWindow[shortMomentumWindow.length - 1] -
+            shortMomentumWindow[0]) /
+          shortMomentumWindow[0]
         : 0;
 
     const trendWindow = adaPrices.slice(-momentumWindowSize);
@@ -130,20 +128,6 @@ export class TradeModelPredictor {
       `Prediction executed in ${(endTime - startTime).toFixed(2)} ms`
     );
     console.log(
-      `Input stats - ADA: min=${Math.min(...adaPrices).toFixed(
-        4
-      )}, max=${Math.max(...adaPrices).toFixed(4)}, mean=${(
-        adaPrices.reduce((a, b) => a + b, 0) / adaPrices.length
-      ).toFixed(4)}`
-    );
-    console.log(
-      `Input stats - BTC: min=${Math.min(...btcPrices).toFixed(
-        4
-      )}, max=${Math.max(...btcPrices).toFixed(4)}, mean=${(
-        btcPrices.reduce((a, b) => a + b, 0) / btcPrices.length
-      ).toFixed(4)}`
-    );
-    console.log(
       `ATR: ${atr.toFixed(4)}, Momentum Window: ${momentumWindowSize}`
     );
     console.log(
@@ -154,6 +138,8 @@ export class TradeModelPredictor {
     );
     console.log(
       `Confidence: ${confidence.toFixed(4)}, Momentum: ${momentum.toFixed(
+        4
+      )}, Short Momentum: ${shortMomentum.toFixed(
         4
       )}, Trend Slope: ${trendSlope.toFixed(4)}`
     );
@@ -172,6 +158,7 @@ export class TradeModelPredictor {
       sellProb,
       confidence,
       momentum,
+      shortMomentum,
       trendSlope,
       atr,
     };

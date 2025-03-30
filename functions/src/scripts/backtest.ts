@@ -1,9 +1,7 @@
-import { CryptoCompareService } from "../api/CryptoCompareService";
 import { TradeModelBacktester } from "../cardano/TradeModelBacktester";
 
 async function runMultiPeriodBacktest() {
   const backtester = new TradeModelBacktester();
-  const cryptoCompare = new CryptoCompareService();
   const results: { period: string; result: any }[] = [];
 
   const startYear = 2020;
@@ -25,24 +23,11 @@ async function runMultiPeriodBacktest() {
         `Running backtest for ${startDate.toISOString()} to ${endDate.toISOString()}`
       );
       const result = await backtester.backtest(startDate, endDate);
-
-      const adaPrices = (
-        await cryptoCompare.getHistoricalData(
-          "ADA",
-          Math.ceil(
-            (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
-          )
-        )
-      ).prices;
-      const atr = calculateATR(adaPrices);
-      const trend =
-        (adaPrices[adaPrices.length - 1] - adaPrices[0]) / adaPrices[0];
-
       results.push({
         period: `${startDate.toISOString().slice(0, 10)} - ${endDate
           .toISOString()
           .slice(0, 10)}`,
-        result: { ...result, atr, trend },
+        result,
       });
     }
   }
@@ -51,24 +36,10 @@ async function runMultiPeriodBacktest() {
   console.log("Multi-Period Backtest Summary:", summary);
 }
 
-function calculateATR(prices: number[], period: number = 14): number {
-  if (prices.length < period + 1) return 0.01;
-  const trueRanges = [];
-  for (let i = 1; i < prices.length; i++) {
-    trueRanges.push(Math.abs(prices[i] - prices[i - 1]));
-  }
-  const recentRanges = trueRanges.slice(-period);
-  return recentRanges.reduce((sum, range) => sum + range, 0) / period;
-}
-
-interface Metric {
-  values: number[];
-  avg: number;
-  std: number;
-}
-
 function aggregateResults(results: { period: string; result: any }[]) {
-  const metrics: { [key: string]: Metric } = {
+  const metrics: {
+    [key: string]: { values: number[]; avg: number; std: number };
+  } = {
     totalReturn: { values: [], avg: 0, std: 0 },
     winRate: { values: [], avg: 0, std: 0 },
     sharpeRatio: { values: [], avg: 0, std: 0 },
@@ -91,13 +62,24 @@ function aggregateResults(results: { period: string; result: any }[]) {
     );
   });
 
+  const atrValues = results.map((r) =>
+    r.result.trades.length > 0
+      ? r.result.trades[r.result.trades.length - 1].price * 0.01
+      : 0
+  ); // Proxy ATR
   const correlations = {
     atrVsReturn: calculateCorrelation(
-      results.map((r) => r.result.atr),
+      atrValues,
       results.map((r) => r.result.totalReturn)
     ),
     trendVsReturn: calculateCorrelation(
-      results.map((r) => r.result.trend),
+      results.map((r) =>
+        r.result.trades.length > 0
+          ? (r.result.trades[r.result.trades.length - 1].price -
+              r.result.trades[0].price) /
+            r.result.trades[0].price
+          : 0
+      ),
       results.map((r) => r.result.totalReturn)
     ),
   };
@@ -107,17 +89,18 @@ function aggregateResults(results: { period: string; result: any }[]) {
 
 function calculateCorrelation(x: number[], y: number[]): number {
   const n = x.length;
+  if (n !== y.length || n < 2) return 0;
   const meanX = x.reduce((a, b) => a + b, 0) / n;
   const meanY = y.reduce((a, b) => a + b, 0) / n;
   const cov =
-    x.reduce((sum, xi, i) => sum + (xi - meanX) * (y[i] - meanY), 0) / n;
+    x.reduce((sum, xi, i) => sum + (xi - meanX) * (y[i] - meanY), 0) / (n - 1);
   const stdX = Math.sqrt(
-    x.reduce((sum, xi) => sum + Math.pow(xi - meanX, 2), 0) / n
+    x.reduce((sum, xi) => sum + Math.pow(xi - meanX, 2), 0) / (n - 1)
   );
   const stdY = Math.sqrt(
-    y.reduce((sum, yi) => sum + Math.pow(yi - meanY, 2), 0) / n
+    y.reduce((sum, yi) => sum + Math.pow(yi - meanY, 2), 0) / (n - 1)
   );
-  return cov / (stdX * stdY) || 0;
+  return stdX === 0 || stdY === 0 ? 0 : cov / (stdX * stdY);
 }
 
 runMultiPeriodBacktest().catch((error) =>

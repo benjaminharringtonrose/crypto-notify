@@ -1,257 +1,149 @@
-import * as admin from "firebase-admin";
 import * as tf from "@tensorflow/tfjs-node";
-import dotenv from "dotenv";
-import { BestWeightsCallback } from "./callbacks/BestWeightsCallback";
-import { PredictionLoggerCallback } from "./callbacks/PredictionLoggerCallback";
-import { CyclicLearningRateCallback } from "./callbacks/CyclicLearningRateCallback";
+import { ModelWeightManager } from "./TradeModelWeightManager";
 import TradeModelFactory from "./TradeModelFactory";
-import { ModelConfig } from "../types";
+import { FeatureSequenceGenerator } from "./FeatureSequenceGenerator";
 import { FirebaseService } from "../api/FirebaseService";
-import { TRADE_PREDICTOR_WEIGHTS } from "../constants";
-import { DataProcessor } from "./DataProcessor";
-import { Metrics } from "./Metrics";
 
-dotenv.config();
-
-FirebaseService.getInstance();
-
-export class TradeModelTrainer {
-  private readonly config: ModelConfig = {
-    timesteps: 30,
-    epochs: 50,
-    batchSize: 128,
-    initialLearningRate: 0.0008,
-  };
-  private bucket = admin.storage().bucket();
-  private model: tf.LayersModel | null = null;
-  private lossFn = Metrics.focalLoss.bind(Metrics);
-  private dataProcessor: DataProcessor;
+export class TradeModelPredictor {
+  private weightManager: ModelWeightManager;
+  private sequenceGenerator: FeatureSequenceGenerator;
+  private timesteps = 30;
+  private model: tf.LayersModel;
+  private isWeightsLoaded = false;
 
   constructor() {
-    this.dataProcessor = new DataProcessor(this.config, 450, 365);
-    console.log("TradeModelTrainer initialized");
+    this.weightManager = new ModelWeightManager();
+    this.sequenceGenerator = new FeatureSequenceGenerator(this.timesteps);
+    FirebaseService.getInstance();
+    const factory = new TradeModelFactory(this.timesteps, 32); // 32 features for ADA
+    this.model = factory.createModel();
+    this.loadWeightsAsync();
   }
 
-  private async trainModel(
-    X: number[][][],
-    y: number[]
-  ): Promise<{ X_mean: tf.Tensor; X_std: tf.Tensor }> {
-    console.log(
-      `Input data dimensions: [${X.length}, ${X[0].length}, ${X[0][0].length}]`
-    );
-    if (X[0].length !== this.config.timesteps) {
-      throw new Error(
-        `Data timestep mismatch: expected ${this.config.timesteps}, got ${X[0].length}`
-      );
-    }
-    const X_tensor = tf.tensor3d(X, [X.length, this.config.timesteps, 61]);
-    const y_tensor = tf.tensor2d(
-      y.map((label) => [label === 0 ? 1 : 0, label === 1 ? 1 : 0]),
-      [y.length, 2]
-    );
-    const X_mean = tf.tensor1d(
-      this.dataProcessor.computeFeatureStats(X.flat(1)).mean
-    );
-    const X_std = tf.tensor1d(
-      this.dataProcessor.computeFeatureStats(X.flat(1)).std
-    );
-    const X_normalized = X_tensor.sub(X_mean).div(X_std);
-
+  private async loadWeightsAsync(): Promise<void> {
     try {
-      const totalSamples = X.length;
-      const trainSize = Math.floor(totalSamples * 0.7);
-      const indices = Array.from({ length: totalSamples }, (_, i) => i);
-      tf.util.shuffle(indices);
-
-      const trainIndices = indices.slice(0, trainSize);
-      const valIndices = indices.slice(trainSize);
-
-      const X_train = tf.gather(X_normalized, trainIndices);
-      const y_train = tf.gather(y_tensor, trainIndices);
-      const X_val = tf.gather(X_normalized, valIndices);
-      const y_val = tf.gather(y_tensor, valIndices);
-
-      const trainDataset = tf.data
-        .zip({
-          xs: tf.data.array(X_train.arraySync() as number[][][]),
-          ys: tf.data.array(y_train.arraySync() as number[][]),
-        })
-        .shuffle(trainSize)
-        .batch(this.config.batchSize)
-        .prefetch(2);
-
-      const valDataset = tf.data
-        .zip({
-          xs: tf.data.array(X_val.arraySync() as number[][][]),
-          ys: tf.data.array(y_val.arraySync() as number[][]),
-        })
-        .batch(this.config.batchSize);
-
-      const factory = new TradeModelFactory(this.config.timesteps, 61);
-      this.model = factory.createModel();
-
-      const bestWeightsCallback = new BestWeightsCallback();
-      const predictionLoggerCallback = new PredictionLoggerCallback(X_val);
-      const cyclicLRCallback = new CyclicLearningRateCallback(
-        0.00005,
-        this.config.initialLearningRate,
-        10
-      );
-
-      if (!this.model) throw new Error("Model initialization failed");
-
-      this.model.compile({
-        optimizer: tf.train.adam(this.config.initialLearningRate),
-        loss: this.lossFn,
-        metrics: [
-          tf.metrics.binaryAccuracy,
-          Metrics.customPrecision,
-          Metrics.customRecall,
-          Metrics.customF1,
-        ],
-      });
-
-      bestWeightsCallback.setModel(this.model);
-      predictionLoggerCallback.setModel(this.model);
-      cyclicLRCallback.setModel(this.model);
-
-      console.log("Model summary:");
-      this.model.summary();
-
-      console.log("Starting model training...");
-      await this.model.fitDataset(trainDataset, {
-        epochs: this.config.epochs,
-        validationData: valDataset,
-        callbacks: [
-          tf.callbacks.earlyStopping({ monitor: "val_loss", patience: 20 }),
-          bestWeightsCallback,
-          predictionLoggerCallback,
-          cyclicLRCallback,
-        ],
-      });
-
-      bestWeightsCallback.applyBestWeights(this.model);
-      console.log("Model training completed.");
-
-      await Metrics.evaluateModel(this.model, X_normalized, y_tensor);
-
-      console.log(
-        `Training Buy Ratio: ${y.filter((l) => l === 1).length / y.length}`
-      );
-
-      console.log(
-        "Memory after training:",
-        tf.memory().numBytes / 1024 / 1024,
-        "MB"
-      );
-
-      return { X_mean, X_std };
-    } finally {
-      X_tensor.dispose();
-      y_tensor.dispose();
-      X_normalized.dispose();
-    }
-  }
-
-  private async saveModelWeights(
-    featureStats: { mean: number[]; std: number[] },
-    X_mean: tf.Tensor,
-    X_std: tf.Tensor
-  ): Promise<void> {
-    if (!this.model) throw new Error("Model not initialized");
-    const weights = {
-      conv1Weights: Array.from(
-        await this.model.getLayer("conv1d").getWeights()[0].data()
-      ),
-      conv1Bias: Array.from(
-        await this.model.getLayer("conv1d").getWeights()[1].data()
-      ),
-      conv2Weights: Array.from(
-        await this.model.getLayer("conv1d_2").getWeights()[0].data()
-      ),
-      conv2Bias: Array.from(
-        await this.model.getLayer("conv1d_2").getWeights()[1].data()
-      ),
-      lstm1Weights: Array.from(
-        await this.model.getLayer("lstm1").getWeights()[0].data()
-      ),
-      lstm1RecurrentWeights: Array.from(
-        await this.model.getLayer("lstm1").getWeights()[1].data()
-      ),
-      lstm1Bias: Array.from(
-        await this.model.getLayer("lstm1").getWeights()[2].data()
-      ),
-      lstm2Weights: Array.from(
-        await this.model.getLayer("lstm2").getWeights()[0].data()
-      ),
-      lstm2RecurrentWeights: Array.from(
-        await this.model.getLayer("lstm2").getWeights()[1].data()
-      ),
-      lstm2Bias: Array.from(
-        await this.model.getLayer("lstm2").getWeights()[2].data()
-      ),
-      lstm3Weights: Array.from(
-        await this.model.getLayer("lstm3").getWeights()[0].data()
-      ),
-      lstm3RecurrentWeights: Array.from(
-        await this.model.getLayer("lstm3").getWeights()[1].data()
-      ),
-      lstm3Bias: Array.from(
-        await this.model.getLayer("lstm3").getWeights()[2].data()
-      ),
-      timeDistributedWeights: Array.from(
-        await this.model.getLayer("time_distributed").getWeights()[0].data()
-      ),
-      timeDistributedBias: Array.from(
-        await this.model.getLayer("time_distributed").getWeights()[1].data()
-      ),
-      bnGamma: Array.from(
-        await this.model.getLayer("batchNormalization").getWeights()[0].data()
-      ),
-      bnBeta: Array.from(
-        await this.model.getLayer("batchNormalization").getWeights()[1].data()
-      ),
-      bnMovingMean: Array.from(
-        await this.model.getLayer("batchNormalization").getWeights()[2].data()
-      ),
-      bnMovingVariance: Array.from(
-        await this.model.getLayer("batchNormalization").getWeights()[3].data()
-      ),
-      dense1Weights: Array.from(
-        await this.model.getLayer("dense").getWeights()[0].data()
-      ),
-      dense1Bias: Array.from(
-        await this.model.getLayer("dense").getWeights()[1].data()
-      ),
-      dense2Weights: Array.from(
-        await this.model.getLayer("dense_1").getWeights()[0].data()
-      ),
-      dense2Bias: Array.from(
-        await this.model.getLayer("dense_1").getWeights()[1].data()
-      ),
-      featureMeans: Array.from(await X_mean.data()),
-      featureStds: Array.from(await X_std.data()),
-    };
-    const weightsJson = JSON.stringify({ weights });
-    const file = this.bucket.file(TRADE_PREDICTOR_WEIGHTS);
-    await file.save(weightsJson, { contentType: "application/json" });
-    console.log("Model weights saved to Firebase Storage");
-    X_mean.dispose();
-    X_std.dispose();
-  }
-
-  public async train(): Promise<void> {
-    try {
-      const startTime = performance.now();
-      const { X, y, featureStats } = await this.dataProcessor.prepareData();
-      const { X_mean, X_std } = await this.trainModel(X, y);
-      await this.saveModelWeights(featureStats, X_mean, X_std);
-      const endTime = performance.now();
-      const executionTime = (endTime - startTime) / 1000;
-      console.log(`Execution time: ${executionTime} milliseconds`);
+      await this.weightManager.loadWeights();
+      this.weightManager.setWeights(this.model);
+      this.isWeightsLoaded = true;
+      console.log("Weights loaded successfully");
     } catch (error) {
-      console.error("Training failed:", error);
+      console.error("Failed to load weights:", error);
       throw error;
     }
+  }
+
+  public async predict(
+    adaPrices: number[],
+    adaVolumes: number[],
+    btcPrices: number[],
+    btcVolumes: number[]
+  ): Promise<{
+    buyLogit: number;
+    sellLogit: number;
+    buyProb: number;
+    sellProb: number;
+    confidence: number;
+    momentum: number;
+    trendSlope: number;
+    atr: number; // From FeatureSequenceGenerator
+  }> {
+    if (!this.isWeightsLoaded) {
+      console.log("Weights not yet loaded, awaiting load...");
+      await this.loadWeightsAsync();
+    }
+
+    const startTime = performance.now();
+
+    const startIndex = Math.max(0, adaPrices.length - this.timesteps - 1);
+    const endIndex = adaPrices.length - 1;
+    const sequence = this.sequenceGenerator.generateSequence(
+      adaPrices,
+      adaVolumes,
+      btcPrices,
+      btcVolumes,
+      startIndex,
+      endIndex
+    );
+
+    const features = tf.tensor3d([sequence], [1, this.timesteps, 32]);
+    const means = tf.tensor1d(this.weightManager.getFeatureMeans());
+    const stds = tf.tensor1d(this.weightManager.getFeatureStds());
+    const featuresNormalized = features.sub(means).div(stds.add(1e-6));
+
+    const logits = this.model.predict(featuresNormalized) as tf.Tensor2D;
+    const logitsArray = await logits.data();
+    const [sellLogit, buyLogit] = [logitsArray[0], logitsArray[1]];
+    const probs = tf.tensor2d([[sellLogit, buyLogit]]).softmax();
+    const probArray = await probs.data();
+    let [sellProb, buyProb] = [probArray[0], probArray[1]];
+    const confidence = Math.max(buyProb, sellProb);
+
+    // Dynamic momentum window based on ATR (feature index 11)
+    const atr = sequence[sequence.length - 1][11]; // ATR from features
+    const momentumWindowSize = atr > 0.02 ? 5 : 14; // Short window for high volatility
+    const momentumWindow = adaPrices.slice(-momentumWindowSize);
+    const momentum =
+      momentumWindow.length >= 2
+        ? (momentumWindow[momentumWindow.length - 1] - momentumWindow[0]) /
+          momentumWindow[0]
+        : 0;
+
+    const trendWindow = adaPrices.slice(-momentumWindowSize);
+    const trendSlope =
+      trendWindow.length >= 2
+        ? (trendWindow[trendWindow.length - 1] - trendWindow[0]) /
+          (trendWindow.length - 1)
+        : 0;
+
+    const endTime = performance.now();
+    console.log(
+      `Prediction executed in ${(endTime - startTime).toFixed(2)} ms`
+    );
+    console.log(
+      `Input stats - ADA: min=${Math.min(...adaPrices).toFixed(
+        4
+      )}, max=${Math.max(...adaPrices).toFixed(4)}, mean=${(
+        adaPrices.reduce((a, b) => a + b, 0) / adaPrices.length
+      ).toFixed(4)}`
+    );
+    console.log(
+      `Input stats - BTC: min=${Math.min(...btcPrices).toFixed(
+        4
+      )}, max=${Math.max(...btcPrices).toFixed(4)}, mean=${(
+        btcPrices.reduce((a, b) => a + b, 0) / btcPrices.length
+      ).toFixed(4)}`
+    );
+    console.log(
+      `ATR: ${atr.toFixed(4)}, Momentum Window: ${momentumWindowSize}`
+    );
+    console.log(
+      `Logits: [Sell: ${sellLogit.toFixed(4)}, Buy: ${buyLogit.toFixed(4)}]`
+    );
+    console.log(
+      `Probs: [Sell: ${sellProb.toFixed(4)}, Buy: ${buyProb.toFixed(4)}]`
+    );
+    console.log(
+      `Confidence: ${confidence.toFixed(4)}, Momentum: ${momentum.toFixed(
+        4
+      )}, Trend Slope: ${trendSlope.toFixed(4)}`
+    );
+
+    features.dispose();
+    featuresNormalized.dispose();
+    logits.dispose();
+    probs.dispose();
+    means.dispose();
+    stds.dispose();
+
+    return {
+      buyLogit,
+      sellLogit,
+      buyProb,
+      sellProb,
+      confidence,
+      momentum,
+      trendSlope,
+      atr,
+    };
   }
 }

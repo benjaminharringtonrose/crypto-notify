@@ -3,6 +3,7 @@ import { BacktestResult, Trade, Recommendation } from "../types";
 import { FirebaseService } from "../api/FirebaseService";
 import { CryptoCompareService } from "../api/CryptoCompareService";
 import { TradingBot } from "./TradingBot";
+import { MODEL_CONSTANTS } from "../constants";
 
 FirebaseService.getInstance();
 
@@ -14,17 +15,17 @@ export class TradeModelBacktester {
 
   constructor(
     initialCapital: number = 10000,
-    basePositionSize: number = 0.05,
-    slippage: number = 0.001,
-    commission: number = 0.1,
-    stopLossMultiplier: number = 4.0,
-    trailingStop: number = 0.08,
-    minHoldDays: number = 4,
-    minConfidence: number = 0.55,
-    profitTakeMultiplier: number = 3.5,
-    logitThreshold: number = 0.05,
-    buyProbThreshold: number = 0.5,
-    sellProbThreshold: number = 0.33
+    basePositionSize: number = MODEL_CONSTANTS.BASE_POSITION_SIZE_DEFAULT,
+    slippage: number = MODEL_CONSTANTS.SLIPPAGE,
+    commission: number = MODEL_CONSTANTS.COMMISSION,
+    stopLossMultiplier: number = MODEL_CONSTANTS.STOP_LOSS_MULTIPLIER_DEFAULT,
+    trailingStop: number = MODEL_CONSTANTS.TRAILING_STOP_DEFAULT,
+    minHoldDays: number = MODEL_CONSTANTS.MIN_HOLD_DAYS_DEFAULT,
+    minConfidence: number = MODEL_CONSTANTS.MIN_CONFIDENCE_DEFAULT,
+    profitTakeMultiplier: number = MODEL_CONSTANTS.PROFIT_TAKE_MULTIPLIER_DEFAULT,
+    logitThreshold: number = MODEL_CONSTANTS.LOGIT_THRESHOLD_DEFAULT,
+    buyProbThreshold: number = MODEL_CONSTANTS.BUY_PROB_THRESHOLD_DEFAULT,
+    sellProbThreshold: number = MODEL_CONSTANTS.SELL_PROB_THRESHOLD_DEFAULT
   ) {
     this.bot = new TradingBot({
       basePositionSize,
@@ -67,6 +68,8 @@ export class TradeModelBacktester {
     let lastBuyPrice: number | undefined;
     let peakPrice: number | undefined;
     let buyTimestamp: string | undefined;
+    let maxWinStreak = 0;
+    let maxLossStreak = 0;
     let winStreak = 0;
     let lossStreak = 0;
 
@@ -75,11 +78,7 @@ export class TradeModelBacktester {
       `Backtest period: ${startDate.toISOString()} to ${endDate.toISOString()}`
     );
 
-    for (
-      let i = this.bot["predictor"]["timesteps"];
-      i < adaData.prices.length;
-      i++
-    ) {
+    for (let i = MODEL_CONSTANTS.TIMESTEPS; i < adaData.prices.length; i++) {
       const currentTimestamp = new Date(
         startDate.getTime() + i * 24 * 60 * 60 * 1000
       ).toISOString();
@@ -91,7 +90,6 @@ export class TradeModelBacktester {
       const currentPrice = adaPrices[adaPrices.length - 1];
 
       const portfolioValue = capital + holdings * currentPrice;
-
       portfolioHistory.push({
         timestamp: currentTimestamp,
         value: portfolioValue,
@@ -137,8 +135,15 @@ export class TradeModelBacktester {
               2
             )}, Confidence: ${confidence.toFixed(2)}`
           );
-          if (profitLoss > 0) winStreak++, (lossStreak = 0);
-          else lossStreak++, (winStreak = 0);
+          if (profitLoss > 0) {
+            winStreak++;
+            lossStreak = 0;
+            maxWinStreak = Math.max(maxWinStreak, winStreak);
+          } else {
+            lossStreak++;
+            winStreak = 0;
+            maxLossStreak = Math.max(maxLossStreak, lossStreak);
+          }
           console.log(`Win Streak: ${winStreak}, Loss Streak: ${lossStreak}`);
           holdings = 0;
           consecutiveBuys = 0;
@@ -152,7 +157,7 @@ export class TradeModelBacktester {
         peakPrice = Math.max(peakPrice || lastBuyPrice!, currentPrice);
       }
 
-      if (i > this.bot["predictor"]["timesteps"]) {
+      if (i > MODEL_CONSTANTS.TIMESTEPS) {
         const prevValue = portfolioHistory[portfolioHistory.length - 2].value;
         returns.push((portfolioValue - prevValue) / prevValue);
       }
@@ -168,30 +173,45 @@ export class TradeModelBacktester {
       (t) => t.type === Recommendation.Sell && t.price > (t.buyPrice || 0)
     ).length;
     const winRate = totalTrades > 0 ? wins / (totalTrades / 2) : 0;
+    const avgWin =
+      trades
+        .filter(
+          (t) => t.type === Recommendation.Sell && t.price > (t.buyPrice || 0)
+        )
+        .reduce(
+          (sum, t) => sum + (t.usdValue - (t.buyPrice || 0) * t.adaAmount),
+          0
+        ) / (wins || 1);
+    const avgLoss =
+      trades
+        .filter(
+          (t) => t.type === Recommendation.Sell && t.price <= (t.buyPrice || 0)
+        )
+        .reduce(
+          (sum, t) => sum + (t.usdValue - (t.buyPrice || 0) * t.adaAmount),
+          0
+        ) / (totalTrades / 2 - wins || 1);
 
     const sharpeRatio = this.calculateSharpeRatio(returns);
+    const sortinoRatio = this.calculateSortinoRatio(returns);
     const maxDrawdown = this.calculateMaxDrawdown(portfolioHistory);
 
-    const avgTradeDuration =
-      trades.length > 1
-        ? trades
-            .filter((t) => t.type === Recommendation.Sell)
-            .reduce((sum, sellTrade, idx) => {
-              const buyTrade = trades[idx * 2];
-              return (
-                sum +
-                (new Date(sellTrade.timestamp).getTime() -
-                  new Date(buyTrade.timestamp).getTime()) /
-                  (1000 * 60 * 60 * 24)
-              );
-            }, 0) /
-          (totalTrades / 2)
-        : 0;
-    console.log(`Average Trade Duration: ${avgTradeDuration.toFixed(2)} days`);
+    console.log(
+      `Average Trade Duration: ${this.calculateAvgTradeDuration(trades).toFixed(
+        2
+      )} days`
+    );
     console.log(`Total Return: ${(totalReturn * 100).toFixed(2)}%`);
     console.log(`Win Rate: ${(winRate * 100).toFixed(2)}%`);
     console.log(`Sharpe Ratio: ${sharpeRatio.toFixed(2)}`);
+    console.log(`Sortino Ratio: ${sortinoRatio.toFixed(2)}`);
     console.log(`Max Drawdown: ${(maxDrawdown * 100).toFixed(2)}%`);
+    console.log(
+      `Max Win Streak: ${maxWinStreak}, Max Loss Streak: ${maxLossStreak}`
+    );
+    console.log(
+      `Avg Win: $${avgWin.toFixed(2)}, Avg Loss: $${avgLoss.toFixed(2)}`
+    );
 
     return {
       totalReturn,
@@ -208,14 +228,23 @@ export class TradeModelBacktester {
     if (returns.length === 0) return 0;
     const returnsTensor = tf.tensor1d(returns);
     const mean = tf.mean(returnsTensor).dataSync()[0];
-    const meanTensor = tf.scalar(mean);
-    const squaredDiffs = tf.square(returnsTensor.sub(meanTensor));
-    const variance = tf.mean(squaredDiffs).dataSync()[0];
-    const std = Math.sqrt(variance);
+    const std = tf
+      .sqrt(tf.mean(tf.square(returnsTensor.sub(mean))))
+      .dataSync()[0];
     returnsTensor.dispose();
-    meanTensor.dispose();
-    squaredDiffs.dispose();
     return std === 0 ? 0 : (mean / std) * Math.sqrt(252);
+  }
+
+  private calculateSortinoRatio(returns: number[]): number {
+    if (returns.length === 0) return 0;
+    const returnsTensor = tf.tensor1d(returns);
+    const mean = tf.mean(returnsTensor).dataSync()[0];
+    const downsideReturns = returns.map((r) => (r < 0 ? r : 0));
+    const downsideStd = tf
+      .sqrt(tf.mean(tf.square(tf.tensor1d(downsideReturns))))
+      .dataSync()[0];
+    returnsTensor.dispose();
+    return downsideStd === 0 ? 0 : (mean / downsideStd) * Math.sqrt(252);
   }
 
   private calculateMaxDrawdown(
@@ -229,5 +258,22 @@ export class TradeModelBacktester {
       maxDrawdown = Math.max(maxDrawdown, drawdown);
     }
     return maxDrawdown;
+  }
+
+  private calculateAvgTradeDuration(trades: Trade[]): number {
+    return trades.length > 1
+      ? trades
+          .filter((t) => t.type === Recommendation.Sell)
+          .reduce((sum, sellTrade, idx) => {
+            const buyTrade = trades[idx * 2];
+            return (
+              sum +
+              (new Date(sellTrade.timestamp).getTime() -
+                new Date(buyTrade.timestamp).getTime()) /
+                (1000 * 60 * 60 * 24)
+            );
+          }, 0) /
+          (trades.length / 2)
+      : 0;
   }
 }

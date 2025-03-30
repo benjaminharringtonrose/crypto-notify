@@ -34,3 +34,20 @@ export const PERIODS = {
   VOL_SMA_LONG: 14,
   MOMENTUM: 10,
 } as const;
+
+export const MODEL_CONSTANTS = {
+  TIMESTEPS: 30, // Number of timesteps for the sequence
+  FEATURE_COUNT: 61, // Number of features per timestep
+  MIN_CONFIDENCE_DEFAULT: 0.5, // Default minimum confidence for trades (lowered to increase trades)
+  PROFIT_TAKE_MULTIPLIER_DEFAULT: 3.0, // Default profit take multiplier
+  BASE_POSITION_SIZE_DEFAULT: 0.08, // Default base position size (increased for higher returns)
+  SLIPPAGE: 0.001, // Slippage factor
+  COMMISSION: 0.1, // Commission per trade
+  STOP_LOSS_MULTIPLIER_DEFAULT: 4.0, // Default stop-loss multiplier
+  TRAILING_STOP_DEFAULT: 0.06, // Default trailing stop percentage
+  MIN_HOLD_DAYS_DEFAULT: 4, // Minimum holding period in days
+  LOGIT_THRESHOLD_DEFAULT: 0.05, // Default logit threshold for trade decisions
+  BUY_PROB_THRESHOLD_DEFAULT: 0.5, // Default buy probability threshold
+  SELL_PROB_THRESHOLD_DEFAULT: 0.33, // Default sell probability threshold
+  MOMENTUM_WINDOW_THRESHOLD: 0.01, // ATR threshold for switching momentum window (lowered for more short-term signals)
+};

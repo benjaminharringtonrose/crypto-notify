@@ -1,18 +1,19 @@
 import { TradeModelPredictor } from "./TradeModelPredictor";
 import { Trade, Recommendation } from "../types";
+import { MODEL_CONSTANTS } from "../constants";
 
 interface TradingBotParams {
-  basePositionSize: number;
-  slippage: number;
-  commission: number;
-  stopLossMultiplier: number;
-  trailingStop: number;
-  minHoldDays: number;
-  minConfidence: number;
-  profitTakeMultiplier: number;
-  logitThreshold: number;
-  buyProbThreshold: number;
-  sellProbThreshold: number;
+  basePositionSize?: number;
+  slippage?: number;
+  commission?: number;
+  stopLossMultiplier?: number;
+  trailingStop?: number;
+  minHoldDays?: number;
+  minConfidence?: number;
+  profitTakeMultiplier?: number;
+  logitThreshold?: number;
+  buyProbThreshold?: number;
+  sellProbThreshold?: number;
 }
 
 export class TradingBot {
@@ -30,18 +31,18 @@ export class TradingBot {
   private sellProbThreshold: number;
 
   constructor({
-    basePositionSize = 0.05,
-    slippage = 0.001,
-    commission = 0.1,
-    stopLossMultiplier = 4.0,
-    trailingStop = 0.08,
-    minHoldDays = 4,
-    minConfidence = 0.55,
-    profitTakeMultiplier = 3.5,
-    logitThreshold = 0.05,
-    buyProbThreshold = 0.5,
-    sellProbThreshold = 0.33,
-  }: TradingBotParams) {
+    basePositionSize = MODEL_CONSTANTS.BASE_POSITION_SIZE_DEFAULT,
+    slippage = MODEL_CONSTANTS.SLIPPAGE,
+    commission = MODEL_CONSTANTS.COMMISSION,
+    stopLossMultiplier = MODEL_CONSTANTS.STOP_LOSS_MULTIPLIER_DEFAULT,
+    trailingStop = MODEL_CONSTANTS.TRAILING_STOP_DEFAULT,
+    minHoldDays = MODEL_CONSTANTS.MIN_HOLD_DAYS_DEFAULT,
+    minConfidence = MODEL_CONSTANTS.MIN_CONFIDENCE_DEFAULT,
+    profitTakeMultiplier = MODEL_CONSTANTS.PROFIT_TAKE_MULTIPLIER_DEFAULT,
+    logitThreshold = MODEL_CONSTANTS.LOGIT_THRESHOLD_DEFAULT,
+    buyProbThreshold = MODEL_CONSTANTS.BUY_PROB_THRESHOLD_DEFAULT,
+    sellProbThreshold = MODEL_CONSTANTS.SELL_PROB_THRESHOLD_DEFAULT,
+  }: TradingBotParams = {}) {
     this.predictor = new TradeModelPredictor();
     this.basePositionSize = basePositionSize;
     this.slippage = slippage;
@@ -54,16 +55,6 @@ export class TradingBot {
     this.logitThreshold = logitThreshold;
     this.buyProbThreshold = buyProbThreshold;
     this.sellProbThreshold = sellProbThreshold;
-  }
-
-  private calculateATR(prices: number[], period: number = 14): number {
-    if (prices.length < period + 1) return 0.01;
-    const trueRanges = [];
-    for (let i = 1; i < prices.length; i++) {
-      trueRanges.push(Math.abs(prices[i] - prices[i - 1]));
-    }
-    const recentRanges = trueRanges.slice(-period);
-    return recentRanges.reduce((sum, range) => sum + range, 0) / period;
   }
 
   public async decideTrade({
@@ -104,10 +95,10 @@ export class TradingBot {
       confidence,
       momentum,
       trendSlope,
+      atr,
     } = prediction;
-    const atr = this.calculateATR(
-      adaPrices.slice(-this.predictor["timesteps"])
-    );
+
+    const dynamicMinConfidence = atr > 0.03 ? 0.65 : this.minConfidence;
     const dynamicStopLossMultiplier =
       atr > 0.02 ? this.stopLossMultiplier * 0.8 : this.stopLossMultiplier;
     const dynamicTrailingStop =
@@ -132,28 +123,20 @@ export class TradingBot {
         if (
           (sellLogit > buyLogit + this.logitThreshold &&
             sellProb > this.sellProbThreshold) ||
-          (momentum < -0.1 && sellProb > 0.3 && trendSlope < -0.01)
-        ) {
-          const effectivePrice = currentPrice * (1 - this.slippage);
-          const usdReceived = holdings * effectivePrice - this.commission;
-          return {
-            trade: {
-              type: Recommendation.Sell,
-              price: effectivePrice,
-              timestamp: currentTimestamp,
-              adaAmount: holdings,
-              usdValue: usdReceived,
-              buyPrice: lastBuyPrice,
-            },
-            confidence,
-          };
-        } else if (
+          (momentum < -0.05 && trendSlope < 0) ||
           priceChange <= -stopLossLevel ||
           currentPrice <= trailingStopLevel ||
           currentPrice >= profitTakeLevel
         ) {
           const effectivePrice = currentPrice * (1 - this.slippage);
           const usdReceived = holdings * effectivePrice - this.commission;
+          console.log(
+            `Sell Trigger: StopLoss=${stopLossLevel.toFixed(
+              4
+            )}, Trailing=${trailingStopLevel.toFixed(
+              4
+            )}, ProfitTake=${profitTakeLevel.toFixed(4)}`
+          );
           return {
             trade: {
               type: Recommendation.Sell,
@@ -170,12 +153,12 @@ export class TradingBot {
     } else if (
       buyLogit > sellLogit + this.logitThreshold &&
       buyProb > this.buyProbThreshold &&
-      confidence >= this.minConfidence &&
+      confidence >= dynamicMinConfidence &&
       capital > 0
     ) {
       const volatilityAdjustedSize = Math.min(
         this.basePositionSize / (atr > 0 ? atr : 0.01),
-        0.15
+        trendSlope > 0.05 && atr < 0.02 ? 0.2 : 0.15
       );
       const trendAdjustedSize =
         trendSlope > 0.02
@@ -186,12 +169,17 @@ export class TradingBot {
         trendAdjustedSize *
           confidenceBoost *
           Math.min(buyProb / this.buyProbThreshold, 2.0),
-        0.15
+        0.2
       );
       const tradeAmount = Math.min(capital * positionSize, capital);
       const effectivePrice = currentPrice * (1 + this.slippage);
       const adaBought = (tradeAmount - this.commission) / effectivePrice;
 
+      console.log(
+        `Position Size: ${positionSize.toFixed(4)}, ATR: ${atr.toFixed(
+          4
+        )}, MinConfidence: ${dynamicMinConfidence.toFixed(2)}`
+      );
       return {
         trade: {
           type: Recommendation.Buy,

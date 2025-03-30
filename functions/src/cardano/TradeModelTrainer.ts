@@ -18,8 +18,8 @@ FirebaseService.getInstance();
 export class TradeModelTrainer {
   private readonly config: ModelConfig = {
     timesteps: 30,
-    epochs: 50,
-    batchSize: 128,
+    epochs: 55,
+    batchSize: 256,
     initialLearningRate: 0.0008,
   };
   private bucket = admin.storage().bucket();

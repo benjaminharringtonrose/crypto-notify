@@ -13,7 +13,7 @@ import { Collections, CryptoIds, Currencies, Docs } from "../types";
 
 dotenv.config();
 
-export const runPriceCheckADA = onSchedule(`*/10 * * * *`, async () => {
+export const runPriceCheckADA = onSchedule("*/10 * * * *", async () => {
   try {
     const coinGecko = new CoinGeckoService({
       id: CryptoIds.Cardano,

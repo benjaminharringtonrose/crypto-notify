@@ -7,7 +7,7 @@ async function runMultiPeriodBacktest() {
   const results: { period: string; result: any }[] = [];
 
   const startYear = 2020;
-  const endYear = 2023;
+  const endYear = 2024;
   const periodLengthMonths = 6;
   const stepMonths = 3;
 

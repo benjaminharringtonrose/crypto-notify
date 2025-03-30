@@ -98,7 +98,6 @@ export class TradingBot {
       atr,
     } = prediction;
 
-    const dynamicMinConfidence = atr > 0.03 ? 0.65 : this.minConfidence;
     const dynamicStopLossMultiplier =
       atr > 0.02 ? this.stopLossMultiplier * 0.8 : this.stopLossMultiplier;
     const dynamicTrailingStop =
@@ -123,7 +122,7 @@ export class TradingBot {
         if (
           (sellLogit > buyLogit + this.logitThreshold &&
             sellProb > this.sellProbThreshold) ||
-          (momentum < -0.05 && trendSlope < 0) ||
+          (momentum < -0.03 && trendSlope < 0) || // Version 3 momentum exit
           priceChange <= -stopLossLevel ||
           currentPrice <= trailingStopLevel ||
           currentPrice >= profitTakeLevel
@@ -153,7 +152,7 @@ export class TradingBot {
     } else if (
       buyLogit > sellLogit + this.logitThreshold &&
       buyProb > this.buyProbThreshold &&
-      confidence >= dynamicMinConfidence &&
+      confidence >= this.minConfidence &&
       capital > 0
     ) {
       const volatilityAdjustedSize = Math.min(
@@ -178,7 +177,7 @@ export class TradingBot {
       console.log(
         `Position Size: ${positionSize.toFixed(4)}, ATR: ${atr.toFixed(
           4
-        )}, MinConfidence: ${dynamicMinConfidence.toFixed(2)}`
+        )}, MinConfidence: ${this.minConfidence.toFixed(2)}`
       );
       return {
         trade: {

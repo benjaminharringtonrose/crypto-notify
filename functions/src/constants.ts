@@ -25,7 +25,7 @@ export const FIVE_YEARS_IN_DAYS = 1826;
 
 export const TRAINING_CONFIG: ScheduleOptions = {
   schedule: EVERY_THIRTY_MINS,
-  memory: LOW_MEMORY,
+  memory: MEDIUM_MEMORY,
 };
 
 export const RUN_TRADE_MODEL_CONFIG: ScheduleOptions = {

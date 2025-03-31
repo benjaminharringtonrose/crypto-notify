@@ -1,7 +1,11 @@
 import * as tf from "@tensorflow/tfjs-node";
 import { FirebaseService } from "../api/FirebaseService";
 import { Bucket } from "@google-cloud/storage";
-import { TRADE_PREDICTOR_WEIGHTS } from "../constants";
+import {
+  MODEL_ARCHITECTURE_CONSTANTS,
+  MODEL_CONSTANTS,
+  TRADE_PREDICTOR_WEIGHTS,
+} from "../constants";
 
 export class ModelWeightManager {
   private weights: any;
@@ -39,34 +43,67 @@ export class ModelWeightManager {
     model
       .getLayer("conv1d")
       .setWeights([
-        tf.tensor3d(this.weights.conv1Weights, [5, 61, 12]),
+        tf.tensor3d(
+          this.weights.conv1Weights,
+          MODEL_ARCHITECTURE_CONSTANTS.CONV1D_1_WEIGHT_SHAPE
+        ),
         tf.tensor1d(this.weights.conv1Bias),
       ]);
     model
       .getLayer("conv1d_2")
       .setWeights([
-        tf.tensor3d(this.weights.conv2Weights, [3, 12, 24]),
+        tf.tensor3d(
+          this.weights.conv2Weights,
+          MODEL_ARCHITECTURE_CONSTANTS.CONV1D_2_WEIGHT_SHAPE
+        ),
         tf.tensor1d(this.weights.conv2Bias),
       ]);
-    model.getLayer("lstm1").setWeights([
-      tf.tensor2d(this.weights.lstm1Weights, [24, 256]), // 64 units * 4 = 256
-      tf.tensor2d(this.weights.lstm1RecurrentWeights, [64, 256]),
-      tf.tensor1d(this.weights.lstm1Bias),
-    ]);
-    model.getLayer("lstm2").setWeights([
-      tf.tensor2d(this.weights.lstm2Weights, [64, 128]), // 32 units * 4 = 128
-      tf.tensor2d(this.weights.lstm2RecurrentWeights, [32, 128]),
-      tf.tensor1d(this.weights.lstm2Bias),
-    ]);
-    model.getLayer("lstm3").setWeights([
-      tf.tensor2d(this.weights.lstm3Weights, [32, 32]), // 8 units * 4 = 32
-      tf.tensor2d(this.weights.lstm3RecurrentWeights, [8, 32]),
-      tf.tensor1d(this.weights.lstm3Bias),
-    ]);
+    model
+      .getLayer("lstm1")
+      .setWeights([
+        tf.tensor2d(
+          this.weights.lstm1Weights,
+          MODEL_ARCHITECTURE_CONSTANTS.LSTM1_WEIGHT_SHAPE
+        ),
+        tf.tensor2d(
+          this.weights.lstm1RecurrentWeights,
+          MODEL_ARCHITECTURE_CONSTANTS.LSTM1_RECURRENT_SHAPE
+        ),
+        tf.tensor1d(this.weights.lstm1Bias),
+      ]);
+    model
+      .getLayer("lstm2")
+      .setWeights([
+        tf.tensor2d(
+          this.weights.lstm2Weights,
+          MODEL_ARCHITECTURE_CONSTANTS.LSTM2_WEIGHT_SHAPE
+        ),
+        tf.tensor2d(
+          this.weights.lstm2RecurrentWeights,
+          MODEL_ARCHITECTURE_CONSTANTS.LSTM2_RECURRENT_SHAPE
+        ),
+        tf.tensor1d(this.weights.lstm2Bias),
+      ]);
+    model
+      .getLayer("lstm3")
+      .setWeights([
+        tf.tensor2d(
+          this.weights.lstm3Weights,
+          MODEL_ARCHITECTURE_CONSTANTS.LSTM3_WEIGHT_SHAPE
+        ),
+        tf.tensor2d(
+          this.weights.lstm3RecurrentWeights,
+          MODEL_ARCHITECTURE_CONSTANTS.LSTM3_RECURRENT_SHAPE
+        ),
+        tf.tensor1d(this.weights.lstm3Bias),
+      ]);
     model
       .getLayer("time_distributed")
       .setWeights([
-        tf.tensor2d(this.weights.timeDistributedWeights, [8, 16]),
+        tf.tensor2d(
+          this.weights.timeDistributedWeights,
+          MODEL_ARCHITECTURE_CONSTANTS.TIME_DISTRIBUTED_WEIGHT_SHAPE
+        ),
         tf.tensor1d(this.weights.timeDistributedBias),
       ]);
     model
@@ -80,22 +117,32 @@ export class ModelWeightManager {
     model
       .getLayer("dense")
       .setWeights([
-        tf.tensor2d(this.weights.dense1Weights, [384, 24]),
+        tf.tensor2d(
+          this.weights.dense1Weights,
+          MODEL_ARCHITECTURE_CONSTANTS.DENSE_1_WEIGHT_SHAPE
+        ),
         tf.tensor1d(this.weights.dense1Bias),
       ]);
     model
       .getLayer("dense_1")
       .setWeights([
-        tf.tensor2d(this.weights.dense2Weights, [24, 2]),
+        tf.tensor2d(
+          this.weights.dense2Weights,
+          MODEL_ARCHITECTURE_CONSTANTS.DENSE_2_WEIGHT_SHAPE
+        ),
         tf.tensor1d(this.weights.dense2Bias),
       ]);
   }
 
   public getFeatureMeans(): number[] {
-    return this.weights?.featureMeans || Array(61).fill(0);
+    return (
+      this.weights?.featureMeans || Array(MODEL_CONSTANTS.FEATURE_COUNT).fill(0)
+    );
   }
 
   public getFeatureStds(): number[] {
-    return this.weights?.featureStds || Array(61).fill(1);
+    return (
+      this.weights?.featureStds || Array(MODEL_CONSTANTS.FEATURE_COUNT).fill(1)
+    );
   }
 }

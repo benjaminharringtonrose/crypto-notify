@@ -34,6 +34,7 @@ export const PERIODS = {
   VOL_SMA_LONG: 14,
   MOMENTUM: 10,
   ATR_BREAKOUT: 30, // New: For volatility breakout
+  SECONDS_PER_DAY: 86400,
 } as const;
 
 export const MODEL_CONSTANTS = {
@@ -55,7 +56,5 @@ export const MODEL_CONSTANTS = {
   MIN_PROFIT_THRESHOLD: 0.005,
 };
 
-export const COINBASE_CONSTANTS = {
-  DEFAULT_PRODUCT_ID: "ADA-USD", // Default trading pair
-  SECONDS_PER_DAY: 86400, // For timestamp calculations
-} as const;
+export const TIMESTEPS_IN_SECONDS =
+  MODEL_CONSTANTS.TIMESTEPS * PERIODS.SECONDS_PER_DAY;

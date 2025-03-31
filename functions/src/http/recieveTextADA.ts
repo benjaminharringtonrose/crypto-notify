@@ -8,7 +8,7 @@ import {
 import { formatAnalysisResults, sendSMS } from "../utils";
 import { TradingStrategy } from "../cardano/TradingStrategy";
 import { TradeExecutor } from "../cardano/TradeExecutor";
-import { COINBASE_CONSTANTS, MODEL_CONSTANTS } from "../constants";
+import { TIMESTEPS_IN_SECONDS } from "../constants";
 
 const strategy = new TradingStrategy();
 
@@ -20,9 +20,6 @@ const trader = new TradeExecutor({
 const CONFIG: https.HttpsOptions = {
   memory: "512MiB",
 };
-
-const TIMESTEPS_IN_SECONDS =
-  MODEL_CONSTANTS.TIMESTEPS * COINBASE_CONSTANTS.SECONDS_PER_DAY;
 
 export const receiveTextADA = https.onRequest(CONFIG, async (_, response) => {
   try {

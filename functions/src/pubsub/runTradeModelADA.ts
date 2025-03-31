@@ -12,7 +12,7 @@ import { sendSMS, formatAnalysisResults } from "../utils";
 import { getFirestore } from "firebase-admin/firestore";
 import { TradingStrategy } from "../cardano/TradingStrategy";
 import { TradeExecutor } from "../cardano/TradeExecutor";
-import { COINBASE_CONSTANTS, MODEL_CONSTANTS } from "../constants";
+import { TIMESTEPS_IN_SECONDS } from "../constants";
 
 const strategy = new TradingStrategy();
 
@@ -25,9 +25,6 @@ const CONFIG: ScheduleOptions = {
   schedule: "*/10 * * * *",
   memory: "512MiB",
 };
-
-const TIMESTEPS_IN_SECONDS =
-  MODEL_CONSTANTS.TIMESTEPS * COINBASE_CONSTANTS.SECONDS_PER_DAY;
 
 export const runTradeModelADA = onSchedule(CONFIG, async () => {
   try {

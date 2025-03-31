@@ -13,7 +13,6 @@ import {
   Recommendation,
   Trade,
 } from "../types";
-import { COINBASE_CONSTANTS } from "../constants";
 
 interface CoinbaseClientConfig {
   apiKey?: string;
@@ -35,7 +34,7 @@ export class TradeExecutor {
       return;
     }
     const orderParams = {
-      product_id: COINBASE_CONSTANTS.DEFAULT_PRODUCT_ID,
+      product_id: CoinbaseProductIds.ADA,
       side: trade.type,
       order_configuration: {
         market_market_ioc: {

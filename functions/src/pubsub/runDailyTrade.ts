@@ -4,7 +4,7 @@ import { TradeExecutor } from "../cardano/TradeExecutor";
 import { TradingStrategy } from "../cardano/TradingStrategy";
 import { sendSMS } from "../utils";
 import { CoinbaseProductIds, Granularity } from "../types";
-import { COINBASE_CONSTANTS, MODEL_CONSTANTS } from "../constants";
+import { TIMESTEPS_IN_SECONDS } from "../constants";
 
 const strategy = new TradingStrategy();
 
@@ -17,9 +17,6 @@ const CONFIG: ScheduleOptions = {
   schedule: "every 24 hours",
   memory: "512MiB",
 };
-
-const TIMESTEPS_IN_SECONDS =
-  MODEL_CONSTANTS.TIMESTEPS * COINBASE_CONSTANTS.SECONDS_PER_DAY;
 
 // Scheduled function to run every 24 hours
 export const runDailyTrade = onSchedule(CONFIG, async () => {

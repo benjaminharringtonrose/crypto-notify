@@ -46,7 +46,10 @@ export const receiveTextADA = https.onRequest(CONFIG, async (_, response) => {
     const capital = parseFloat(balances.usd?.available_balance.value || "0");
     const holdings = parseFloat(balances.ada?.available_balance.value || "0");
 
-    if (adaData.prices.length < 30 || btcData.prices.length < 30) {
+    if (
+      adaData.prices.length < TIME_CONVERSIONS.ONE_MONTH_IN_DAYS ||
+      btcData.prices.length < TIME_CONVERSIONS.ONE_MONTH_IN_DAYS
+    ) {
       console.log("Insufficient historical data for prediction");
       throw new Error("Insufficient historical data for prediction");
     }

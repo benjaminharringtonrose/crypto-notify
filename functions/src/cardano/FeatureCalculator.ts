@@ -1,5 +1,5 @@
 import { Indicators } from "../types";
-import { MODEL_CONSTANTS, PERIODS } from "../constants";
+import { MODEL_CONSTANTS, PERIODS, TIME_CONVERSIONS } from "../constants";
 
 interface ComputeParams {
   prices: number[];
@@ -139,7 +139,7 @@ export default class FeatureCalculator {
 
   public calculateFibonacciLevels(
     prices: number[],
-    period: number = 30
+    period: number = TIME_CONVERSIONS.ONE_MONTH_IN_DAYS
   ): { levels: number[]; high: number; low: number } {
     if (prices.length < period)
       return {

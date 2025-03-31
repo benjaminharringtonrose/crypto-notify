@@ -182,7 +182,7 @@ export class TradeModelBacktester {
       if (i > MODEL_CONSTANTS.TIMESTEPS) {
         const prevValue = portfolioHistory[portfolioHistory.length - 2].value;
         returns.push((portfolioValue - prevValue) / prevValue);
-        if (i % 30 === 0) {
+        if (i % TIME_CONVERSIONS.ONE_MONTH_IN_DAYS === 0) {
           console.log(
             `Portfolio Trend at ${currentTimestamp}: Value: $${portfolioValue.toFixed(
               2
@@ -190,8 +190,8 @@ export class TradeModelBacktester {
               ((portfolioValue - prevValue) / prevValue) *
               100
             ).toFixed(2)}%, Rolling Sharpe (30d): ${this.calculateRollingSharpe(
-              returns.slice(-30),
-              30
+              returns.slice(-TIME_CONVERSIONS.ONE_MONTH_IN_DAYS),
+              TIME_CONVERSIONS.ONE_MONTH_IN_DAYS
             ).toFixed(2)}, Win Streak: ${winStreak}, Loss Streak: ${lossStreak}`
           );
         }

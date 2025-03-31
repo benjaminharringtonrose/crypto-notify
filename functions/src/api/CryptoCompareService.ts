@@ -35,11 +35,17 @@ export class CryptoCompareService {
             ? new Date(endDate.getTime() - totalMilliseconds)
             : chunkStart;
 
-        const toTimestamp = Math.floor(chunkEnd.getTime() / 1000);
+        const toTimestamp = Math.floor(
+          chunkEnd.getTime() / TIME_CONVERSIONS.ONE_SECOND_IN_MILLISECONDS
+        );
         const limit = Math.min(
           chunkDays,
           Math.ceil(
-            (toTimestamp - Math.floor(actualChunkStart.getTime() / 1000)) /
+            (toTimestamp -
+              Math.floor(
+                actualChunkStart.getTime() /
+                  TIME_CONVERSIONS.ONE_SECOND_IN_MILLISECONDS
+              )) /
               TIME_CONVERSIONS.ONE_DAY_IN_SECONDS
           )
         );

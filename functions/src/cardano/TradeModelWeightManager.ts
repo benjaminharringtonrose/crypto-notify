@@ -1,7 +1,7 @@
 import * as tf from "@tensorflow/tfjs-node";
 import { FirebaseService } from "../api/FirebaseService";
 import { Bucket } from "@google-cloud/storage";
-import { MODEL_CONFIG, TRADE_PREDICTOR_WEIGHTS } from "../constants";
+import { FILE_NAMES, MODEL_CONFIG } from "../constants";
 
 export class ModelWeightManager {
   private weights: any;
@@ -12,7 +12,7 @@ export class ModelWeightManager {
   }
 
   public async loadWeights(): Promise<void> {
-    const file = this.bucket.file(TRADE_PREDICTOR_WEIGHTS);
+    const file = this.bucket.file(FILE_NAMES.WEIGHTS);
     const [weightsData] = await file.download();
     this.weights = JSON.parse(weightsData.toString("utf8")).weights;
     this.validateWeights();

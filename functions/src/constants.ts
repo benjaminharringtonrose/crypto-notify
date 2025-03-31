@@ -2,12 +2,12 @@ import { firestore } from "firebase-admin";
 
 export const PRICES = [0.8, 0.9, 1.0, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
 
-export const NOTIFICATION_COOLDOWN = 30 * 60 * 1000; // 30 mins
-
-export const TRADE_PREDICTOR_WEIGHTS = "tradePredictorWeights.json";
-
 export const MERGE_PAYLOAD: firestore.SetOptions = {
   merge: true,
+};
+
+export const FILE_NAMES = {
+  WEIGHTS: "tradePredictorWeights.json",
 };
 
 export const PERIODS = {
@@ -72,7 +72,6 @@ export const STRATEGY_CONFIG = {
   NEGATIVE_DEVIATION_THRESHOLD: -0.015,
 };
 
-// Base architecture constants without tensor shapes
 const MODEL_CONFIG_BASE = {
   CONV1D_FILTERS_1: 12,
   CONV1D_FILTERS_2: 24,
@@ -86,14 +85,13 @@ const MODEL_CONFIG_BASE = {
   OUTPUT_UNITS: 2,
   L2_REGULARIZATION: 0.01,
   DROPOUT_RATE: 0.5,
-  TIMESTEPS_AFTER_CONV: 24, // 30 - (5-1) - (3-1) = 24
+  TIMESTEPS_AFTER_CONV: 24,
   TIMESTEPS: 30,
   ADA_FEATURE_COUNT: 32,
   BTC_FEATURE_COUNT: 29,
   FEATURE_COUNT: 61,
 };
 
-// Computed tensor shapes
 export const MODEL_CONFIG = {
   ...MODEL_CONFIG_BASE,
   LSTM1_INPUT_FEATURES: MODEL_CONFIG_BASE.CONV1D_FILTERS_2,
@@ -164,22 +162,13 @@ export const TRAINING_CONFIG = {
   ALPHA: [0.6, 0.4] as [number, number],
 };
 
-export const ONE_MONTH_IN_DAYS = 30;
-export const ONE_SECOND_IN_MILLISECONDS = 1000;
-export const ONE_MINUTE_IN_SECONDS = 60;
-export const ONE_HOUR_IN_SECONDS = 3600;
-export const ONE_DAY_IN_SECONDS = 86400;
-export const ONE_DAY_IN_MILLISECONDS =
-  ONE_DAY_IN_SECONDS * ONE_SECOND_IN_MILLISECONDS;
-export const TIMESTEP_IN_SECONDS =
-  MODEL_CONFIG_BASE.TIMESTEPS * ONE_DAY_IN_SECONDS;
-
 export const TIME_CONVERSIONS = {
-  ONE_SECOND_IN_MILLISECONDS,
-  ONE_MINUTE_IN_SECONDS,
-  ONE_HOUR_IN_SECONDS,
-  ONE_DAY_IN_MILLISECONDS,
-  ONE_DAY_IN_SECONDS,
-  TIMESTEP_IN_SECONDS,
-  ONE_MONTH_IN_DAYS,
+  ONE_SECOND_IN_MILLISECONDS: 1000,
+  THIRTY_MINUTES_IN_MILLISECONDS: 1800000,
+  ONE_MINUTE_IN_SECONDS: 60,
+  ONE_HOUR_IN_SECONDS: 3600,
+  ONE_DAY_IN_MILLISECONDS: 86400000,
+  ONE_DAY_IN_SECONDS: 86400,
+  TIMESTEP_IN_SECONDS: MODEL_CONFIG_BASE.TIMESTEPS * 86400,
+  ONE_MONTH_IN_DAYS: 30,
 };

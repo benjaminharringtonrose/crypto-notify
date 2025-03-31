@@ -1,6 +1,6 @@
 import { onSchedule, ScheduleOptions } from "firebase-functions/v2/scheduler";
 import { firestore } from "firebase-admin";
-import { MERGE_PAYLOAD, NOTIFICATION_COOLDOWN, PRICES } from "../constants";
+import { MERGE_PAYLOAD, PRICES, TIME_CONVERSIONS } from "../constants";
 import {
   sendSMS,
   checkCardanoPriceErrorMessage,
@@ -37,7 +37,9 @@ export const runPriceCheckADA = onSchedule(CONFIG, async () => {
 
     const now = new Date();
     const timeSinceLastNotification = now.getTime() - lastNotified.getTime();
-    const cooldownActive = timeSinceLastNotification <= NOTIFICATION_COOLDOWN;
+    const cooldownActive =
+      timeSinceLastNotification <=
+      TIME_CONVERSIONS.THIRTY_MINUTES_IN_MILLISECONDS;
 
     const exceededThreshold = isAboveThreshold({
       prices: PRICES,

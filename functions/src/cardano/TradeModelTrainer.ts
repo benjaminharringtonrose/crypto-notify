@@ -7,11 +7,7 @@ import { CyclicLearningRateCallback } from "./callbacks/CyclicLearningRateCallba
 import TradeModelFactory from "./TradeModelFactory";
 import { ModelConfig } from "../types";
 import { FirebaseService } from "../api/FirebaseService";
-import {
-  MODEL_CONFIG,
-  TRADE_PREDICTOR_WEIGHTS,
-  TRAINING_CONFIG,
-} from "../constants";
+import { FILE_NAMES, MODEL_CONFIG, TRAINING_CONFIG } from "../constants";
 import { DataProcessor } from "./DataProcessor";
 import { Metrics } from "./Metrics";
 
@@ -251,7 +247,7 @@ export class TradeModelTrainer {
       featureStds: Array.from(await X_std.data()),
     };
     const weightsJson = JSON.stringify({ weights });
-    const file = this.bucket.file(TRADE_PREDICTOR_WEIGHTS);
+    const file = this.bucket.file(FILE_NAMES.WEIGHTS);
     await file.save(weightsJson, { contentType: "application/json" });
     console.log("Model weights saved to Firebase Storage");
     X_mean.dispose();

@@ -1,6 +1,6 @@
 import { TradeModelPredictor } from "./TradeModelPredictor";
 import { Trade, Recommendation, StrategyType } from "../types";
-import { MODEL_CONSTANTS, PERIODS } from "../constants";
+import { MODEL_CONSTANTS, PERIODS, TIME_CONVERSIONS } from "../constants";
 
 interface TradingStrategyParams {
   basePositionSize?: number;
@@ -225,7 +225,7 @@ export class TradingStrategy {
     const daysSinceLastTrade = buyTimestamp
       ? (new Date(currentTimestamp).getTime() -
           new Date(buyTimestamp).getTime()) /
-        (1000 * 60 * 60 * 24)
+        TIME_CONVERSIONS.ONE_DAY_IN_MILLISECONDS
       : Infinity;
 
     const dynamicBreakoutThreshold =
@@ -263,7 +263,7 @@ export class TradingStrategy {
       const daysHeld =
         (new Date(currentTimestamp).getTime() -
           new Date(buyTimestamp).getTime()) /
-        (1000 * 60 * 60 * 24);
+        TIME_CONVERSIONS.ONE_DAY_IN_MILLISECONDS;
 
       const priceChange = (currentPrice - lastBuyPrice) / lastBuyPrice;
 

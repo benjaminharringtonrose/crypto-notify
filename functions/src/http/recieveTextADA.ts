@@ -8,7 +8,7 @@ import {
 import { formatAnalysisResults, sendSMS } from "../utils";
 import { TradingStrategy } from "../cardano/TradingStrategy";
 import { TradeExecutor } from "../cardano/TradeExecutor";
-import { TIMESTEPS_IN_SECONDS } from "../constants";
+import { TIME_CONVERSIONS } from "../constants";
 
 const strategy = new TradingStrategy();
 
@@ -24,7 +24,7 @@ const CONFIG: https.HttpsOptions = {
 export const receiveTextADA = https.onRequest(CONFIG, async (_, response) => {
   try {
     const now = Math.floor(Date.now() / 1000);
-    const start = now - TIMESTEPS_IN_SECONDS;
+    const start = now - TIME_CONVERSIONS.TIMESTEP_IN_SECONDS;
 
     const currentPrice = await trader.getCurrentPrice(CoinbaseProductIds.ADA);
 

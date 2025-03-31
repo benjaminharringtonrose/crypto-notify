@@ -13,6 +13,7 @@ import {
   Recommendation,
   Trade,
 } from "../types";
+import { TIME_CONVERSIONS } from "../constants";
 
 interface CoinbaseClientConfig {
   apiKey?: string;
@@ -60,7 +61,7 @@ export class TradeExecutor {
     try {
       // Calculate timestamps for a short recent time range (e.g., last hour)
       const now = Math.floor(Date.now() / 1000); // Current time in seconds (March 31, 2025)
-      const oneHourAgo = now - 3600; // 1 hour ago in seconds
+      const oneHourAgo = now - TIME_CONVERSIONS.ONE_HOUR_IN_SECONDS;
 
       // Fetch the latest candlestick data
       const response = await this.getMarketData({

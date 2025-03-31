@@ -4,7 +4,7 @@ async function runMultiPeriodBacktest() {
   const backtester = new TradeModelBacktester();
   const results: { period: string; result: any }[] = [];
 
-  const startYear = 2020;
+  const startYear = 2018;
   const endYear = 2024;
   const periodLengthMonths = 6;
   const stepMonths = 3;

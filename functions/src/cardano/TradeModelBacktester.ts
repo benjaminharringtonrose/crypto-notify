@@ -3,7 +3,7 @@ import { BacktestResult, Trade, Recommendation, StrategyType } from "../types";
 import { FirebaseService } from "../api/FirebaseService";
 import { CryptoCompareService } from "../api/CryptoCompareService";
 import { TradingStrategy } from "./TradingStrategy";
-import { MODEL_CONSTANTS } from "../constants";
+import { MODEL_CONSTANTS, TIME_CONVERSIONS } from "../constants";
 
 FirebaseService.getInstance();
 const cryptoCompare = new CryptoCompareService();
@@ -47,7 +47,8 @@ export class TradeModelBacktester {
     btcSymbol: string = "BTC"
   ): Promise<BacktestResult> {
     const days = Math.ceil(
-      (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+      (endDate.getTime() - startDate.getTime()) /
+        TIME_CONVERSIONS.ONE_DAY_IN_MILLISECONDS
     );
     const adaData = await cryptoCompare.getHistoricalData(adaSymbol, days);
     const btcData = await cryptoCompare.getHistoricalData(btcSymbol, days);
@@ -84,7 +85,7 @@ export class TradeModelBacktester {
 
     for (let i = MODEL_CONSTANTS.TIMESTEPS; i < adaData.prices.length; i++) {
       const currentTimestamp = new Date(
-        startDate.getTime() + i * 24 * 60 * 60 * 1000
+        startDate.getTime() + i * TIME_CONVERSIONS.ONE_DAY_IN_MILLISECONDS
       ).toISOString();
       const adaPrices = adaData.prices.slice(0, i + 1);
       const adaVolumes = adaData.volumes.slice(0, i + 1);
@@ -335,7 +336,7 @@ export class TradeModelBacktester {
               sum +
               (new Date(sellTrade.timestamp).getTime() -
                 new Date(buyTrade.timestamp).getTime()) /
-                (1000 * 60 * 60 * 24)
+                TIME_CONVERSIONS.ONE_DAY_IN_MILLISECONDS
             );
           }, 0) /
           (trades.length / 2)

@@ -1,11 +1,12 @@
 import * as tf from "@tensorflow/tfjs-node";
+import { TRAINING_CONSTANTS } from "../constants";
 
 export class Metrics {
   static focalLoss(
     yTrue: tf.Tensor,
     yPred: tf.Tensor,
-    gamma: number = 2.0,
-    alphaArr: [number, number] = [0.6, 0.4]
+    gamma: number = TRAINING_CONSTANTS.GAMMA,
+    alphaArr: [number, number] = TRAINING_CONSTANTS.ALPHA
   ): tf.Scalar {
     const alpha = tf.tensor1d(alphaArr);
     const ce = tf.losses.sigmoidCrossEntropy(yTrue, yPred);

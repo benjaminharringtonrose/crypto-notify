@@ -1,3 +1,4 @@
+import { MODEL_CONSTANTS } from "../constants";
 import FeatureCalculator from "./FeatureCalculator";
 
 export class FeatureSequenceGenerator {
@@ -42,7 +43,9 @@ export class FeatureSequenceGenerator {
     }
 
     while (sequence.length < this.timesteps) {
-      sequence.unshift(sequence[0] || Array(61).fill(0));
+      sequence.unshift(
+        sequence[0] || Array(MODEL_CONSTANTS.FEATURE_COUNT).fill(0)
+      );
     }
     return sequence.slice(-this.timesteps); // Ensure exact length
   }

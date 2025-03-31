@@ -1,5 +1,5 @@
 import { Indicators } from "../types";
-import { PERIODS } from "../constants";
+import { MODEL_CONSTANTS, PERIODS } from "../constants";
 
 interface ComputeParams {
   prices: number[];
@@ -593,7 +593,11 @@ export default class FeatureCalculator {
     btcPrice,
   }: ComputeParams): number[] {
     if (!prices || !volumes || dayIndex < 0 || dayIndex >= prices.length) {
-      return Array(isBTC ? 29 : 32).fill(0);
+      return Array(
+        isBTC
+          ? MODEL_CONSTANTS.BTC_FEATURE_COUNT
+          : MODEL_CONSTANTS.ADA_FEATURE_COUNT
+      ).fill(0);
     }
 
     const indicators = this.calculateIndicators({
@@ -635,12 +639,12 @@ export default class FeatureCalculator {
     ];
 
     return isBTC
-      ? baseFeatures // 29 features
+      ? baseFeatures
       : [
           ...baseFeatures,
           indicators.isTripleBottom ? 1 : 0,
           indicators.adxProxy,
           btcPrice ? currentPrice / btcPrice : 0,
-        ]; // 32 features
+        ];
   }
 }

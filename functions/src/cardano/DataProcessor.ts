@@ -1,4 +1,5 @@
 import { CryptoCompareService } from "../api/CryptoCompareService";
+import { MODEL_CONSTANTS } from "../constants";
 import { HistoricalData, ModelConfig } from "../types";
 import FeatureCalculator from "./FeatureCalculator";
 
@@ -95,9 +96,9 @@ export class DataProcessor {
   ): boolean {
     return (
       Array.isArray(adaFeatures) &&
-      adaFeatures.length === 32 &&
+      adaFeatures.length === MODEL_CONSTANTS.ADA_FEATURE_COUNT &&
       Array.isArray(btcFeatures) &&
-      btcFeatures.length === 29
+      btcFeatures.length === MODEL_CONSTANTS.BTC_FEATURE_COUNT
     );
   }
 

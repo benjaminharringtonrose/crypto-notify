@@ -1,4 +1,5 @@
 import axios from "axios";
+import { TIME_CONVERSIONS } from "../constants";
 
 export class CryptoCompareService {
   private baseUrl: string = "https://min-api.cryptocompare.com/data/v2";
@@ -12,10 +13,12 @@ export class CryptoCompareService {
   ): Promise<{ prices: number[]; volumes: number[] }> {
     const prices: number[] = [];
     const volumes: number[] = [];
-    const millisecondsPerDay = 24 * 60 * 60 * 1000;
+
     const endDate = new Date();
-    const totalMilliseconds = totalDays * millisecondsPerDay;
-    const chunkMilliseconds = chunkDays * millisecondsPerDay;
+    const totalMilliseconds =
+      totalDays * TIME_CONVERSIONS.ONE_DAY_IN_MILLISECONDS;
+    const chunkMilliseconds =
+      chunkDays * TIME_CONVERSIONS.ONE_DAY_IN_MILLISECONDS;
 
     const numChunks = Math.ceil(totalDays / chunkDays);
 
@@ -37,7 +40,7 @@ export class CryptoCompareService {
           chunkDays,
           Math.ceil(
             (toTimestamp - Math.floor(actualChunkStart.getTime() / 1000)) /
-              (24 * 60 * 60)
+              TIME_CONVERSIONS.ONE_DAY_IN_SECONDS
           )
         );
 

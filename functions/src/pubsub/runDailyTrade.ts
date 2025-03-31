@@ -4,7 +4,7 @@ import { TradeExecutor } from "../cardano/TradeExecutor";
 import { TradingStrategy } from "../cardano/TradingStrategy";
 import { sendSMS } from "../utils";
 import { CoinbaseProductIds, Granularity } from "../types";
-import { TIMESTEPS_IN_SECONDS } from "../constants";
+import { TIME_CONVERSIONS } from "../constants";
 
 const strategy = new TradingStrategy();
 
@@ -22,7 +22,7 @@ const CONFIG: ScheduleOptions = {
 export const runDailyTrade = onSchedule(CONFIG, async () => {
   try {
     const now = Math.floor(Date.now() / 1000);
-    const start = now - TIMESTEPS_IN_SECONDS;
+    const start = now - TIME_CONVERSIONS.TIMESTEP_IN_SECONDS;
 
     const adaData = await trader.getMarketData({
       product_id: CoinbaseProductIds.ADA,

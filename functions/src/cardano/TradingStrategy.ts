@@ -45,20 +45,21 @@ export class TradingStrategy {
     atrBreakout: [],
   };
 
-  constructor({
-    basePositionSize = STRATEGY_CONFIG.BASE_POSITION_SIZE_DEFAULT,
-    slippage = STRATEGY_CONFIG.SLIPPAGE,
-    commission = STRATEGY_CONFIG.COMMISSION,
-    stopLossMultiplier = STRATEGY_CONFIG.STOP_LOSS_MULTIPLIER_DEFAULT,
-    trailingStop = STRATEGY_CONFIG.TRAILING_STOP_DEFAULT,
-    minHoldDays = STRATEGY_CONFIG.MIN_HOLD_DAYS_DEFAULT,
-    minConfidence = STRATEGY_CONFIG.MIN_CONFIDENCE_DEFAULT,
-    profitTakeMultiplier = STRATEGY_CONFIG.PROFIT_TAKE_MULTIPLIER_DEFAULT,
-    buyProbThreshold = STRATEGY_CONFIG.BUY_PROB_THRESHOLD_DEFAULT,
-    sellProbThreshold = STRATEGY_CONFIG.SELL_PROB_THRESHOLD_DEFAULT,
-    smaPeriod = PERIODS.SMA_MEDIUM,
-    breakoutThreshold = STRATEGY_CONFIG.DYNAMIC_BREAKOUT_THRESHOLD,
-  }: TradingStrategyParams) {
+  constructor(params?: TradingStrategyParams) {
+    const {
+      basePositionSize = STRATEGY_CONFIG.BASE_POSITION_SIZE_DEFAULT,
+      slippage = STRATEGY_CONFIG.SLIPPAGE,
+      commission = STRATEGY_CONFIG.COMMISSION,
+      stopLossMultiplier = STRATEGY_CONFIG.STOP_LOSS_MULTIPLIER_DEFAULT,
+      trailingStop = STRATEGY_CONFIG.TRAILING_STOP_DEFAULT,
+      minHoldDays = STRATEGY_CONFIG.MIN_HOLD_DAYS_DEFAULT,
+      minConfidence = STRATEGY_CONFIG.MIN_CONFIDENCE_DEFAULT,
+      profitTakeMultiplier = STRATEGY_CONFIG.PROFIT_TAKE_MULTIPLIER_DEFAULT,
+      buyProbThreshold = STRATEGY_CONFIG.BUY_PROB_THRESHOLD_DEFAULT,
+      sellProbThreshold = STRATEGY_CONFIG.SELL_PROB_THRESHOLD_DEFAULT,
+      smaPeriod = PERIODS.SMA_MEDIUM,
+      breakoutThreshold = STRATEGY_CONFIG.DYNAMIC_BREAKOUT_THRESHOLD,
+    } = params ?? {};
     this.predictor = new TradeModelPredictor();
     this.currentStrategy = StrategyType.Momentum; // Default
     this.basePositionSize = basePositionSize;

@@ -3,7 +3,7 @@ import { ModelWeightManager } from "./TradeModelWeightManager";
 import TradeModelFactory from "./TradeModelFactory";
 import { FeatureSequenceGenerator } from "./FeatureSequenceGenerator";
 import { FirebaseService } from "../api/FirebaseService";
-import { MODEL_CONFIG, PERIODS } from "../constants";
+import { MODEL_CONFIG, PERIODS, STRATEGY_CONFIG } from "../constants";
 
 export class TradeModelPredictor {
   private weightManager: ModelWeightManager;
@@ -104,7 +104,7 @@ export class TradeModelPredictor {
 
     const atr = sequence[sequence.length - 1][11];
     const momentumWindowSize =
-      atr > MODEL_CONFIG.MOMENTUM_WINDOW_THRESHOLD ? 5 : 14;
+      atr > STRATEGY_CONFIG.MOMENTUM_WINDOW_THRESHOLD ? 5 : 14;
     const momentumWindow = adaPrices.slice(-momentumWindowSize);
     const momentum =
       momentumWindow.length >= 2

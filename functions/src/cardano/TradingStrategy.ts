@@ -1,6 +1,6 @@
 import { TradeModelPredictor } from "./TradeModelPredictor";
 import { Trade, Recommendation, StrategyType } from "../types";
-import { MODEL_CONFIG, PERIODS, TIME_CONVERSIONS } from "../constants";
+import { PERIODS, STRATEGY_CONFIG, TIME_CONVERSIONS } from "../constants";
 
 interface TradingStrategyParams {
   basePositionSize?: number;
@@ -34,18 +34,18 @@ export class TradingStrategy {
   private breakoutThreshold: number;
 
   constructor({
-    basePositionSize = MODEL_CONFIG.BASE_POSITION_SIZE_DEFAULT,
-    slippage = MODEL_CONFIG.SLIPPAGE,
-    commission = MODEL_CONFIG.COMMISSION,
-    stopLossMultiplier = MODEL_CONFIG.STOP_LOSS_MULTIPLIER_DEFAULT,
-    trailingStop = MODEL_CONFIG.TRAILING_STOP_DEFAULT,
-    minHoldDays = MODEL_CONFIG.MIN_HOLD_DAYS_DEFAULT,
-    minConfidence = MODEL_CONFIG.MIN_CONFIDENCE_DEFAULT,
-    profitTakeMultiplier = MODEL_CONFIG.PROFIT_TAKE_MULTIPLIER_DEFAULT,
-    buyProbThreshold = MODEL_CONFIG.BUY_PROB_THRESHOLD_DEFAULT,
-    sellProbThreshold = MODEL_CONFIG.SELL_PROB_THRESHOLD_DEFAULT,
+    basePositionSize = STRATEGY_CONFIG.BASE_POSITION_SIZE_DEFAULT,
+    slippage = STRATEGY_CONFIG.SLIPPAGE,
+    commission = STRATEGY_CONFIG.COMMISSION,
+    stopLossMultiplier = STRATEGY_CONFIG.STOP_LOSS_MULTIPLIER_DEFAULT,
+    trailingStop = STRATEGY_CONFIG.TRAILING_STOP_DEFAULT,
+    minHoldDays = STRATEGY_CONFIG.MIN_HOLD_DAYS_DEFAULT,
+    minConfidence = STRATEGY_CONFIG.MIN_CONFIDENCE_DEFAULT,
+    profitTakeMultiplier = STRATEGY_CONFIG.PROFIT_TAKE_MULTIPLIER_DEFAULT,
+    buyProbThreshold = STRATEGY_CONFIG.BUY_PROB_THRESHOLD_DEFAULT,
+    sellProbThreshold = STRATEGY_CONFIG.SELL_PROB_THRESHOLD_DEFAULT,
     smaPeriod = PERIODS.SMA_MEDIUM,
-    breakoutThreshold = MODEL_CONFIG.DYNAMIC_BREAKOUT_THRESHOLD,
+    breakoutThreshold = STRATEGY_CONFIG.DYNAMIC_BREAKOUT_THRESHOLD,
   }: TradingStrategyParams = {}) {
     this.predictor = new TradeModelPredictor();
     this.currentStrategy = StrategyType.Momentum;
@@ -107,10 +107,10 @@ export class TradingStrategy {
     );
 
     if (
-      shortMomentum > MODEL_CONFIG.MOMENTUM_THRESHOLD &&
+      shortMomentum > STRATEGY_CONFIG.MOMENTUM_THRESHOLD &&
       volatilityAdjustedMomentum >
-        MODEL_CONFIG.VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD &&
-      trendStrength > MODEL_CONFIG.TREND_STRENGTH_THRESHOLD &&
+        STRATEGY_CONFIG.VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD &&
+      trendStrength > STRATEGY_CONFIG.TREND_STRENGTH_THRESHOLD &&
       emaShort > emaLong
     ) {
       console.log("Selected Strategy: MomentumTrendHybrid");
@@ -118,18 +118,18 @@ export class TradingStrategy {
     }
 
     if (
-      shortMomentum > MODEL_CONFIG.MOMENTUM_THRESHOLD &&
+      shortMomentum > STRATEGY_CONFIG.MOMENTUM_THRESHOLD &&
       volatilityAdjustedMomentum >
-        MODEL_CONFIG.VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD &&
-      trendStrength > MODEL_CONFIG.TREND_STRENGTH_THRESHOLD
+        STRATEGY_CONFIG.VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD &&
+      trendStrength > STRATEGY_CONFIG.TREND_STRENGTH_THRESHOLD
     ) {
       console.log("Selected Strategy: Momentum");
       return StrategyType.Momentum;
     }
 
     if (
-      Math.abs(deviation) > MODEL_CONFIG.DEVIATION_THRESHOLD &&
-      Math.abs(momentum) < MODEL_CONFIG.MOMENTUM_WINDOW_THRESHOLD &&
+      Math.abs(deviation) > STRATEGY_CONFIG.DEVIATION_THRESHOLD &&
+      Math.abs(momentum) < STRATEGY_CONFIG.MOMENTUM_WINDOW_THRESHOLD &&
       momentumDivergence !== 0
     ) {
       console.log("Selected Strategy: Mean Reversion");
@@ -138,17 +138,17 @@ export class TradingStrategy {
 
     if (
       atrBreakout > this.breakoutThreshold &&
-      currentVolume > avgVolume * MODEL_CONFIG.VOLUME_MULTIPLIER &&
-      shortMomentum > MODEL_CONFIG.SHORT_MOMENTUM_THRESHOLD
+      currentVolume > avgVolume * STRATEGY_CONFIG.VOLUME_MULTIPLIER &&
+      shortMomentum > STRATEGY_CONFIG.SHORT_MOMENTUM_THRESHOLD
     ) {
       console.log("Selected Strategy: Breakout");
       return StrategyType.Breakout;
     }
 
     if (
-      Math.abs(trendSlope) > MODEL_CONFIG.TREND_SLOPE_THRESHOLD &&
+      Math.abs(trendSlope) > STRATEGY_CONFIG.TREND_SLOPE_THRESHOLD &&
       emaShort > emaLong &&
-      trendStrength > MODEL_CONFIG.TREND_SLOPE_THRESHOLD
+      trendStrength > STRATEGY_CONFIG.TREND_SLOPE_THRESHOLD
     ) {
       console.log("Selected Strategy: Trend Following");
       return StrategyType.TrendFollowing;
@@ -229,27 +229,27 @@ export class TradingStrategy {
       : Infinity;
 
     const dynamicBreakoutThreshold =
-      daysSinceLastTrade > MODEL_CONFIG.DAYS_SINCE_TRADE_THRESHOLD
-        ? MODEL_CONFIG.DYNAMIC_BREAKOUT_THRESHOLD
+      daysSinceLastTrade > STRATEGY_CONFIG.DAYS_SINCE_TRADE_THRESHOLD
+        ? STRATEGY_CONFIG.DYNAMIC_BREAKOUT_THRESHOLD
         : this.breakoutThreshold;
 
     const dynamicStopLossMultiplier =
-      confidence > MODEL_CONFIG.HIGH_CONFIDENCE_THRESHOLD
+      confidence > STRATEGY_CONFIG.HIGH_CONFIDENCE_THRESHOLD
         ? this.stopLossMultiplier * 0.8
         : this.stopLossMultiplier;
 
     const dynamicTrailingStop =
-      momentum > MODEL_CONFIG.MOMENTUM_MULTIPLIER
+      momentum > STRATEGY_CONFIG.MOMENTUM_MULTIPLIER
         ? this.trailingStop * 0.8
         : this.trailingStop * 1.2;
 
     const dynamicProfitTake = Math.min(
       this.profitTakeMultiplier *
-        (momentum > 0.1 ? MODEL_CONFIG.CONFIDENCE_BOOST_MULTIPLIER : 1.0),
-      MODEL_CONFIG.MAX_PROFIT_TAKE
+        (momentum > 0.1 ? STRATEGY_CONFIG.CONFIDENCE_BOOST_MULTIPLIER : 1.0),
+      STRATEGY_CONFIG.MAX_PROFIT_TAKE
     );
 
-    if (atr > MODEL_CONFIG.MAX_ATR_THRESHOLD) {
+    if (atr > STRATEGY_CONFIG.MAX_ATR_THRESHOLD) {
       console.log(`Trade skipped: ATR ${atr.toFixed(4)} exceeds threshold`);
       return {
         trade: null,
@@ -272,7 +272,7 @@ export class TradingStrategy {
       const profitTakeLevel = lastBuyPrice + dynamicProfitTake * atr;
 
       const trailingStopLevel =
-        priceChange >= MODEL_CONFIG.MIN_PROFIT_THRESHOLD
+        priceChange >= STRATEGY_CONFIG.MIN_PROFIT_THRESHOLD
           ? (peakPrice || lastBuyPrice) * (1 - dynamicTrailingStop)
           : Infinity;
 
@@ -334,18 +334,19 @@ export class TradingStrategy {
       if (buyConditions && capital > 0) {
         const volatilityAdjustedSize = Math.min(
           this.basePositionSize / (atr > 0 ? atr : 0.01),
-          trendSlope > MODEL_CONFIG.ATR_POSITION_THRESHOLD &&
-            atr < MODEL_CONFIG.ATR_POSITION_THRESHOLD
-            ? MODEL_CONFIG.POSITION_SIZE_MAX
-            : MODEL_CONFIG.POSITION_SIZE_MAX
+          trendSlope > STRATEGY_CONFIG.ATR_POSITION_THRESHOLD &&
+            atr < STRATEGY_CONFIG.ATR_POSITION_THRESHOLD
+            ? STRATEGY_CONFIG.POSITION_SIZE_MAX
+            : STRATEGY_CONFIG.POSITION_SIZE_MAX
         );
         const trendAdjustedSize =
-          trendSlope > MODEL_CONFIG.TREND_SLOPE_BOOST_THRESHOLD
-            ? volatilityAdjustedSize * MODEL_CONFIG.TREND_SLOPE_POSITION_BOOST
+          trendSlope > STRATEGY_CONFIG.TREND_SLOPE_BOOST_THRESHOLD
+            ? volatilityAdjustedSize *
+              STRATEGY_CONFIG.TREND_SLOPE_POSITION_BOOST
             : volatilityAdjustedSize;
         const confidenceBoost =
-          confidence > MODEL_CONFIG.HIGH_CONFIDENCE_THRESHOLD
-            ? MODEL_CONFIG.CONFIDENCE_BOOST_MULTIPLIER
+          confidence > STRATEGY_CONFIG.HIGH_CONFIDENCE_THRESHOLD
+            ? STRATEGY_CONFIG.CONFIDENCE_BOOST_MULTIPLIER
             : 1.0;
         const winStreakBoost =
           this.currentStrategy === StrategyType.Momentum && winStreak > 1
@@ -357,12 +358,12 @@ export class TradingStrategy {
             winStreakBoost *
             Math.min(
               buyProb / this.buyProbThreshold,
-              MODEL_CONFIG.BUY_PROB_MAX_MULTIPLIER
+              STRATEGY_CONFIG.BUY_PROB_MAX_MULTIPLIER
             ),
-          confidence > MODEL_CONFIG.HIGH_CONFIDENCE_THRESHOLD &&
+          confidence > STRATEGY_CONFIG.HIGH_CONFIDENCE_THRESHOLD &&
             trendStrength > 0.1
-            ? MODEL_CONFIG.POSITION_SIZE_MAX_HIGH_CONFIDENCE
-            : MODEL_CONFIG.POSITION_SIZE_MAX
+            ? STRATEGY_CONFIG.POSITION_SIZE_MAX_HIGH_CONFIDENCE
+            : STRATEGY_CONFIG.POSITION_SIZE_MAX
         );
         const tradeAmount = Math.min(capital * positionSize, capital);
         const effectivePrice = currentPrice * (1 + this.slippage);
@@ -444,12 +445,12 @@ export class TradingStrategy {
         return (
           buyProb > this.buyProbThreshold &&
           confidence >= this.minConfidence &&
-          shortMomentum > MODEL_CONFIG.SHORT_MOMENTUM_THRESHOLD &&
+          shortMomentum > STRATEGY_CONFIG.SHORT_MOMENTUM_THRESHOLD &&
           volatilityAdjustedMomentum >
-            MODEL_CONFIG.VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD &&
-          trendStrength > MODEL_CONFIG.TREND_STRENGTH_THRESHOLD &&
+            STRATEGY_CONFIG.VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD &&
+          trendStrength > STRATEGY_CONFIG.TREND_STRENGTH_THRESHOLD &&
           (atrBreakout > dynamicBreakoutThreshold || trendReversal) &&
-          currentVolume > avgVolume * MODEL_CONFIG.VOLUME_BOOST_THRESHOLD
+          currentVolume > avgVolume * STRATEGY_CONFIG.VOLUME_BOOST_THRESHOLD
         );
       case StrategyType.MeanReversion:
         const sma = this.calculateSMA(prices, this.smaPeriod);
@@ -457,8 +458,8 @@ export class TradingStrategy {
         return (
           buyProb > this.buyProbThreshold &&
           confidence >= this.minConfidence &&
-          deviation < MODEL_CONFIG.NEGATIVE_DEVIATION_THRESHOLD &&
-          shortMomentum > MODEL_CONFIG.NEGATIVE_SHORT_MOMENTUM_MIN &&
+          deviation < STRATEGY_CONFIG.NEGATIVE_DEVIATION_THRESHOLD &&
+          shortMomentum > STRATEGY_CONFIG.NEGATIVE_SHORT_MOMENTUM_MIN &&
           momentumDivergence > 0
         );
       case StrategyType.Breakout:
@@ -466,9 +467,9 @@ export class TradingStrategy {
           buyProb > this.buyProbThreshold &&
           confidence >= this.minConfidence &&
           atrBreakout > dynamicBreakoutThreshold &&
-          shortMomentum > MODEL_CONFIG.SHORT_MOMENTUM_THRESHOLD &&
-          trendSlope > MODEL_CONFIG.TREND_STRENGTH_THRESHOLD &&
-          currentVolume > avgVolume * MODEL_CONFIG.VOLUME_MULTIPLIER
+          shortMomentum > STRATEGY_CONFIG.SHORT_MOMENTUM_THRESHOLD &&
+          trendSlope > STRATEGY_CONFIG.TREND_STRENGTH_THRESHOLD &&
+          currentVolume > avgVolume * STRATEGY_CONFIG.VOLUME_MULTIPLIER
         );
       case StrategyType.TrendFollowing:
         const emaLong = this.calculateEMA(
@@ -483,8 +484,8 @@ export class TradingStrategy {
           buyProb > this.buyProbThreshold &&
           confidence >= this.minConfidence &&
           emaShort > emaLong &&
-          trendSlope > MODEL_CONFIG.TREND_STRENGTH_THRESHOLD &&
-          trendStrength > MODEL_CONFIG.TREND_SLOPE_THRESHOLD
+          trendSlope > STRATEGY_CONFIG.TREND_STRENGTH_THRESHOLD &&
+          trendStrength > STRATEGY_CONFIG.TREND_SLOPE_THRESHOLD
         );
       default:
         throw new Error(`Unknown strategy type: ${this.currentStrategy}`);
@@ -506,8 +507,8 @@ export class TradingStrategy {
       case StrategyType.Momentum:
         return (
           sellProb > this.sellProbThreshold ||
-          momentum < MODEL_CONFIG.NEGATIVE_MOMENTUM_THRESHOLD ||
-          shortMomentum < MODEL_CONFIG.NEGATIVE_SHORT_MOMENTUM_THRESHOLD ||
+          momentum < STRATEGY_CONFIG.NEGATIVE_MOMENTUM_THRESHOLD ||
+          shortMomentum < STRATEGY_CONFIG.NEGATIVE_SHORT_MOMENTUM_THRESHOLD ||
           trendStrength < 0 ||
           priceChange <= -stopLossLevel ||
           currentPrice <= trailingStopLevel ||
@@ -516,15 +517,15 @@ export class TradingStrategy {
       case StrategyType.MeanReversion:
         return (
           sellProb > this.sellProbThreshold ||
-          momentum > MODEL_CONFIG.MOMENTUM_MAX ||
-          priceChange >= MODEL_CONFIG.MEAN_REVERSION_THRESHOLD ||
+          momentum > STRATEGY_CONFIG.MOMENTUM_MAX ||
+          priceChange >= STRATEGY_CONFIG.MEAN_REVERSION_THRESHOLD ||
           priceChange <= -stopLossLevel ||
           currentPrice <= trailingStopLevel
         );
       case StrategyType.Breakout:
         return (
           sellProb > this.sellProbThreshold ||
-          momentum < MODEL_CONFIG.NEGATIVE_SHORT_MOMENTUM_THRESHOLD ||
+          momentum < STRATEGY_CONFIG.NEGATIVE_SHORT_MOMENTUM_THRESHOLD ||
           priceChange <= -stopLossLevel ||
           currentPrice <= trailingStopLevel ||
           currentPrice >= profitTakeLevel
@@ -533,7 +534,7 @@ export class TradingStrategy {
         return (
           sellProb > this.sellProbThreshold ||
           trendStrength < 0 ||
-          momentum < MODEL_CONFIG.NEGATIVE_SHORT_MOMENTUM_THRESHOLD ||
+          momentum < STRATEGY_CONFIG.NEGATIVE_SHORT_MOMENTUM_THRESHOLD ||
           priceChange <= -stopLossLevel ||
           currentPrice <= trailingStopLevel ||
           currentPrice >= profitTakeLevel

@@ -3,7 +3,7 @@ import { BacktestResult, Trade, Recommendation, StrategyType } from "../types";
 import { FirebaseService } from "../api/FirebaseService";
 import { CryptoCompareService } from "../api/CryptoCompareService";
 import { TradingStrategy } from "./TradingStrategy";
-import { MODEL_CONFIG, TIME_CONVERSIONS } from "../constants";
+import { MODEL_CONFIG, STRATEGY_CONFIG, TIME_CONVERSIONS } from "../constants";
 
 FirebaseService.getInstance();
 const cryptoCompare = new CryptoCompareService();
@@ -14,16 +14,16 @@ export class TradeModelBacktester {
 
   constructor(
     initialCapital: number = 10000,
-    basePositionSize: number = MODEL_CONFIG.BASE_POSITION_SIZE_DEFAULT,
-    slippage: number = MODEL_CONFIG.SLIPPAGE,
-    commission: number = MODEL_CONFIG.COMMISSION,
-    stopLossMultiplier: number = MODEL_CONFIG.STOP_LOSS_MULTIPLIER_DEFAULT,
-    trailingStop: number = MODEL_CONFIG.TRAILING_STOP_DEFAULT,
-    minHoldDays: number = MODEL_CONFIG.MIN_HOLD_DAYS_DEFAULT,
-    minConfidence: number = MODEL_CONFIG.MIN_CONFIDENCE_DEFAULT,
-    profitTakeMultiplier: number = MODEL_CONFIG.PROFIT_TAKE_MULTIPLIER_DEFAULT,
-    buyProbThreshold: number = MODEL_CONFIG.BUY_PROB_THRESHOLD_DEFAULT,
-    sellProbThreshold: number = MODEL_CONFIG.SELL_PROB_THRESHOLD_DEFAULT
+    basePositionSize: number = STRATEGY_CONFIG.BASE_POSITION_SIZE_DEFAULT,
+    slippage: number = STRATEGY_CONFIG.SLIPPAGE,
+    commission: number = STRATEGY_CONFIG.COMMISSION,
+    stopLossMultiplier: number = STRATEGY_CONFIG.STOP_LOSS_MULTIPLIER_DEFAULT,
+    trailingStop: number = STRATEGY_CONFIG.TRAILING_STOP_DEFAULT,
+    minHoldDays: number = STRATEGY_CONFIG.MIN_HOLD_DAYS_DEFAULT,
+    minConfidence: number = STRATEGY_CONFIG.MIN_CONFIDENCE_DEFAULT,
+    profitTakeMultiplier: number = STRATEGY_CONFIG.PROFIT_TAKE_MULTIPLIER_DEFAULT,
+    buyProbThreshold: number = STRATEGY_CONFIG.BUY_PROB_THRESHOLD_DEFAULT,
+    sellProbThreshold: number = STRATEGY_CONFIG.SELL_PROB_THRESHOLD_DEFAULT
   ) {
     this.strategy = new TradingStrategy({
       basePositionSize,

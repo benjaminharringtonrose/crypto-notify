@@ -1,31 +1,24 @@
-import { Indicators, MarketData } from "../types";
+import { Indicators } from "../types";
 import { PERIODS } from "../constants";
 
+interface ComputeParams {
+  prices: number[];
+  volumes: number[];
+  dayIndex: number;
+  currentPrice: number;
+  isBTC: boolean;
+  btcPrice?: number;
+}
+
+interface CalculateIndicatorsParams {
+  prices: number[];
+  volumes: number[];
+  dayIndex: number;
+  currentPrice: number;
+}
+
 export default class FeatureCalculator {
-  private prices: number[];
-  private volumes: number[];
-  private dayIndex: number;
-  private currentPrice: number;
-  private isBTC: boolean;
-  private btcPrice?: number;
-
-  constructor({
-    prices,
-    volumes,
-    dayIndex,
-    currentPrice,
-    isBTC = false,
-    btcPrice,
-  }: MarketData & { isBTC?: boolean; btcPrice?: number }) {
-    this.prices = prices;
-    this.volumes = volumes;
-    this.dayIndex = dayIndex;
-    this.currentPrice = currentPrice;
-    this.isBTC = isBTC;
-    this.btcPrice = btcPrice;
-  }
-
-  private calculateVWAP(
+  public calculateVWAP(
     prices: number[],
     volumes: number[],
     period: number = 7
@@ -42,7 +35,7 @@ export default class FeatureCalculator {
     return priceVolumeSum / volumeSum;
   }
 
-  private calculateATR(prices: number[], period: number = 14): number {
+  public calculateATR(prices: number[], period: number = 14): number {
     if (prices.length < period + 1) return 0;
     const trueRanges = [];
     for (let i = 1; i < prices.length; i++) {
@@ -52,15 +45,11 @@ export default class FeatureCalculator {
     return recentRanges.reduce((sum, range) => sum + range, 0) / period;
   }
 
-  private calculateSlice(
-    data: number[],
-    periods: number,
-    offset = 0
-  ): number[] {
+  public calculateSlice(data: number[], periods: number, offset = 0): number[] {
     return data.slice(-periods - offset, offset === 0 ? undefined : -offset);
   }
 
-  private calculateRSI(prices: number[], period = 14): number | undefined {
+  public calculateRSI(prices: number[], period = 14): number | undefined {
     if (prices.length < period + 1) return undefined;
     let gains = 0,
       losses = 0;
@@ -86,7 +75,7 @@ export default class FeatureCalculator {
     return 100 - 100 / (1 + rs);
   }
 
-  private calculateEMA(prices: number[], period: number): number {
+  public calculateEMA(prices: number[], period: number): number {
     const k = 2 / (period + 1);
     let ema = prices[0];
     for (let i = 1; i < prices.length; i++) {
@@ -95,18 +84,18 @@ export default class FeatureCalculator {
     return ema;
   }
 
-  private calculateSMA(prices: number[]): number {
+  public calculateSMA(prices: number[]): number {
     return prices.reduce((sum, price) => sum + price, 0) / prices.length;
   }
 
-  private calculateStdDev(values: number[], mean: number): number {
+  public calculateStdDev(values: number[], mean: number): number {
     const variance =
       values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) /
       values.length;
     return Math.sqrt(variance);
   }
 
-  private detectTripleBottom(
+  public detectTripleBottom(
     prices: number[],
     volumes: number[],
     currentPrice: number
@@ -148,7 +137,7 @@ export default class FeatureCalculator {
     return areSimilar && volumeDecreasing && isVolumeSpike && isBreakingUp;
   }
 
-  private calculateFibonacciLevels(
+  public calculateFibonacciLevels(
     prices: number[],
     period: number = 30
   ): { levels: number[]; high: number; low: number } {
@@ -174,7 +163,7 @@ export default class FeatureCalculator {
     return { levels, high, low };
   }
 
-  private detectHeadAndShoulders(
+  public detectHeadAndShoulders(
     prices: number[],
     volumes: number[],
     currentPrice: number
@@ -238,7 +227,7 @@ export default class FeatureCalculator {
     );
   }
 
-  private calculateStochRSI(
+  public calculateStochRSI(
     prices: number[],
     rsiPeriod: number = 14,
     stochPeriod: number = 14,
@@ -281,7 +270,7 @@ export default class FeatureCalculator {
     return { stochRsi, signal };
   }
 
-  private detectDoubleTop(
+  public detectDoubleTop(
     prices: number[],
     volumes: number[],
     currentPrice: number
@@ -330,7 +319,7 @@ export default class FeatureCalculator {
     );
   }
 
-  private detectTripleTop(
+  public detectTripleTop(
     prices: number[],
     volumes: number[],
     currentPrice: number
@@ -395,46 +384,49 @@ export default class FeatureCalculator {
     );
   }
 
-  public calculateIndicators(): Indicators {
-    const rsi = this.calculateRSI(
-      this.calculateSlice(this.prices, PERIODS.RSI + 1)
-    );
+  public calculateIndicators({
+    prices,
+    volumes,
+    dayIndex,
+    currentPrice,
+  }: CalculateIndicatorsParams): Indicators {
+    const rsi = this.calculateRSI(this.calculateSlice(prices, PERIODS.RSI + 1));
     const prevRsi = this.calculateRSI(
-      this.calculateSlice(this.prices, PERIODS.RSI + 1, 1)
+      this.calculateSlice(prices, PERIODS.RSI + 1, 1)
     );
     const sma7 = this.calculateSMA(
-      this.calculateSlice(this.prices, PERIODS.SMA_SHORT)
+      this.calculateSlice(prices, PERIODS.SMA_SHORT)
     );
     const sma21 = this.calculateSMA(
-      this.calculateSlice(this.prices, PERIODS.SMA_LONG)
+      this.calculateSlice(prices, PERIODS.SMA_LONG)
     );
     const prevSma7 = this.calculateSMA(
-      this.calculateSlice(this.prices, PERIODS.SMA_SHORT, 1)
+      this.calculateSlice(prices, PERIODS.SMA_SHORT, 1)
     );
     const prevSma21 = this.calculateSMA(
-      this.calculateSlice(this.prices, PERIODS.SMA_LONG, 1)
+      this.calculateSlice(prices, PERIODS.SMA_LONG, 1)
     );
     const ema12 = this.calculateEMA(
-      this.calculateSlice(this.prices, PERIODS.EMA_SHORT),
+      this.calculateSlice(prices, PERIODS.EMA_SHORT),
       PERIODS.EMA_SHORT
     );
     const ema26 = this.calculateEMA(
-      this.calculateSlice(this.prices, PERIODS.EMA_LONG),
+      this.calculateSlice(prices, PERIODS.EMA_LONG),
       PERIODS.EMA_LONG
     );
     const macdLine = ema12 - ema26;
     const prevEma12 = this.calculateEMA(
-      this.calculateSlice(this.prices, PERIODS.EMA_SHORT, 1),
+      this.calculateSlice(prices, PERIODS.EMA_SHORT, 1),
       PERIODS.EMA_SHORT
     );
     const prevEma26 = this.calculateEMA(
-      this.calculateSlice(this.prices, PERIODS.EMA_LONG, 1),
+      this.calculateSlice(prices, PERIODS.EMA_LONG, 1),
       PERIODS.EMA_LONG
     );
     const prevMacdLine = prevEma12 - prevEma26;
     const signalLine = this.calculateEMA(
-      this.prices.slice(-PERIODS.MACD_SIGNAL).map((_, i) => {
-        const slice = this.calculateSlice(this.prices, PERIODS.EMA_LONG + i, i);
+      prices.slice(-PERIODS.MACD_SIGNAL).map((_, i) => {
+        const slice = this.calculateSlice(prices, PERIODS.EMA_LONG + i, i);
         return (
           this.calculateEMA(
             slice.slice(-PERIODS.EMA_SHORT),
@@ -445,126 +437,111 @@ export default class FeatureCalculator {
       PERIODS.MACD_SIGNAL
     );
     const sma20 = this.calculateSMA(
-      this.calculateSlice(this.prices, PERIODS.SMA_MEDIUM)
+      this.calculateSlice(prices, PERIODS.SMA_MEDIUM)
     );
     const stdDev20 = this.calculateStdDev(
-      this.calculateSlice(this.prices, PERIODS.SMA_MEDIUM),
+      this.calculateSlice(prices, PERIODS.SMA_MEDIUM),
       sma20
     );
     const upperBand = sma20 + 2 * stdDev20;
     const lowerBand = sma20 - 2 * stdDev20;
     const obvValues = [0];
     let obv = 0;
-    for (let i = 1; i <= this.dayIndex && i < this.prices.length; i++) {
-      const priceChange = this.prices[i] - this.prices[i - 1];
-      obv +=
-        priceChange > 0
-          ? this.volumes[i]
-          : priceChange < 0
-          ? -this.volumes[i]
-          : 0;
+    for (let i = 1; i <= dayIndex && i < prices.length; i++) {
+      const priceChange = prices[i] - prices[i - 1];
+      obv += priceChange > 0 ? volumes[i] : priceChange < 0 ? -volumes[i] : 0;
       obvValues.push(obv);
     }
-    const atr = this.calculateATR(
-      this.prices.slice(0, this.dayIndex + 1),
-      PERIODS.ATR
-    );
+    const atr = this.calculateATR(prices.slice(0, dayIndex + 1), PERIODS.ATR);
     const atrBaseline = this.calculateATR(
-      this.prices.slice(0, Math.max(0, this.dayIndex)),
+      prices.slice(0, Math.max(0, dayIndex)),
       PERIODS.ATR
     );
     const zScore =
-      this.dayIndex >= PERIODS.SMA_MEDIUM
-        ? (this.currentPrice - sma20) / stdDev20
-        : 0;
+      dayIndex >= PERIODS.SMA_MEDIUM ? (currentPrice - sma20) / stdDev20 : 0;
     const vwap = this.calculateVWAP(
-      this.prices.slice(0, this.dayIndex + 1),
-      this.volumes.slice(0, this.dayIndex + 1),
+      prices.slice(0, dayIndex + 1),
+      volumes.slice(0, dayIndex + 1),
       PERIODS.VWAP
     );
     const { stochRsi, signal: stochRsiSignal } = this.calculateStochRSI(
-      this.prices.slice(0, this.dayIndex + 1),
+      prices.slice(0, dayIndex + 1),
       PERIODS.STOCH_RSI,
       PERIODS.STOCH_RSI,
       PERIODS.STOCH_SMOOTH
     );
     const prevStochRsi =
-      this.dayIndex > 0
+      dayIndex > 0
         ? this.calculateStochRSI(
-            this.prices.slice(0, this.dayIndex),
+            prices.slice(0, dayIndex),
             PERIODS.STOCH_RSI,
             PERIODS.STOCH_RSI,
             PERIODS.STOCH_SMOOTH
           ).stochRsi
         : 0;
     const { levels } = this.calculateFibonacciLevels(
-      this.prices.slice(0, this.dayIndex + 1),
+      prices.slice(0, dayIndex + 1),
       PERIODS.FIBONACCI
     );
     const fib61_8 = levels[3] || 0;
     const volSmaShort = this.calculateSMA(
-      this.calculateSlice(this.volumes, PERIODS.VOL_SMA_SHORT)
+      this.calculateSlice(volumes, PERIODS.VOL_SMA_SHORT)
     );
     const volSmaLong = this.calculateSMA(
-      this.calculateSlice(this.volumes, PERIODS.VOL_SMA_LONG)
+      this.calculateSlice(volumes, PERIODS.VOL_SMA_LONG)
     );
     const volumeOscillator =
       volSmaLong !== 0 ? ((volSmaShort - volSmaLong) / volSmaLong) * 100 : 0;
     const prevVolSmaShort = this.calculateSMA(
-      this.calculateSlice(this.volumes, PERIODS.VOL_SMA_SHORT, 1)
+      this.calculateSlice(volumes, PERIODS.VOL_SMA_SHORT, 1)
     );
     const prevVolSmaLong = this.calculateSMA(
-      this.calculateSlice(this.volumes, PERIODS.VOL_SMA_LONG, 1)
+      this.calculateSlice(volumes, PERIODS.VOL_SMA_LONG, 1)
     );
     const prevVolumeOscillator =
       prevVolSmaLong !== 0
         ? ((prevVolSmaShort - prevVolSmaLong) / prevVolSmaLong) * 100
         : 0;
-    const currentVolume = this.dayIndex >= 0 ? this.volumes[this.dayIndex] : 0;
+    const currentVolume = dayIndex >= 0 ? volumes[dayIndex] : 0;
     const volSma5 = this.calculateSMA(
-      this.calculateSlice(this.volumes, PERIODS.VOL_SMA_SHORT)
+      this.calculateSlice(volumes, PERIODS.VOL_SMA_SHORT)
     );
     const isVolumeSpike = currentVolume > volSma5 * 2;
     const isDoubleTop = this.detectDoubleTop(
-      this.prices.slice(0, this.dayIndex + 1),
-      this.volumes.slice(0, this.dayIndex + 1),
-      this.currentPrice
+      prices.slice(0, dayIndex + 1),
+      volumes.slice(0, dayIndex + 1),
+      currentPrice
     );
     const isHeadAndShoulders = this.detectHeadAndShoulders(
-      this.prices.slice(0, this.dayIndex + 1),
-      this.volumes.slice(0, this.dayIndex + 1),
-      this.currentPrice
+      prices.slice(0, dayIndex + 1),
+      volumes.slice(0, dayIndex + 1),
+      currentPrice
     );
     const isTripleTop = this.detectTripleTop(
-      this.prices.slice(0, this.dayIndex + 1),
-      this.volumes.slice(0, this.dayIndex + 1),
-      this.currentPrice
+      prices.slice(0, dayIndex + 1),
+      volumes.slice(0, dayIndex + 1),
+      currentPrice
     );
     const isTripleBottom = this.detectTripleBottom(
-      this.prices.slice(0, this.dayIndex + 1),
-      this.volumes.slice(0, this.dayIndex + 1),
-      this.currentPrice
+      prices.slice(0, dayIndex + 1),
+      volumes.slice(0, dayIndex + 1),
+      currentPrice
     );
     const momentum =
-      this.dayIndex >= PERIODS.MOMENTUM
-        ? this.currentPrice - this.prices[this.dayIndex - PERIODS.MOMENTUM]
+      dayIndex >= PERIODS.MOMENTUM
+        ? currentPrice - prices[dayIndex - PERIODS.MOMENTUM]
         : 0;
     const priceChangePct =
-      this.dayIndex >= 1
-        ? ((this.currentPrice - this.prices[this.dayIndex - 1]) /
-            this.prices[this.dayIndex - 1]) *
-          100
+      dayIndex >= 1
+        ? ((currentPrice - prices[dayIndex - 1]) / prices[dayIndex - 1]) * 100
         : 0;
     const volAdjustedMomentum =
-      this.dayIndex >= PERIODS.MOMENTUM && atr !== 0
-        ? (this.currentPrice - this.prices[this.dayIndex - PERIODS.MOMENTUM]) /
-          atr
+      dayIndex >= PERIODS.MOMENTUM && atr !== 0
+        ? (currentPrice - prices[dayIndex - PERIODS.MOMENTUM]) / atr
         : 0;
     const sma50 =
-      this.dayIndex >= 49
-        ? this.calculateSMA(
-            this.prices.slice(this.dayIndex - 49, this.dayIndex + 1)
-          )
+      dayIndex >= 49
+        ? this.calculateSMA(prices.slice(dayIndex - 49, dayIndex + 1))
         : sma20;
     const adxProxy = sma50 !== 0 ? Math.abs((sma7 - sma50) / sma50) : 0;
 
@@ -577,7 +554,7 @@ export default class FeatureCalculator {
       prevSma21,
       macdLine,
       signalLine,
-      currentPrice: this.currentPrice,
+      currentPrice: currentPrice,
       upperBand,
       lowerBand,
       obvValues,
@@ -601,23 +578,30 @@ export default class FeatureCalculator {
       momentum,
       priceChangePct,
       sma20,
-      prices: this.prices,
+      prices,
       volAdjustedMomentum,
       adxProxy,
     };
   }
 
-  public compute(): number[] {
-    if (
-      !this.prices ||
-      !this.volumes ||
-      this.dayIndex < 0 ||
-      this.dayIndex >= this.prices.length
-    ) {
-      return Array(this.isBTC ? 29 : 32).fill(0);
+  public compute({
+    prices,
+    volumes,
+    dayIndex,
+    currentPrice,
+    isBTC,
+    btcPrice,
+  }: ComputeParams): number[] {
+    if (!prices || !volumes || dayIndex < 0 || dayIndex >= prices.length) {
+      return Array(isBTC ? 29 : 32).fill(0);
     }
 
-    const indicators = this.calculateIndicators();
+    const indicators = this.calculateIndicators({
+      prices,
+      volumes,
+      dayIndex,
+      currentPrice,
+    });
     const baseFeatures = [
       indicators.rsi ?? 0,
       indicators.prevRsi ?? 0,
@@ -637,7 +621,7 @@ export default class FeatureCalculator {
       indicators.stochRsi,
       indicators.prevStochRsi,
       indicators.fib61_8,
-      this.dayIndex > 0 ? this.prices[this.dayIndex - 1] : this.prices[0],
+      dayIndex > 0 ? prices[dayIndex - 1] : prices[0],
       indicators.volumeOscillator,
       indicators.prevVolumeOscillator,
       indicators.isDoubleTop ? 1 : 0,
@@ -650,13 +634,13 @@ export default class FeatureCalculator {
       indicators.volAdjustedMomentum,
     ];
 
-    return this.isBTC
+    return isBTC
       ? baseFeatures // 29 features
       : [
           ...baseFeatures,
           indicators.isTripleBottom ? 1 : 0,
           indicators.adxProxy,
-          this.btcPrice ? this.currentPrice / this.btcPrice : 0,
+          btcPrice ? currentPrice / btcPrice : 0,
         ]; // 32 features
   }
 }

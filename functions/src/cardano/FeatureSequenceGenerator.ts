@@ -20,20 +20,24 @@ export class FeatureSequenceGenerator {
     const safeStartIndex = Math.max(0, safeEndIndex - this.timesteps + 1);
 
     for (let i = safeStartIndex; i <= safeEndIndex; i++) {
-      const adaFeatures = new FeatureCalculator({
+      const featureCalculator = new FeatureCalculator();
+
+      const adaFeatures = featureCalculator.compute({
         prices: adaPrices,
         volumes: adaVolumes,
         dayIndex: i,
         currentPrice: adaPrices[i],
         isBTC: false,
-      }).compute();
-      const btcFeatures = new FeatureCalculator({
+      });
+
+      const btcFeatures = featureCalculator.compute({
         prices: btcPrices,
         volumes: btcVolumes,
         dayIndex: i,
         currentPrice: btcPrices[i],
         isBTC: true,
-      }).compute();
+      });
+
       sequence.push([...adaFeatures, ...btcFeatures]);
     }
 

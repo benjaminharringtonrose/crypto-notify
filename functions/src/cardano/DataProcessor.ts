@@ -68,22 +68,24 @@ export class DataProcessor {
     btcData: HistoricalData,
     index: number
   ): [number[], number[]] {
-    const adaCalculator = new FeatureCalculator({
+    const featureCalculator = new FeatureCalculator();
+
+    const adaFeatures = featureCalculator.compute({
       prices: adaData.prices,
       volumes: adaData.volumes,
       dayIndex: index,
       currentPrice: adaData.prices[index],
       isBTC: false,
     });
-    const btcCalculator = new FeatureCalculator({
+
+    const btcFeatures = featureCalculator.compute({
       prices: btcData.prices,
       volumes: btcData.volumes,
       dayIndex: index,
       currentPrice: btcData.prices[index],
       isBTC: true,
     });
-    const adaFeatures = adaCalculator.compute();
-    const btcFeatures = btcCalculator.compute();
+
     return [adaFeatures, btcFeatures];
   }
 

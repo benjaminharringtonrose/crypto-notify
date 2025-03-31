@@ -1,6 +1,6 @@
 import { TradeModelPredictor } from "./TradeModelPredictor";
 import { Trade, Recommendation, StrategyType } from "../types";
-import { MODEL_CONSTANTS } from "../constants";
+import { MODEL_CONSTANTS, PERIODS } from "../constants";
 
 interface TradingStrategyParams {
   basePositionSize?: number;
@@ -44,7 +44,7 @@ export class TradingStrategy {
     profitTakeMultiplier = MODEL_CONSTANTS.PROFIT_TAKE_MULTIPLIER_DEFAULT,
     buyProbThreshold = MODEL_CONSTANTS.BUY_PROB_THRESHOLD_DEFAULT,
     sellProbThreshold = MODEL_CONSTANTS.SELL_PROB_THRESHOLD_DEFAULT,
-    smaPeriod = 20,
+    smaPeriod = PERIODS.SMA_MEDIUM,
     breakoutThreshold = 0.8, // Reduced from 1.0
   }: TradingStrategyParams = {}) {
     this.predictor = new TradeModelPredictor();

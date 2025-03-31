@@ -1,14 +1,14 @@
 import { TradeModelBacktester } from "../cardano/TradeModelBacktester";
 
 async function runMultiPeriodBacktest() {
-  const backtester = new TradeModelBacktester();
   const results: { period: string; result: any }[] = [];
 
   const startYear = 2018;
-  const endYear = 2024;
+  const endYear = 2025; // Extended to 2025 to reach today
   const periodLengthMonths = 6;
   const stepMonths = 3;
 
+  // Sliding window periods from 2018 to 2025
   for (
     let year = startYear;
     year <= endYear - periodLengthMonths / 12;
@@ -17,11 +17,12 @@ async function runMultiPeriodBacktest() {
     for (let month = 0; month <= 12 - periodLengthMonths; month += stepMonths) {
       const startDate = new Date(year, month, 1);
       const endDate = new Date(year, month + periodLengthMonths, 0);
-      if (endDate > new Date()) continue;
+      if (endDate > new Date("2025-03-31T04:00:00.000Z")) continue; // Cap at today
 
       console.log(
         `Running backtest for ${startDate.toISOString()} to ${endDate.toISOString()}`
       );
+      const backtester = new TradeModelBacktester(); // Fresh instance per period
       const result = await backtester.backtest(startDate, endDate);
       results.push({
         period: `${startDate.toISOString().slice(0, 10)} - ${endDate
@@ -32,8 +33,26 @@ async function runMultiPeriodBacktest() {
     }
   }
 
+  // Add the specific recent 6-month period: 2024-09-30 to 2025-03-31
+  const recentStart = new Date("2024-09-30T04:00:00.000Z");
+  const recentEnd = new Date("2025-03-31T04:00:00.000Z");
+  console.log(
+    `Running backtest for ${recentStart.toISOString()} to ${recentEnd.toISOString()}`
+  );
+  const recentBacktester = new TradeModelBacktester();
+  const recentResult = await recentBacktester.backtest(recentStart, recentEnd);
+  results.push({
+    period: `${recentStart.toISOString().slice(0, 10)} - ${recentEnd
+      .toISOString()
+      .slice(0, 10)}`,
+    result: recentResult,
+  });
+
   const summary = aggregateResults(results);
-  console.log("Multi-Period Backtest Summary:", summary);
+  console.log(
+    "Multi-Period Backtest Summary:",
+    JSON.stringify(summary, null, 2)
+  );
 }
 
 function aggregateResults(results: { period: string; result: any }[]) {

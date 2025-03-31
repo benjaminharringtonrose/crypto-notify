@@ -32,6 +32,18 @@ export class TradingStrategy {
   private sellProbThreshold: number;
   private smaPeriod: number;
   private breakoutThreshold: number;
+  private strategyStartTimestamp: string | null = null; // Track strategy start time
+  private strategyTradeCount: number = 0; // Track trades under current strategy
+  private recentIndicators: { [key: string]: number[] } = {
+    // Store 3-day history
+    shortMomentum: [],
+    momentum: [],
+    trendSlope: [],
+    momentumDivergence: [],
+    volatilityAdjustedMomentum: [],
+    trendStrength: [],
+    atrBreakout: [],
+  };
 
   constructor({
     basePositionSize = STRATEGY_CONFIG.BASE_POSITION_SIZE_DEFAULT,
@@ -48,7 +60,7 @@ export class TradingStrategy {
     breakoutThreshold = STRATEGY_CONFIG.DYNAMIC_BREAKOUT_THRESHOLD,
   }: TradingStrategyParams) {
     this.predictor = new TradeModelPredictor();
-    this.currentStrategy = StrategyType.Momentum;
+    this.currentStrategy = StrategyType.Momentum; // Default
     this.basePositionSize = basePositionSize;
     this.slippage = slippage;
     this.commission = commission;
@@ -79,6 +91,64 @@ export class TradingStrategy {
     return ema;
   }
 
+  private updateRecentIndicators(
+    shortMomentum: number,
+    momentum: number,
+    trendSlope: number,
+    momentumDivergence: number,
+    volatilityAdjustedMomentum: number,
+    trendStrength: number,
+    atrBreakout: number
+  ) {
+    const keys = [
+      "shortMomentum",
+      "momentum",
+      "trendSlope",
+      "momentumDivergence",
+      "volatilityAdjustedMomentum",
+      "trendStrength",
+      "atrBreakout",
+    ];
+    const values = [
+      shortMomentum,
+      momentum,
+      trendSlope,
+      momentumDivergence,
+      volatilityAdjustedMomentum,
+      trendStrength,
+      atrBreakout,
+    ];
+    keys.forEach((key, index) => {
+      this.recentIndicators[key].push(values[index]);
+      if (this.recentIndicators[key].length > 3) {
+        this.recentIndicators[key].shift(); // Keep only last 3 days
+      }
+    });
+  }
+
+  private getThreeDayAverage(key: string): number {
+    const values = this.recentIndicators[key];
+    return values.length >= 3
+      ? values.reduce((sum, val) => sum + val, 0) / 3
+      : values[values.length - 1] || 0;
+  }
+
+  private shouldPersistStrategy(
+    currentTimestamp: string,
+    confidence: number
+  ): boolean {
+    if (!this.strategyStartTimestamp) return false;
+    const daysSinceStart =
+      (new Date(currentTimestamp).getTime() -
+        new Date(this.strategyStartTimestamp).getTime()) /
+      TIME_CONVERSIONS.ONE_DAY_IN_MILLISECONDS;
+    return (
+      (this.strategyTradeCount < STRATEGY_CONFIG.STRATEGY_PERSISTENCE_TRADES ||
+        daysSinceStart < STRATEGY_CONFIG.STRATEGY_PERSISTENCE_DAYS) &&
+      confidence < STRATEGY_CONFIG.STRATEGY_OVERRIDE_CONFIDENCE
+    );
+  }
+
   private selectStrategy(
     shortMomentum: number,
     momentum: number,
@@ -88,8 +158,30 @@ export class TradingStrategy {
     trendStrength: number,
     atrBreakout: number,
     prices: number[],
-    volumes: number[]
+    volumes: number[],
+    currentTimestamp: string,
+    confidence: number
   ): StrategyType {
+    this.updateRecentIndicators(
+      shortMomentum,
+      momentum,
+      trendSlope,
+      momentumDivergence,
+      volatilityAdjustedMomentum,
+      trendStrength,
+      atrBreakout
+    );
+
+    const avgShortMomentum = this.getThreeDayAverage("shortMomentum");
+    const avgMomentum = this.getThreeDayAverage("momentum");
+    const avgTrendSlope = this.getThreeDayAverage("trendSlope");
+    const avgMomentumDivergence = this.getThreeDayAverage("momentumDivergence");
+    const avgVolatilityAdjustedMomentum = this.getThreeDayAverage(
+      "volatilityAdjustedMomentum"
+    );
+    const avgTrendStrength = this.getThreeDayAverage("trendStrength");
+    const avgAtrBreakout = this.getThreeDayAverage("atrBreakout");
+
     const currentPrice = prices[prices.length - 1];
     const currentVolume = volumes[volumes.length - 1];
     const avgVolume =
@@ -106,56 +198,54 @@ export class TradingStrategy {
       Math.floor(this.smaPeriod / 2)
     );
 
+    if (this.shouldPersistStrategy(currentTimestamp, confidence)) {
+      console.log(`Persisting Strategy: ${this.currentStrategy}`);
+      return this.currentStrategy;
+    }
+
+    let newStrategy: StrategyType;
     if (
-      shortMomentum > STRATEGY_CONFIG.MOMENTUM_THRESHOLD &&
-      volatilityAdjustedMomentum >
+      avgShortMomentum > STRATEGY_CONFIG.MOMENTUM_THRESHOLD &&
+      avgVolatilityAdjustedMomentum >
         STRATEGY_CONFIG.VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD &&
-      trendStrength > STRATEGY_CONFIG.TREND_STRENGTH_THRESHOLD &&
+      avgTrendStrength > STRATEGY_CONFIG.TREND_STRENGTH_THRESHOLD &&
       emaShort > emaLong
     ) {
+      newStrategy = StrategyType.Momentum;
       console.log("Selected Strategy: MomentumTrendHybrid");
-      return StrategyType.Momentum;
-    }
-
-    if (
-      shortMomentum > STRATEGY_CONFIG.MOMENTUM_THRESHOLD &&
-      volatilityAdjustedMomentum >
-        STRATEGY_CONFIG.VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD &&
-      trendStrength > STRATEGY_CONFIG.TREND_STRENGTH_THRESHOLD
-    ) {
-      console.log("Selected Strategy: Momentum");
-      return StrategyType.Momentum;
-    }
-
-    if (
+    } else if (
       Math.abs(deviation) > STRATEGY_CONFIG.DEVIATION_THRESHOLD &&
-      Math.abs(momentum) < STRATEGY_CONFIG.MOMENTUM_WINDOW_THRESHOLD &&
-      momentumDivergence !== 0
+      Math.abs(avgMomentum) < STRATEGY_CONFIG.MOMENTUM_THRESHOLD &&
+      avgMomentumDivergence !== 0
     ) {
+      newStrategy = StrategyType.MeanReversion;
       console.log("Selected Strategy: Mean Reversion");
-      return StrategyType.MeanReversion;
-    }
-
-    if (
-      atrBreakout > this.breakoutThreshold &&
+    } else if (
+      avgAtrBreakout > this.breakoutThreshold &&
       currentVolume > avgVolume * STRATEGY_CONFIG.VOLUME_MULTIPLIER &&
-      shortMomentum > STRATEGY_CONFIG.SHORT_MOMENTUM_THRESHOLD
+      avgShortMomentum > STRATEGY_CONFIG.SHORT_MOMENTUM_THRESHOLD * 0.8
     ) {
+      newStrategy = StrategyType.Breakout;
       console.log("Selected Strategy: Breakout");
-      return StrategyType.Breakout;
-    }
-
-    if (
-      Math.abs(trendSlope) > STRATEGY_CONFIG.TREND_SLOPE_THRESHOLD &&
+    } else if (
+      Math.abs(avgTrendSlope) > STRATEGY_CONFIG.TREND_SLOPE_THRESHOLD &&
       emaShort > emaLong &&
-      trendStrength > STRATEGY_CONFIG.TREND_SLOPE_THRESHOLD
+      avgTrendStrength > STRATEGY_CONFIG.TREND_STRENGTH_THRESHOLD
     ) {
+      newStrategy = StrategyType.TrendFollowing;
       console.log("Selected Strategy: Trend Following");
-      return StrategyType.TrendFollowing;
+    } else {
+      newStrategy = StrategyType.Momentum;
+      console.log("Selected Strategy: Momentum (default)");
     }
 
-    console.log("Selected Strategy: Momentum (default)");
-    return StrategyType.Momentum;
+    if (newStrategy !== this.currentStrategy) {
+      this.currentStrategy = newStrategy;
+      this.strategyStartTimestamp = currentTimestamp;
+      this.strategyTradeCount = 0;
+    }
+
+    return this.currentStrategy;
   }
 
   public async decideTrade({
@@ -210,6 +300,22 @@ export class TradingStrategy {
       atrBreakout,
     } = prediction;
 
+    if (
+      confidence < STRATEGY_CONFIG.MIN_CONFIDENCE_DEFAULT ||
+      atr > STRATEGY_CONFIG.MAX_ATR_THRESHOLD
+    ) {
+      console.log(
+        `Trade Skipped: Confidence=${confidence.toFixed(
+          4
+        )} < ${STRATEGY_CONFIG.MIN_CONFIDENCE_DEFAULT.toFixed(
+          2
+        )} or ATR=${atr.toFixed(
+          4
+        )} > ${STRATEGY_CONFIG.MAX_ATR_THRESHOLD.toFixed(2)}`
+      );
+      return { trade: null, confidence, buyProb, sellProb };
+    }
+
     this.currentStrategy = this.selectStrategy(
       shortMomentum,
       momentum,
@@ -219,7 +325,9 @@ export class TradingStrategy {
       trendStrength,
       atrBreakout,
       adaPrices,
-      adaVolumes
+      adaVolumes,
+      currentTimestamp,
+      confidence
     );
 
     const daysSinceLastTrade = buyTimestamp
@@ -235,8 +343,8 @@ export class TradingStrategy {
 
     const dynamicStopLossMultiplier =
       confidence > STRATEGY_CONFIG.HIGH_CONFIDENCE_THRESHOLD
-        ? this.stopLossMultiplier * 0.8
-        : this.stopLossMultiplier;
+        ? this.stopLossMultiplier * 1.2
+        : this.stopLossMultiplier * 1.5;
 
     const dynamicTrailingStop =
       momentum > STRATEGY_CONFIG.MOMENTUM_MULTIPLIER
@@ -249,16 +357,6 @@ export class TradingStrategy {
       STRATEGY_CONFIG.MAX_PROFIT_TAKE
     );
 
-    if (atr > STRATEGY_CONFIG.MAX_ATR_THRESHOLD) {
-      console.log(`Trade skipped: ATR ${atr.toFixed(4)} exceeds threshold`);
-      return {
-        trade: null,
-        confidence,
-        buyProb,
-        sellProb,
-      };
-    }
-
     if (holdings > 0 && lastBuyPrice && buyTimestamp) {
       const daysHeld =
         (new Date(currentTimestamp).getTime() -
@@ -268,9 +366,7 @@ export class TradingStrategy {
       const priceChange = (currentPrice - lastBuyPrice) / lastBuyPrice;
 
       const stopLossLevel = dynamicStopLossMultiplier * atr;
-
       const profitTakeLevel = lastBuyPrice + dynamicProfitTake * atr;
-
       const trailingStopLevel =
         priceChange >= STRATEGY_CONFIG.MIN_PROFIT_THRESHOLD
           ? (peakPrice || lastBuyPrice) * (1 - dynamicTrailingStop)
@@ -302,6 +398,7 @@ export class TradingStrategy {
               this.currentStrategy
             }`
           );
+          this.strategyTradeCount++;
           return {
             trade: {
               type: Recommendation.Sell,
@@ -334,9 +431,8 @@ export class TradingStrategy {
       if (buyConditions && capital > 0) {
         const volatilityAdjustedSize = Math.min(
           this.basePositionSize / (atr > 0 ? atr : 0.01),
-          trendSlope > STRATEGY_CONFIG.ATR_POSITION_THRESHOLD &&
-            atr < STRATEGY_CONFIG.ATR_POSITION_THRESHOLD
-            ? STRATEGY_CONFIG.POSITION_SIZE_MAX
+          atr > STRATEGY_CONFIG.ATR_POSITION_THRESHOLD
+            ? STRATEGY_CONFIG.POSITION_SIZE_MAX_HIGH_ATR
             : STRATEGY_CONFIG.POSITION_SIZE_MAX
         );
         const trendAdjustedSize =
@@ -393,6 +489,7 @@ export class TradingStrategy {
             2
           )}, WinStreakBoost: ${winStreakBoost.toFixed(2)}`
         );
+        this.strategyTradeCount++;
         return {
           trade: {
             type: Recommendation.Buy,
@@ -506,10 +603,10 @@ export class TradingStrategy {
     switch (this.currentStrategy) {
       case StrategyType.Momentum:
         return (
-          sellProb > this.sellProbThreshold ||
+          sellProb > this.sellProbThreshold + 0.05 ||
           momentum < STRATEGY_CONFIG.NEGATIVE_MOMENTUM_THRESHOLD ||
           shortMomentum < STRATEGY_CONFIG.NEGATIVE_SHORT_MOMENTUM_THRESHOLD ||
-          trendStrength < 0 ||
+          trendStrength < STRATEGY_CONFIG.TREND_STRENGTH_REVERSAL_THRESHOLD ||
           priceChange <= -stopLossLevel ||
           currentPrice <= trailingStopLevel ||
           currentPrice >= profitTakeLevel
@@ -532,8 +629,8 @@ export class TradingStrategy {
         );
       case StrategyType.TrendFollowing:
         return (
-          sellProb > this.sellProbThreshold ||
-          trendStrength < 0 ||
+          sellProb > this.sellProbThreshold + 0.05 ||
+          trendStrength < STRATEGY_CONFIG.TREND_STRENGTH_REVERSAL_THRESHOLD ||
           momentum < STRATEGY_CONFIG.NEGATIVE_SHORT_MOMENTUM_THRESHOLD ||
           priceChange <= -stopLossLevel ||
           currentPrice <= trailingStopLevel ||
@@ -546,6 +643,8 @@ export class TradingStrategy {
 
   public setStrategy(strategyType: StrategyType): void {
     this.currentStrategy = strategyType;
+    this.strategyStartTimestamp = null; // Reset on manual set
+    this.strategyTradeCount = 0;
     console.log(`Strategy manually set to: ${strategyType}`);
   }
 

@@ -3,7 +3,7 @@ import { ModelWeightManager } from "./TradeModelWeightManager";
 import TradeModelFactory from "./TradeModelFactory";
 import { FeatureSequenceGenerator } from "./FeatureSequenceGenerator";
 import { FirebaseService } from "../api/FirebaseService";
-import { MODEL_CONFIG, PERIODS, STRATEGY_CONFIG } from "../constants";
+import { MODEL_CONFIG, PERIODS } from "../constants";
 
 export class TradeModelPredictor {
   private weightManager: ModelWeightManager;
@@ -102,9 +102,13 @@ export class TradeModelPredictor {
     const [sellProb, buyProb] = [probArray[0], probArray[1]];
     const confidence = Math.max(buyProb, sellProb);
 
+    // Manual variance calculation
+    const meanProb = tf.mean(probs).dataSync()[0];
+    const variance = tf.mean(tf.square(probs.sub(meanProb))).dataSync()[0];
+
     const atr = sequence[sequence.length - 1][11];
     const momentumWindowSize =
-      atr > STRATEGY_CONFIG.MOMENTUM_WINDOW_THRESHOLD ? 5 : 14;
+      atr > 0.05 ? 5 : atr > 0.02 ? 10 : atr > 0.01 ? 14 : 20;
     const momentumWindow = adaPrices.slice(-momentumWindowSize);
     const momentum =
       momentumWindow.length >= 2
@@ -143,7 +147,11 @@ export class TradeModelPredictor {
       `Prediction executed in ${(endTime - startTime).toFixed(2)} ms`
     );
     console.log(
-      `ATR: ${atr.toFixed(4)}, Momentum Window: ${momentumWindowSize}`
+      `ATR: ${atr.toFixed(
+        4
+      )}, Momentum Window: ${momentumWindowSize}, Variance: ${variance.toFixed(
+        4
+      )}`
     );
     console.log(
       `Logits: [Sell: ${sellLogit.toFixed(4)}, Buy: ${buyLogit.toFixed(4)}]`

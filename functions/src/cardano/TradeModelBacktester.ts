@@ -77,8 +77,18 @@ export class TradeModelBacktester {
       [StrategyType.Breakout]: 0,
       [StrategyType.TrendFollowing]: 0,
     };
+    const strategyPL: { [key in StrategyType]: number } = {
+      [StrategyType.Momentum]: 0,
+      [StrategyType.MeanReversion]: 0,
+      [StrategyType.Breakout]: 0,
+      [StrategyType.TrendFollowing]: 0,
+    };
 
-    console.log(`Starting Capital: $${capital.toFixed(2)}`);
+    console.log(
+      `Period Start: ${startDate.toISOString()}, Initial Capital: $${capital.toFixed(
+        2
+      )}`
+    );
     console.log(
       `Backtest period: ${startDate.toISOString()} to ${endDate.toISOString()}`
     );
@@ -99,32 +109,30 @@ export class TradeModelBacktester {
         value: portfolioValue,
       });
 
-      const { trade, confidence } = await this.strategy.decideTrade({
-        adaPrices,
-        adaVolumes,
-        btcPrices,
-        btcVolumes,
-        capital,
-        holdings,
-        lastBuyPrice,
-        peakPrice,
-        buyTimestamp,
-        currentTimestamp,
-        winStreak,
-      });
+      const { trade, confidence, buyProb, sellProb } =
+        await this.strategy.decideTrade({
+          adaPrices,
+          adaVolumes,
+          btcPrices,
+          btcVolumes,
+          capital,
+          holdings,
+          lastBuyPrice,
+          peakPrice,
+          buyTimestamp,
+          currentTimestamp,
+          winStreak,
+        });
 
       strategyCount[this.strategy.getCurrentStrategy()]++;
 
       if (trade) {
-        if (trade.type === Recommendation.Buy && consecutiveBuys < 4) {
+        if (
+          trade.type === Recommendation.Buy &&
+          consecutiveBuys < STRATEGY_CONFIG.CONSECUTIVE_BUYS_MAX
+        ) {
           const minConfidence =
-            consecutiveBuys === 0
-              ? 0.5
-              : consecutiveBuys === 1
-              ? 0.55
-              : consecutiveBuys === 2
-              ? 0.6
-              : 0.65;
+            STRATEGY_CONFIG.CONSECUTIVE_BUY_CONFIDENCE_LEVELS[consecutiveBuys];
           if (confidence >= minConfidence) {
             capital -= trade.usdValue;
             holdings += trade.adaAmount;
@@ -140,12 +148,21 @@ export class TradeModelBacktester {
                 2
               )} ADA, Confidence: ${confidence.toFixed(
                 2
-              )}, Consecutive: ${consecutiveBuys}`
+              )}, Consecutive: ${consecutiveBuys}, MinConfidence: ${minConfidence.toFixed(
+                2
+              )}`
+            );
+          } else {
+            console.log(
+              `Buy Skipped: Confidence=${confidence.toFixed(
+                4
+              )} < MinConfidence=${minConfidence.toFixed(2)}`
             );
           }
         } else if (trade.type === Recommendation.Sell) {
           const profitLoss = trade.usdValue - holdings * (lastBuyPrice || 0);
           cumulativePL += profitLoss;
+          strategyPL[this.strategy.getCurrentStrategy()] += profitLoss;
           capital += trade.usdValue;
           trades.push(trade);
           console.log(
@@ -153,7 +170,9 @@ export class TradeModelBacktester {
               4
             )}, P/L: $${profitLoss.toFixed(
               2
-            )}, Confidence: ${confidence.toFixed(2)}`
+            )}, Confidence: ${confidence.toFixed(
+              2
+            )}, SellProb: ${sellProb.toFixed(4)}`
           );
           console.log(`Trade Success: ${profitLoss > 0 ? "Win" : "Loss"}`);
           console.log(`Cumulative P/L: $${cumulativePL.toFixed(2)}`);
@@ -173,6 +192,12 @@ export class TradeModelBacktester {
           peakPrice = undefined;
           buyTimestamp = undefined;
         }
+      } else {
+        console.log(
+          `Trade Skipped: Confidence=${confidence.toFixed(
+            4
+          )}, BuyProb=${buyProb.toFixed(4)}, SellProb=${sellProb.toFixed(4)}`
+        );
       }
 
       if (holdings > 0) {
@@ -200,7 +225,11 @@ export class TradeModelBacktester {
 
     const finalValue =
       capital + holdings * adaData.prices[adaData.prices.length - 1];
-    console.log(`Ending Capital: $${finalValue.toFixed(2)}`);
+    console.log(
+      `Period End: ${endDate.toISOString()}, Ending Capital: $${finalValue.toFixed(
+        2
+      )}`
+    );
     const totalReturn =
       (finalValue - this.initialCapital) / this.initialCapital;
     const totalTrades = trades.length;
@@ -231,6 +260,16 @@ export class TradeModelBacktester {
     const sortinoRatio = this.calculateSortinoRatio(returns);
     const maxDrawdown = this.calculateMaxDrawdown(portfolioHistory);
     const rollingSharpe = this.calculateRollingSharpe(returns, 30);
+    const annualizedReturn =
+      (finalValue / this.initialCapital) ** (252 / days) - 1;
+    const volatility =
+      tf
+        .sqrt(
+          tf.mean(
+            tf.square(tf.tensor1d(returns).sub(tf.mean(tf.tensor1d(returns))))
+          )
+        )
+        .dataSync()[0] * Math.sqrt(252);
 
     console.log(
       `Average Trade Duration: ${this.calculateAvgTradeDuration(trades).toFixed(
@@ -254,6 +293,8 @@ export class TradeModelBacktester {
         totalTrades / 2 - wins
       }`
     );
+    console.log(`Annualized Return: ${(annualizedReturn * 100).toFixed(2)}%`);
+    console.log(`Annualized Volatility: ${(volatility * 100).toFixed(2)}%`);
     console.log(
       "Strategy Usage:",
       Object.fromEntries(
@@ -264,6 +305,12 @@ export class TradeModelBacktester {
             100
           ).toFixed(2)}%`,
         ])
+      )
+    );
+    console.log(
+      "Strategy P/L:",
+      Object.fromEntries(
+        Object.entries(strategyPL).map(([k, v]) => [k, `$${v.toFixed(2)}`])
       )
     );
 

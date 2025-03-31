@@ -1,9 +1,9 @@
-import { logger } from "firebase-functions";
-import { onSchedule, ScheduleOptions } from "firebase-functions/v2/scheduler";
-import { TradeExecutor } from "../cardano/TradeExecutor";
-import { TradingStrategy } from "../cardano/TradingStrategy";
-import { sendSMS } from "../utils";
+import { https, logger } from "firebase-functions";
+import { HttpsOptions } from "firebase-functions/https";
 import { CoinbaseProductIds, Granularity } from "../types";
+import { sendSMS } from "../utils";
+import { TradingStrategy } from "../cardano/TradingStrategy";
+import { TradeExecutor } from "../cardano/TradeExecutor";
 import { COINBASE_CONSTANTS, MODEL_CONSTANTS } from "../constants";
 
 const strategy = new TradingStrategy();
@@ -13,16 +13,14 @@ const trader = new TradeExecutor({
   apiSecret: process.env.COINBASE_API_SECRET,
 });
 
-const CONFIG: ScheduleOptions = {
-  schedule: "every 24 hours",
+const NOW_CONFIG: HttpsOptions = {
   memory: "512MiB",
 };
 
 const TIMESTEPS_IN_SECONDS =
   MODEL_CONSTANTS.TIMESTEPS * COINBASE_CONSTANTS.SECONDS_PER_DAY;
 
-// Scheduled function to run every 24 hours
-export const runDailyTrade = onSchedule(CONFIG, async () => {
+export const runTradeNow = https.onRequest(NOW_CONFIG, async (_, res) => {
   try {
     const now = Math.floor(Date.now() / 1000);
     const start = now - TIMESTEPS_IN_SECONDS;
@@ -41,12 +39,10 @@ export const runDailyTrade = onSchedule(CONFIG, async () => {
       end: now.toString(),
     });
 
-    // Fetch current portfolio state (simplified; adjust based on your needs)
     const balances = await trader.getAccountBalances();
     const capital = parseFloat(balances.usd?.available_balance.value || "0");
     const holdings = parseFloat(balances.ada?.available_balance.value || "0");
 
-    // Decide trade using existing strategy
     const { trade, confidence } = await strategy.decideTrade({
       adaPrices: adaData.prices,
       adaVolumes: adaData.volumes,
@@ -54,7 +50,7 @@ export const runDailyTrade = onSchedule(CONFIG, async () => {
       btcVolumes: btcData.volumes,
       capital,
       holdings,
-      lastBuyPrice: undefined, // Persist this in Firestore if needed
+      lastBuyPrice: undefined,
       peakPrice: undefined,
       buyTimestamp: undefined,
       currentTimestamp: new Date().toISOString(),
@@ -62,28 +58,13 @@ export const runDailyTrade = onSchedule(CONFIG, async () => {
 
     if (trade) {
       sendSMS(JSON.stringify(trade));
-      // // Execute the trade on Coinbase
       // const tradeResult = await trader.executeTrade(trade);
-      // functions.logger.info("Trade executed:", {
-      //   trade,
-      //   confidence,
-      //   tradeResult,
-      // });
-      // // Optionally store trade in Firestore
-      // await admin
-      //   .firestore()
-      //   .collection("trades")
-      //   .add({
-      //     ...trade,
-      //     confidence,
-      //     executedAt: admin.firestore.FieldValue.serverTimestamp(),
-      //     coinbaseResult: tradeResult,
-      //   });
+      // res.status(200).json({ trade, confidence, tradeResult });
     } else {
-      logger.info("No trade recommended", { confidence });
+      res.status(200).json({ message: "No trade recommended", confidence });
     }
-  } catch (error) {
-    logger.error("Trading error:", error);
-    throw error;
+  } catch (error: any) {
+    logger.error("Trade execution failed:", error);
+    res.status(500).json({ error: error.message });
   }
 });

@@ -141,6 +141,17 @@ export enum Recommendation {
   Sell = "SELL",
 }
 
+export enum Granularity {
+  OneMinute = "ONE_MINUTE",
+  FiveMinute = "FIVE_MINUTE",
+  FifteenMinute = "FIFTEEN_MINUTE",
+  ThirtyMinute = "THIRTY_MINUTE",
+  OneHour = "ONE_HOUR",
+  TwoHour = "TWO_HOUR",
+  SixHour = "SIX_HOUR",
+  OneDay = "ONE_DAY",
+}
+
 export enum CryptoIds {
   Bitcoin = "bitcoin",
   Cardano = "cardano",
@@ -205,4 +216,69 @@ export enum StrategyType {
   MeanReversion = "mean_reversion",
   Breakout = "breakout",
   TrendFollowing = "trend_following",
+}
+
+export enum CoinbaseProductIds {
+  ADA = "ADA-USD",
+  BTC = "BTC-USD",
+}
+
+export enum CoinbaseCurrency {
+  ADA = "ADA",
+  USD = "USD",
+}
+
+export interface AdvTradeCandle {
+  start: string;
+  low: string;
+  high: string;
+  open: string;
+  close: string;
+  volume: string;
+}
+
+interface Balance {
+  value: string;
+  currency: string;
+}
+
+export interface AdvTradeAccount {
+  uuid: string;
+  name: string;
+  currency: string;
+  available_balance: Balance;
+  default: boolean;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string;
+  type: string;
+  ready: boolean;
+  hold: Balance;
+  retail_portfolio_id: string;
+  platform: string;
+}
+
+export interface AdvTradeAccountsList {
+  accounts: AdvTradeAccount[];
+  has_next: boolean;
+  cursor: string;
+  size: number;
+}
+
+export interface GetAdvTradeProductCandlesRequest {
+  product_id: string;
+  start: string;
+  end: string;
+  granularity:
+    | "UNKNOWN_GRANULARITY"
+    | "ONE_MINUTE"
+    | "FIVE_MINUTE"
+    | "FIFTEEN_MINUTE"
+    | "THIRTY_MINUTE"
+    | "ONE_HOUR"
+    | "TWO_HOUR"
+    | "SIX_HOUR"
+    | "ONE_DAY";
+  limit?: number;
 }

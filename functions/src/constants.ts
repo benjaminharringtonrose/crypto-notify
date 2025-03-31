@@ -54,3 +54,8 @@ export const MODEL_CONSTANTS = {
   MAX_ATR_THRESHOLD: 0.1,
   MIN_PROFIT_THRESHOLD: 0.005,
 };
+
+export const COINBASE_CONSTANTS = {
+  DEFAULT_PRODUCT_ID: "ADA-USD", // Default trading pair
+  SECONDS_PER_DAY: 86400, // For timestamp calculations
+} as const;

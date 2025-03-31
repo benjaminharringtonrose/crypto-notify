@@ -180,7 +180,12 @@ export class TradingStrategy {
     buyTimestamp: string | undefined;
     currentTimestamp: string;
     winStreak?: number;
-  }): Promise<{ trade: Trade | null; confidence: number }> {
+  }): Promise<{
+    trade: Trade | null;
+    confidence: number;
+    buyProb: number;
+    sellProb: number;
+  }> {
     const currentPrice = adaPrices[adaPrices.length - 1];
     const currentVolume = adaVolumes[adaVolumes.length - 1];
     const prediction = await this.predictor.predict(
@@ -220,14 +225,18 @@ export class TradingStrategy {
           new Date(buyTimestamp).getTime()) /
         (1000 * 60 * 60 * 24)
       : Infinity;
+
     const dynamicBreakoutThreshold =
       daysSinceLastTrade > 15 ? 0.7 : this.breakoutThreshold;
+
     const dynamicStopLossMultiplier =
       confidence > 0.7
         ? this.stopLossMultiplier * 0.8
         : this.stopLossMultiplier;
+
     const dynamicTrailingStop =
       momentum > 0.05 ? this.trailingStop * 0.8 : this.trailingStop * 1.2;
+
     const dynamicProfitTake = Math.min(
       this.profitTakeMultiplier * (momentum > 0.1 ? 1.2 : 1.0),
       4.0
@@ -235,7 +244,12 @@ export class TradingStrategy {
 
     if (atr > MODEL_CONSTANTS.MAX_ATR_THRESHOLD) {
       console.log(`Trade skipped: ATR ${atr.toFixed(4)} exceeds threshold`);
-      return { trade: null, confidence };
+      return {
+        trade: null,
+        confidence,
+        buyProb,
+        sellProb,
+      };
     }
 
     if (holdings > 0 && lastBuyPrice && buyTimestamp) {
@@ -243,9 +257,13 @@ export class TradingStrategy {
         (new Date(currentTimestamp).getTime() -
           new Date(buyTimestamp).getTime()) /
         (1000 * 60 * 60 * 24);
+
       const priceChange = (currentPrice - lastBuyPrice) / lastBuyPrice;
+
       const stopLossLevel = dynamicStopLossMultiplier * atr;
+
       const profitTakeLevel = lastBuyPrice + dynamicProfitTake * atr;
+
       const trailingStopLevel =
         priceChange >= MODEL_CONSTANTS.MIN_PROFIT_THRESHOLD
           ? (peakPrice || lastBuyPrice) * (1 - dynamicTrailingStop)
@@ -287,6 +305,8 @@ export class TradingStrategy {
               buyPrice: lastBuyPrice,
             },
             confidence,
+            buyProb,
+            sellProb,
           };
         }
       }
@@ -362,11 +382,18 @@ export class TradingStrategy {
             usdValue: tradeAmount,
           },
           confidence,
+          buyProb,
+          sellProb,
         };
       }
     }
 
-    return { trade: null, confidence };
+    return {
+      trade: null,
+      confidence,
+      buyProb,
+      sellProb,
+    };
   }
 
   private getBuyConditions(

@@ -46,7 +46,7 @@ export class TradingStrategy {
     sellProbThreshold = STRATEGY_CONFIG.SELL_PROB_THRESHOLD_DEFAULT,
     smaPeriod = PERIODS.SMA_MEDIUM,
     breakoutThreshold = STRATEGY_CONFIG.DYNAMIC_BREAKOUT_THRESHOLD,
-  }: TradingStrategyParams = {}) {
+  }: TradingStrategyParams) {
     this.predictor = new TradeModelPredictor();
     this.currentStrategy = StrategyType.Momentum;
     this.basePositionSize = basePositionSize;

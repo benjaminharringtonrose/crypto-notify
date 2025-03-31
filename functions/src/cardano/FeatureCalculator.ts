@@ -1,5 +1,5 @@
 import { Indicators } from "../types";
-import { MODEL_CONSTANTS, PERIODS, TIME_CONVERSIONS } from "../constants";
+import { MODEL_CONFIG, PERIODS, TIME_CONVERSIONS } from "../constants";
 
 interface ComputeParams {
   prices: number[];
@@ -594,9 +594,7 @@ export default class FeatureCalculator {
   }: ComputeParams): number[] {
     if (!prices || !volumes || dayIndex < 0 || dayIndex >= prices.length) {
       return Array(
-        isBTC
-          ? MODEL_CONSTANTS.BTC_FEATURE_COUNT
-          : MODEL_CONSTANTS.ADA_FEATURE_COUNT
+        isBTC ? MODEL_CONFIG.BTC_FEATURE_COUNT : MODEL_CONFIG.ADA_FEATURE_COUNT
       ).fill(0);
     }
 

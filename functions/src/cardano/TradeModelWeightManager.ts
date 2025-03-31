@@ -1,11 +1,7 @@
 import * as tf from "@tensorflow/tfjs-node";
 import { FirebaseService } from "../api/FirebaseService";
 import { Bucket } from "@google-cloud/storage";
-import {
-  MODEL_ARCHITECTURE_CONSTANTS,
-  MODEL_CONSTANTS,
-  TRADE_PREDICTOR_WEIGHTS,
-} from "../constants";
+import { MODEL_CONFIG, TRADE_PREDICTOR_WEIGHTS } from "../constants";
 
 export class ModelWeightManager {
   private weights: any;
@@ -45,7 +41,7 @@ export class ModelWeightManager {
       .setWeights([
         tf.tensor3d(
           this.weights.conv1Weights,
-          MODEL_ARCHITECTURE_CONSTANTS.CONV1D_1_WEIGHT_SHAPE
+          MODEL_CONFIG.CONV1D_1_WEIGHT_SHAPE
         ),
         tf.tensor1d(this.weights.conv1Bias),
       ]);
@@ -54,46 +50,37 @@ export class ModelWeightManager {
       .setWeights([
         tf.tensor3d(
           this.weights.conv2Weights,
-          MODEL_ARCHITECTURE_CONSTANTS.CONV1D_2_WEIGHT_SHAPE
+          MODEL_CONFIG.CONV1D_2_WEIGHT_SHAPE
         ),
         tf.tensor1d(this.weights.conv2Bias),
       ]);
     model
       .getLayer("lstm1")
       .setWeights([
-        tf.tensor2d(
-          this.weights.lstm1Weights,
-          MODEL_ARCHITECTURE_CONSTANTS.LSTM1_WEIGHT_SHAPE
-        ),
+        tf.tensor2d(this.weights.lstm1Weights, MODEL_CONFIG.LSTM1_WEIGHT_SHAPE),
         tf.tensor2d(
           this.weights.lstm1RecurrentWeights,
-          MODEL_ARCHITECTURE_CONSTANTS.LSTM1_RECURRENT_SHAPE
+          MODEL_CONFIG.LSTM1_RECURRENT_SHAPE
         ),
         tf.tensor1d(this.weights.lstm1Bias),
       ]);
     model
       .getLayer("lstm2")
       .setWeights([
-        tf.tensor2d(
-          this.weights.lstm2Weights,
-          MODEL_ARCHITECTURE_CONSTANTS.LSTM2_WEIGHT_SHAPE
-        ),
+        tf.tensor2d(this.weights.lstm2Weights, MODEL_CONFIG.LSTM2_WEIGHT_SHAPE),
         tf.tensor2d(
           this.weights.lstm2RecurrentWeights,
-          MODEL_ARCHITECTURE_CONSTANTS.LSTM2_RECURRENT_SHAPE
+          MODEL_CONFIG.LSTM2_RECURRENT_SHAPE
         ),
         tf.tensor1d(this.weights.lstm2Bias),
       ]);
     model
       .getLayer("lstm3")
       .setWeights([
-        tf.tensor2d(
-          this.weights.lstm3Weights,
-          MODEL_ARCHITECTURE_CONSTANTS.LSTM3_WEIGHT_SHAPE
-        ),
+        tf.tensor2d(this.weights.lstm3Weights, MODEL_CONFIG.LSTM3_WEIGHT_SHAPE),
         tf.tensor2d(
           this.weights.lstm3RecurrentWeights,
-          MODEL_ARCHITECTURE_CONSTANTS.LSTM3_RECURRENT_SHAPE
+          MODEL_CONFIG.LSTM3_RECURRENT_SHAPE
         ),
         tf.tensor1d(this.weights.lstm3Bias),
       ]);
@@ -102,7 +89,7 @@ export class ModelWeightManager {
       .setWeights([
         tf.tensor2d(
           this.weights.timeDistributedWeights,
-          MODEL_ARCHITECTURE_CONSTANTS.TIME_DISTRIBUTED_WEIGHT_SHAPE
+          MODEL_CONFIG.TIME_DISTRIBUTED_WEIGHT_SHAPE
         ),
         tf.tensor1d(this.weights.timeDistributedBias),
       ]);
@@ -119,7 +106,7 @@ export class ModelWeightManager {
       .setWeights([
         tf.tensor2d(
           this.weights.dense1Weights,
-          MODEL_ARCHITECTURE_CONSTANTS.DENSE_1_WEIGHT_SHAPE
+          MODEL_CONFIG.DENSE_1_WEIGHT_SHAPE
         ),
         tf.tensor1d(this.weights.dense1Bias),
       ]);
@@ -128,7 +115,7 @@ export class ModelWeightManager {
       .setWeights([
         tf.tensor2d(
           this.weights.dense2Weights,
-          MODEL_ARCHITECTURE_CONSTANTS.DENSE_2_WEIGHT_SHAPE
+          MODEL_CONFIG.DENSE_2_WEIGHT_SHAPE
         ),
         tf.tensor1d(this.weights.dense2Bias),
       ]);
@@ -136,13 +123,13 @@ export class ModelWeightManager {
 
   public getFeatureMeans(): number[] {
     return (
-      this.weights?.featureMeans || Array(MODEL_CONSTANTS.FEATURE_COUNT).fill(0)
+      this.weights?.featureMeans || Array(MODEL_CONFIG.FEATURE_COUNT).fill(0)
     );
   }
 
   public getFeatureStds(): number[] {
     return (
-      this.weights?.featureStds || Array(MODEL_CONSTANTS.FEATURE_COUNT).fill(1)
+      this.weights?.featureStds || Array(MODEL_CONFIG.FEATURE_COUNT).fill(1)
     );
   }
 }

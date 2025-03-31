@@ -8,9 +8,9 @@ import TradeModelFactory from "./TradeModelFactory";
 import { ModelConfig } from "../types";
 import { FirebaseService } from "../api/FirebaseService";
 import {
-  MODEL_CONSTANTS,
+  MODEL_CONFIG,
   TRADE_PREDICTOR_WEIGHTS,
-  TRAINING_CONSTANTS,
+  TRAINING_CONFIG,
 } from "../constants";
 import { DataProcessor } from "./DataProcessor";
 import { Metrics } from "./Metrics";
@@ -21,10 +21,10 @@ FirebaseService.getInstance();
 
 export class TradeModelTrainer {
   private readonly config: ModelConfig = {
-    timesteps: MODEL_CONSTANTS.TIMESTEPS,
-    epochs: TRAINING_CONSTANTS.EPOCHS,
-    batchSize: TRAINING_CONSTANTS.BATCH_SIZE,
-    initialLearningRate: TRAINING_CONSTANTS.INITIAL_LEARNING_RATE,
+    timesteps: MODEL_CONFIG.TIMESTEPS,
+    epochs: TRAINING_CONFIG.EPOCHS,
+    batchSize: TRAINING_CONFIG.BATCH_SIZE,
+    initialLearningRate: TRAINING_CONFIG.INITIAL_LEARNING_RATE,
   };
   private bucket = admin.storage().bucket();
   private model: tf.LayersModel | null = null;
@@ -34,8 +34,8 @@ export class TradeModelTrainer {
   constructor() {
     this.dataProcessor = new DataProcessor(
       this.config,
-      TRAINING_CONSTANTS.LOOKBACK_DAYS,
-      TRAINING_CONSTANTS.PREDICTION_DAYS
+      TRAINING_CONFIG.LOOKBACK_DAYS,
+      TRAINING_CONFIG.PREDICTION_DAYS
     );
     console.log("TradeModelTrainer initialized");
   }
@@ -55,11 +55,11 @@ export class TradeModelTrainer {
     const X_tensor = tf.tensor3d(X, [
       X.length,
       this.config.timesteps,
-      MODEL_CONSTANTS.FEATURE_COUNT,
+      MODEL_CONFIG.FEATURE_COUNT,
     ]);
     const y_tensor = tf.tensor2d(
       y.map((label) => [label === 0 ? 1 : 0, label === 1 ? 1 : 0]),
-      [y.length, TRAINING_CONSTANTS.OUTPUT_CLASSES]
+      [y.length, TRAINING_CONFIG.OUTPUT_CLASSES]
     );
     const X_mean = tf.tensor1d(
       this.dataProcessor.computeFeatureStats(X.flat(1)).mean
@@ -71,9 +71,7 @@ export class TradeModelTrainer {
 
     try {
       const totalSamples = X.length;
-      const trainSize = Math.floor(
-        totalSamples * TRAINING_CONSTANTS.TRAIN_SPLIT
-      );
+      const trainSize = Math.floor(totalSamples * TRAINING_CONFIG.TRAIN_SPLIT);
       const indices = Array.from({ length: totalSamples }, (_, i) => i);
       tf.util.shuffle(indices);
 
@@ -92,7 +90,7 @@ export class TradeModelTrainer {
         })
         .shuffle(trainSize)
         .batch(this.config.batchSize)
-        .prefetch(TRAINING_CONSTANTS.PREFETCH_BUFFER);
+        .prefetch(TRAINING_CONFIG.PREFETCH_BUFFER);
 
       const valDataset = tf.data
         .zip({
@@ -103,16 +101,16 @@ export class TradeModelTrainer {
 
       const factory = new TradeModelFactory(
         this.config.timesteps,
-        MODEL_CONSTANTS.FEATURE_COUNT
+        MODEL_CONFIG.FEATURE_COUNT
       );
       this.model = factory.createModel();
 
       const bestWeightsCallback = new BestWeightsCallback();
       const predictionLoggerCallback = new PredictionLoggerCallback(X_val);
       const cyclicLRCallback = new CyclicLearningRateCallback(
-        TRAINING_CONSTANTS.MIN_LEARNING_RATE,
+        TRAINING_CONFIG.MIN_LEARNING_RATE,
         this.config.initialLearningRate,
-        TRAINING_CONSTANTS.CYCLIC_LR_STEP_SIZE
+        TRAINING_CONFIG.CYCLIC_LR_STEP_SIZE
       );
 
       if (!this.model) throw new Error("Model initialization failed");
@@ -142,7 +140,7 @@ export class TradeModelTrainer {
         callbacks: [
           tf.callbacks.earlyStopping({
             monitor: "val_loss",
-            patience: TRAINING_CONSTANTS.PATIENCE,
+            patience: TRAINING_CONFIG.PATIENCE,
           }),
           bestWeightsCallback,
           predictionLoggerCallback,
@@ -161,7 +159,7 @@ export class TradeModelTrainer {
 
       console.log(
         "Memory after training:",
-        tf.memory().numBytes / TRAINING_CONSTANTS.BYTES_TO_MB,
+        tf.memory().numBytes / TRAINING_CONFIG.BYTES_TO_MB,
         "MB"
       );
 
@@ -268,7 +266,7 @@ export class TradeModelTrainer {
       await this.saveModelWeights(featureStats, X_mean, X_std);
       const endTime = performance.now();
       const executionTime =
-        (endTime - startTime) / TRAINING_CONSTANTS.MS_TO_SECONDS;
+        (endTime - startTime) / TRAINING_CONFIG.MS_TO_SECONDS;
       console.log(`Execution time: ${executionTime} seconds`);
     } catch (error) {
       console.error("Training failed:", error);

@@ -3,12 +3,12 @@ import { ModelWeightManager } from "./TradeModelWeightManager";
 import TradeModelFactory from "./TradeModelFactory";
 import { FeatureSequenceGenerator } from "./FeatureSequenceGenerator";
 import { FirebaseService } from "../api/FirebaseService";
-import { MODEL_CONSTANTS, PERIODS } from "../constants";
+import { MODEL_CONFIG, PERIODS } from "../constants";
 
 export class TradeModelPredictor {
   private weightManager: ModelWeightManager;
   private sequenceGenerator: FeatureSequenceGenerator;
-  private timesteps = MODEL_CONSTANTS.TIMESTEPS;
+  private timesteps = MODEL_CONFIG.TIMESTEPS;
   private model: tf.LayersModel;
   private isWeightsLoaded = false;
 
@@ -17,8 +17,8 @@ export class TradeModelPredictor {
     this.sequenceGenerator = new FeatureSequenceGenerator(this.timesteps);
     FirebaseService.getInstance();
     const factory = new TradeModelFactory(
-      MODEL_CONSTANTS.TIMESTEPS,
-      MODEL_CONSTANTS.FEATURE_COUNT
+      MODEL_CONFIG.TIMESTEPS,
+      MODEL_CONFIG.FEATURE_COUNT
     );
     this.model = factory.createModel();
     this.loadWeightsAsync();
@@ -76,19 +76,19 @@ export class TradeModelPredictor {
       .slice(-this.timesteps);
 
     if (
-      sequence.length !== MODEL_CONSTANTS.TIMESTEPS ||
-      sequence[0].length !== MODEL_CONSTANTS.FEATURE_COUNT
+      sequence.length !== MODEL_CONFIG.TIMESTEPS ||
+      sequence[0].length !== MODEL_CONFIG.FEATURE_COUNT
     ) {
       throw new Error(
-        `Sequence shape mismatch: expected [${MODEL_CONSTANTS.TIMESTEPS}, ${
-          MODEL_CONSTANTS.FEATURE_COUNT
+        `Sequence shape mismatch: expected [${MODEL_CONFIG.TIMESTEPS}, ${
+          MODEL_CONFIG.FEATURE_COUNT
         }], got [${sequence.length}, ${sequence[0]?.length || 0}]`
       );
     }
 
     const features = tf.tensor3d(
       [sequence],
-      [1, MODEL_CONSTANTS.TIMESTEPS, MODEL_CONSTANTS.FEATURE_COUNT]
+      [1, MODEL_CONFIG.TIMESTEPS, MODEL_CONFIG.FEATURE_COUNT]
     );
     const means = tf.tensor1d(this.weightManager.getFeatureMeans());
     const stds = tf.tensor1d(this.weightManager.getFeatureStds());
@@ -104,7 +104,7 @@ export class TradeModelPredictor {
 
     const atr = sequence[sequence.length - 1][11];
     const momentumWindowSize =
-      atr > MODEL_CONSTANTS.MOMENTUM_WINDOW_THRESHOLD ? 5 : 14;
+      atr > MODEL_CONFIG.MOMENTUM_WINDOW_THRESHOLD ? 5 : 14;
     const momentumWindow = adaPrices.slice(-momentumWindowSize);
     const momentum =
       momentumWindow.length >= 2

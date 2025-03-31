@@ -3,7 +3,7 @@ import { BacktestResult, Trade, Recommendation, StrategyType } from "../types";
 import { FirebaseService } from "../api/FirebaseService";
 import { CryptoCompareService } from "../api/CryptoCompareService";
 import { TradingStrategy } from "./TradingStrategy";
-import { MODEL_CONSTANTS, TIME_CONVERSIONS } from "../constants";
+import { MODEL_CONFIG, TIME_CONVERSIONS } from "../constants";
 
 FirebaseService.getInstance();
 const cryptoCompare = new CryptoCompareService();
@@ -14,16 +14,16 @@ export class TradeModelBacktester {
 
   constructor(
     initialCapital: number = 10000,
-    basePositionSize: number = MODEL_CONSTANTS.BASE_POSITION_SIZE_DEFAULT,
-    slippage: number = MODEL_CONSTANTS.SLIPPAGE,
-    commission: number = MODEL_CONSTANTS.COMMISSION,
-    stopLossMultiplier: number = MODEL_CONSTANTS.STOP_LOSS_MULTIPLIER_DEFAULT,
-    trailingStop: number = MODEL_CONSTANTS.TRAILING_STOP_DEFAULT,
-    minHoldDays: number = MODEL_CONSTANTS.MIN_HOLD_DAYS_DEFAULT,
-    minConfidence: number = MODEL_CONSTANTS.MIN_CONFIDENCE_DEFAULT,
-    profitTakeMultiplier: number = MODEL_CONSTANTS.PROFIT_TAKE_MULTIPLIER_DEFAULT,
-    buyProbThreshold: number = MODEL_CONSTANTS.BUY_PROB_THRESHOLD_DEFAULT,
-    sellProbThreshold: number = MODEL_CONSTANTS.SELL_PROB_THRESHOLD_DEFAULT
+    basePositionSize: number = MODEL_CONFIG.BASE_POSITION_SIZE_DEFAULT,
+    slippage: number = MODEL_CONFIG.SLIPPAGE,
+    commission: number = MODEL_CONFIG.COMMISSION,
+    stopLossMultiplier: number = MODEL_CONFIG.STOP_LOSS_MULTIPLIER_DEFAULT,
+    trailingStop: number = MODEL_CONFIG.TRAILING_STOP_DEFAULT,
+    minHoldDays: number = MODEL_CONFIG.MIN_HOLD_DAYS_DEFAULT,
+    minConfidence: number = MODEL_CONFIG.MIN_CONFIDENCE_DEFAULT,
+    profitTakeMultiplier: number = MODEL_CONFIG.PROFIT_TAKE_MULTIPLIER_DEFAULT,
+    buyProbThreshold: number = MODEL_CONFIG.BUY_PROB_THRESHOLD_DEFAULT,
+    sellProbThreshold: number = MODEL_CONFIG.SELL_PROB_THRESHOLD_DEFAULT
   ) {
     this.strategy = new TradingStrategy({
       basePositionSize,
@@ -83,7 +83,7 @@ export class TradeModelBacktester {
       `Backtest period: ${startDate.toISOString()} to ${endDate.toISOString()}`
     );
 
-    for (let i = MODEL_CONSTANTS.TIMESTEPS; i < adaData.prices.length; i++) {
+    for (let i = MODEL_CONFIG.TIMESTEPS; i < adaData.prices.length; i++) {
       const currentTimestamp = new Date(
         startDate.getTime() + i * TIME_CONVERSIONS.ONE_DAY_IN_MILLISECONDS
       ).toISOString();
@@ -179,7 +179,7 @@ export class TradeModelBacktester {
         peakPrice = Math.max(peakPrice || lastBuyPrice!, currentPrice);
       }
 
-      if (i > MODEL_CONSTANTS.TIMESTEPS) {
+      if (i > MODEL_CONFIG.TIMESTEPS) {
         const prevValue = portfolioHistory[portfolioHistory.length - 2].value;
         returns.push((portfolioValue - prevValue) / prevValue);
         if (i % TIME_CONVERSIONS.ONE_MONTH_IN_DAYS === 0) {
@@ -260,7 +260,7 @@ export class TradeModelBacktester {
         Object.entries(strategyCount).map(([k, v]) => [
           k,
           `${(
-            (v / (adaData.prices.length - MODEL_CONSTANTS.TIMESTEPS)) *
+            (v / (adaData.prices.length - MODEL_CONFIG.TIMESTEPS)) *
             100
           ).toFixed(2)}%`,
         ])

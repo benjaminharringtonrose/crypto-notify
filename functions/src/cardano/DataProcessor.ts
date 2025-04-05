@@ -176,7 +176,7 @@ export class DataProcessor {
     stds.forEach((sum, i) => (stds[i] = Math.sqrt(sum / features.length) || 1));
     console.log(`Feature means: ${means.slice(0, 5)}...`);
     console.log(`Feature stds: ${stds.slice(0, 5)}...`);
-    return { mean: means, std: means };
+    return { mean: means, std: stds };
   }
 
   public async prepareData(): Promise<{

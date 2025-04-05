@@ -57,12 +57,9 @@ export class TradeModelTrainer {
       y.map((label) => [label === 0 ? 1 : 0, label === 1 ? 1 : 0]),
       [y.length, TRAINING_CONFIG.OUTPUT_CLASSES]
     );
-    const X_mean = tf.tensor1d(
-      this.dataProcessor.computeFeatureStats(X.flat(1)).mean
-    );
-    const X_std = tf.tensor1d(
-      this.dataProcessor.computeFeatureStats(X.flat(1)).std
-    );
+    const featureStats = this.dataProcessor.computeFeatureStats(X.flat(1));
+    const X_mean = tf.tensor1d(featureStats.mean);
+    const X_std = tf.tensor1d(featureStats.std);
     const X_normalized = X_tensor.sub(X_mean).div(X_std);
 
     try {
@@ -84,7 +81,6 @@ export class TradeModelTrainer {
           xs: tf.data.array(X_train.arraySync() as number[][][]),
           ys: tf.data.array(y_train.arraySync() as number[][]),
         })
-        .shuffle(trainSize)
         .batch(this.config.batchSize)
         .prefetch(TRAINING_CONFIG.PREFETCH_BUFFER);
 

@@ -64,17 +64,57 @@ export class TradeModelTrainer {
 
     try {
       const totalSamples = X.length;
-      const trainSize = Math.floor(totalSamples * TRAINING_CONFIG.TRAIN_SPLIT);
-      const indices = Array.from({ length: totalSamples }, (_, i) => i);
-      tf.util.shuffle(indices);
+      const numChunks = Math.ceil(
+        totalSamples / TRAINING_CONFIG.SHUFFLE_CHUNK_SIZE
+      );
 
-      const trainIndices = indices.slice(0, trainSize);
-      const valIndices = indices.slice(trainSize);
+      // Create chunked indices
+      const chunkedIndices: number[][] = [];
+      for (let i = 0; i < numChunks; i++) {
+        const start = i * TRAINING_CONFIG.SHUFFLE_CHUNK_SIZE;
+        const end = Math.min(
+          (i + 1) * TRAINING_CONFIG.SHUFFLE_CHUNK_SIZE,
+          totalSamples
+        );
+        chunkedIndices.push(
+          Array.from({ length: end - start }, (_, j) => start + j)
+        );
+      }
+
+      // Shuffle the chunks
+      const shuffledChunks = [...chunkedIndices];
+      tf.util.shuffle(shuffledChunks);
+
+      // Flatten back to a single index array
+      const shuffledIndices = shuffledChunks.flat();
+
+      // Split into train and val
+      const trainSize = Math.floor(totalSamples * TRAINING_CONFIG.TRAIN_SPLIT);
+      const trainIndices = shuffledIndices.slice(0, trainSize);
+      const valIndices = shuffledIndices.slice(trainSize);
 
       const X_train = tf.gather(X_normalized, trainIndices);
       const y_train = tf.gather(y_tensor, trainIndices);
       const X_val = tf.gather(X_normalized, valIndices);
       const y_val = tf.gather(y_tensor, valIndices);
+
+      // Log class distribution for diagnostics
+      const y_train_array = await y_train.argMax(-1).data();
+      const trainBuyCount = Array.from(y_train_array).filter(
+        (l) => l === 1
+      ).length;
+      console.log(
+        `Training set - Buy: ${trainBuyCount}, Sell: ${
+          trainSize - trainBuyCount
+        }, Buy Ratio: ${(trainBuyCount / trainSize).toFixed(3)}`
+      );
+      const y_val_array = await y_val.argMax(-1).data();
+      const valBuyCount = Array.from(y_val_array).filter((l) => l === 1).length;
+      console.log(
+        `Validation set - Buy: ${valBuyCount}, Sell: ${
+          totalSamples - trainSize - valBuyCount
+        }, Buy Ratio: ${(valBuyCount / (totalSamples - trainSize)).toFixed(3)}`
+      );
 
       const trainDataset = tf.data
         .zip({

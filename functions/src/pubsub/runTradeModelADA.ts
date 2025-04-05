@@ -125,7 +125,7 @@ export const runTradeModelADA = onSchedule(CONFIG, async () => {
           });
           return;
         default:
-          console.log("Recommendation unexpected");
+          console.log("Recommendation unexpected:", trade?.type);
       }
     }
 
@@ -150,7 +150,7 @@ export const runTradeModelADA = onSchedule(CONFIG, async () => {
         case Recommendation.Hold:
           return;
         default:
-          console.log("Recommendation unexpected");
+          console.log("Recommendation unexpected:", trade?.type);
       }
     }
 
@@ -179,7 +179,7 @@ export const runTradeModelADA = onSchedule(CONFIG, async () => {
         case Recommendation.Hold:
           return;
         default:
-          console.log("Recommendation unexpected");
+          console.log("Recommendation unexpected:", trade?.type);
       }
     }
   } catch (error) {

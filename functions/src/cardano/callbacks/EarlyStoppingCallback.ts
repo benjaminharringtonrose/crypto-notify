@@ -2,13 +2,21 @@ import * as tf from "@tensorflow/tfjs-node";
 import { TRAINING_CONFIG } from "../../constants";
 
 interface EarlyStoppingOptions {
-  monitor?: "val_loss" | "val_customF1";
+  monitor?:
+    | "val_loss"
+    | "val_customF1"
+    | "val_customF1Buy"
+    | "val_customF1Sell";
   patience?: number;
   restoreBestWeights?: boolean;
 }
 
 export class EarlyStoppingCallback extends tf.CustomCallback {
-  private monitor: "val_loss" | "val_customF1";
+  private monitor:
+    | "val_loss"
+    | "val_customF1"
+    | "val_customF1Buy"
+    | "val_customF1Sell";
   private patience: number;
   private bestWeights: tf.Tensor[];
   private bestValue: number;
@@ -19,7 +27,7 @@ export class EarlyStoppingCallback extends tf.CustomCallback {
 
   constructor(options: EarlyStoppingOptions = {}) {
     super({});
-    this.monitor = options.monitor || "val_customF1"; // Changed to F1
+    this.monitor = options.monitor || "val_customF1Buy"; // Default to buy F1
     this.patience = options.patience || TRAINING_CONFIG.PATIENCE;
     this.restoreBestWeights = options.restoreBestWeights ?? true;
     this.bestWeights = [];
@@ -36,8 +44,40 @@ export class EarlyStoppingCallback extends tf.CustomCallback {
     if (!this.model) throw new Error("Model not set in EarlyStoppingCallback");
     if (!logs) return;
 
-    const currentValue = logs[this.monitor];
-    if (currentValue === undefined) return;
+    let currentValue: number | undefined;
+    switch (this.monitor) {
+      case "val_loss":
+        currentValue = logs["val_loss"];
+        break;
+      case "val_customF1":
+        if (
+          logs["val_customF1Buy"] !== undefined &&
+          logs["val_customF1Sell"] !== undefined
+        ) {
+          currentValue =
+            (logs["val_customF1Buy"] + logs["val_customF1Sell"]) / 2;
+        } else {
+          console.warn(
+            "val_customF1 requires both val_customF1Buy and val_customF1Sell, but they are not found"
+          );
+        }
+        break;
+      case "val_customF1Buy":
+        currentValue = logs["val_customF1Buy"];
+        break;
+      case "val_customF1Sell":
+        currentValue = logs["val_customF1Sell"];
+        break;
+    }
+
+    if (currentValue === undefined) {
+      console.warn(
+        `Metric ${
+          this.monitor
+        } not found in logs. Available keys: ${Object.keys(logs).join(", ")}`
+      );
+      return;
+    }
 
     const isBetter =
       this.monitor === "val_loss"
@@ -51,7 +91,9 @@ export class EarlyStoppingCallback extends tf.CustomCallback {
         this.bestWeights = this.model.getWeights().map((w) => w.clone());
       }
       console.log(
-        `New best ${this.monitor}: ${this.bestValue} at epoch ${epoch + 1}`
+        `New best ${this.monitor}: ${this.bestValue.toFixed(4)} at epoch ${
+          epoch + 1
+        }`
       );
     } else {
       this.wait += 1;
@@ -70,7 +112,9 @@ export class EarlyStoppingCallback extends tf.CustomCallback {
       console.log(
         `Training stopped at epoch ${
           this.stoppedEpoch + 1
-        }. Restored weights from best ${this.monitor}: ${this.bestValue}`
+        }. Restored weights from best ${this.monitor}: ${this.bestValue.toFixed(
+          4
+        )}`
       );
       this.model.setWeights(this.bestWeights);
       this.bestWeights.forEach((w) => w.dispose());

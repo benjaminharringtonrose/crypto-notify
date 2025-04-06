@@ -19,25 +19,100 @@ export class Metrics {
     return loss;
   }
 
-  static customPrecision(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
-    const truePos = yTrue.mul(yPred.round()).sum();
-    const predPos = yPred.round().sum();
-    return truePos.div(predPos.add(tf.scalar(1e-6))) as tf.Scalar;
+  // Named metric functions
+  static precisionBuy(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
+    const predLabels = yPred.argMax(-1);
+    const trueLabels = yTrue.argMax(-1);
+    const buyMask = predLabels.equal(1).cast("float32");
+    const truePosBuy = tf
+      .logicalAnd(trueLabels.equal(1), predLabels.equal(1))
+      .cast("float32")
+      .sum();
+    const predBuy = buyMask.sum();
+    return truePosBuy.div(predBuy.add(tf.scalar(1e-6))) as tf.Scalar;
   }
 
-  static customRecall(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
-    const truePos = yTrue.mul(yPred.round()).sum();
-    const actualPos = yTrue.sum();
-    return truePos.div(actualPos.add(tf.scalar(1e-6))) as tf.Scalar;
+  static precisionSell(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
+    const predLabels = yPred.argMax(-1);
+    const trueLabels = yTrue.argMax(-1);
+    const sellMask = predLabels.equal(0).cast("float32");
+    const truePosSell = tf
+      .logicalAnd(trueLabels.equal(0), predLabels.equal(0))
+      .cast("float32")
+      .sum();
+    const predSell = sellMask.sum();
+    return truePosSell.div(predSell.add(tf.scalar(1e-6))) as tf.Scalar;
   }
 
-  static customF1(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
-    const precision = Metrics.customPrecision(yTrue, yPred);
-    const recall = Metrics.customRecall(yTrue, yPred);
+  static recallBuy(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
+    const predLabels = yPred.argMax(-1);
+    const trueLabels = yTrue.argMax(-1);
+    const truePosBuy = tf
+      .logicalAnd(trueLabels.equal(1), predLabels.equal(1))
+      .cast("float32")
+      .sum();
+    const actualBuy = trueLabels.equal(1).cast("float32").sum();
+    return truePosBuy.div(actualBuy.add(tf.scalar(1e-6))) as tf.Scalar;
+  }
+
+  static recallSell(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
+    const predLabels = yPred.argMax(-1);
+    const trueLabels = yTrue.argMax(-1);
+    const truePosSell = tf
+      .logicalAnd(trueLabels.equal(0), predLabels.equal(0))
+      .cast("float32")
+      .sum();
+    const actualSell = trueLabels.equal(0).cast("float32").sum();
+    return truePosSell.div(actualSell.add(tf.scalar(1e-6))) as tf.Scalar;
+  }
+
+  static customF1Buy(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
+    const precision = Metrics.precisionBuy(yTrue, yPred);
+    const recall = Metrics.recallBuy(yTrue, yPred);
     return tf
       .scalar(2)
       .mul(precision.mul(recall))
       .div(precision.add(recall).add(1e-6)) as tf.Scalar;
+  }
+
+  static customF1Sell(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
+    const precision = Metrics.precisionSell(yTrue, yPred);
+    const recall = Metrics.recallSell(yTrue, yPred);
+    return tf
+      .scalar(2)
+      .mul(precision.mul(recall))
+      .div(precision.add(recall).add(1e-6)) as tf.Scalar;
+  }
+
+  // Legacy methods (kept for compatibility with PredictionLoggerCallback and evaluateModel)
+  static customPrecision(
+    yTrue: tf.Tensor,
+    yPred: tf.Tensor
+  ): { buy: tf.Scalar; sell: tf.Scalar } {
+    return {
+      buy: Metrics.precisionBuy(yTrue, yPred),
+      sell: Metrics.precisionSell(yTrue, yPred),
+    };
+  }
+
+  static customRecall(
+    yTrue: tf.Tensor,
+    yPred: tf.Tensor
+  ): { buy: tf.Scalar; sell: tf.Scalar } {
+    return {
+      buy: Metrics.recallBuy(yTrue, yPred),
+      sell: Metrics.recallSell(yTrue, yPred),
+    };
+  }
+
+  static customF1(
+    yTrue: tf.Tensor,
+    yPred: tf.Tensor
+  ): { buy: tf.Scalar; sell: tf.Scalar } {
+    return {
+      buy: Metrics.customF1Buy(yTrue, yPred),
+      sell: Metrics.customF1Sell(yTrue, yPred),
+    };
   }
 
   static calculateMetrics(
@@ -107,8 +182,8 @@ export class Metrics {
     let bestThreshold = 0.5;
     let bestRoi = -Infinity;
     let bestF1 = 0;
-    const X3D = X as tf.Tensor3D; // Assert X as 3D tensor
-    const lastTimestep = X3D.shape[1] - 1; // Safe access with type assertion
+    const X3D = X as tf.Tensor3D;
+    const lastTimestep = X3D.shape[1] - 1;
     const prices = (await X3D.slice(
       [0, lastTimestep, 8],
       [X3D.shape[0], 1, 1]

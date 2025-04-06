@@ -27,6 +27,7 @@ export class GradientClippingCallback extends tf.CustomCallback {
 
   async onEpochEnd(epoch: number, logs?: tf.Logs) {
     if (!this.model || !logs) return;
+    if (epoch % 5 !== 0) return; // Log every 5 epochs to match PredictionLoggerCallback
 
     const trainableWeights = this.model.trainableWeights;
     if (trainableWeights.length === 0) return;

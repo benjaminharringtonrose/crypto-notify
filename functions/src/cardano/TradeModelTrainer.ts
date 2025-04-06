@@ -127,14 +127,14 @@ export class TradeModelTrainer {
       this.model = factory.createModel();
 
       const earlyStoppingCallback = new EarlyStoppingCallback({
-        monitor: "val_loss",
+        monitor: "val_customF1Buy", // Matches named metric
         patience: TRAINING_CONFIG.PATIENCE,
         restoreBestWeights: true,
       });
       const predictionLoggerCallback = new PredictionLoggerCallback(
         X_val,
         y_val
-      ); // Pass X_val and y_val
+      );
       const lrCallback = new ExponentialDecayLRCallback();
       const gradientClippingCallback = new GradientClippingCallback(
         this.lossFn,
@@ -148,10 +148,13 @@ export class TradeModelTrainer {
         optimizer: tf.train.adam(this.config.initialLearningRate),
         loss: this.lossFn,
         metrics: [
-          tf.metrics.binaryAccuracy,
-          Metrics.customPrecision,
-          Metrics.customRecall,
-          Metrics.customF1,
+          "binaryAccuracy",
+          Metrics.precisionBuy,
+          Metrics.precisionSell,
+          Metrics.recallBuy,
+          Metrics.recallSell,
+          Metrics.customF1Buy,
+          Metrics.customF1Sell,
         ],
       });
 

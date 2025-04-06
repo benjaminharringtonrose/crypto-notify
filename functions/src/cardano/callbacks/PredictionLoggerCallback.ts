@@ -16,8 +16,7 @@ export class PredictionLoggerCallback extends tf.CustomCallback {
   async onEpochEnd(epoch: number, logs?: tf.Logs) {
     if (!this.model)
       throw new Error("Model not set in PredictionLoggerCallback");
-    if (epoch % 5 !== 0) return;
-
+    // Log every epoch instead of every 5
     const predsAllVal = this.model.predict(
       this.validationFeatures
     ) as tf.Tensor;
@@ -29,6 +28,7 @@ export class PredictionLoggerCallback extends tf.CustomCallback {
       (p) => p === 1
     ).length;
     const totalValSamples = predLabelsAllVal.length;
+    const buyRatio = buyCountAllVal / totalValSamples;
     const metrics = Metrics.calculateMetrics(
       Array.from(predLabelsAllVal),
       yVal
@@ -56,7 +56,7 @@ export class PredictionLoggerCallback extends tf.CustomCallback {
         epoch + 1
       } Validation Buy Count: ${buyCountAllVal}, Sell Count: ${
         totalValSamples - buyCountAllVal
-      }, Buy Ratio: ${(buyCountAllVal / totalValSamples).toFixed(3)}`
+      }, Buy Ratio: ${buyRatio.toFixed(3)}`
     );
     console.log(
       `Epoch ${epoch + 1} Val Precision Buy: ${metrics.precisionBuy.toFixed(

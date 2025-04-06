@@ -14,8 +14,8 @@ export interface CoinGeckoMarketChartResponse {
 }
 
 export interface Indicators {
-  rsi?: number;
-  prevRsi?: number;
+  rsi: number;
+  prevRsi: number;
   sma7: number;
   sma21: number;
   prevSma7: number;
@@ -24,59 +24,32 @@ export interface Indicators {
   signalLine: number;
   currentPrice: number;
   upperBand: number;
+  lowerBand: number;
   obvValues: number[];
+  obv: number;
   atr: number;
   atrBaseline: number;
   zScore: number;
   vwap: number;
   stochRsi: number;
+  stochRsiSignal: number;
   prevStochRsi: number;
   fib61_8: number;
-  prices: number[];
   volumeOscillator: number;
   prevVolumeOscillator: number;
   isDoubleTop: boolean;
   isHeadAndShoulders: boolean;
   prevMacdLine: number;
   isTripleTop: boolean;
+  isTripleBottom: boolean;
   isVolumeSpike: boolean;
   momentum: number;
-  priceChangePct?: number;
-  isTripleBottom: boolean;
-  volAdjustedMomentum: number;
+  priceChangePct: number;
   sma20: number;
-  lowerBand: number;
-  obv: number;
-  stochRsiSignal: number;
+  prices: number[];
+  volAdjustedMomentum: number;
+  trendRegime: number;
   adxProxy: number;
-  btcRsi?: number;
-  btcPrevRsi?: number;
-  btcSma7?: number;
-  btcSma21?: number;
-  btcPrevSma7?: number;
-  btcPrevSma21?: number;
-  btcMacdLine?: number;
-  btcSignalLine?: number;
-  btcUpperBand?: number;
-  btcObvValues?: number[];
-  btcAtr?: number;
-  btcAtrBaseline?: number;
-  btcZScore?: number;
-  btcVwap?: number;
-  btcStochRsi?: number;
-  btcPrevStochRsi?: number;
-  btcFib61_8?: number;
-  btcPrices?: number[];
-  btcVolumeOscillator?: number;
-  btcPrevVolumeOscillator?: number;
-  btcIsDoubleTop?: boolean;
-  btcIsHeadAndShoulders?: boolean;
-  btcPrevMacdLine?: number;
-  btcIsTripleTop?: boolean;
-  btcIsVolumeSpike?: boolean;
-  btcMomentum?: number;
-  btcPriceChangePct?: number;
-  btcVolAdjustedMomentum?: number;
 }
 
 export interface StrategyResult {

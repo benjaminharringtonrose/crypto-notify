@@ -84,7 +84,6 @@ export default class TradeModelFactory {
       })
     );
     model.add(tf.layers.flatten());
-
     model.add(tf.layers.batchNormalization({ name: "batchNormalization" }));
 
     model.add(

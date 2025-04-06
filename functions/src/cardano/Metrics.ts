@@ -1,5 +1,5 @@
 import * as tf from "@tensorflow/tfjs-node";
-import { TRAINING_CONFIG } from "../constants";
+import { TRAINING_CONFIG, STRATEGY_CONFIG } from "../constants";
 
 export class Metrics {
   static focalLoss(
@@ -104,18 +104,31 @@ export class Metrics {
     const predArray = (await preds.array()) as number[][];
     const yArray = Array.from(await y.argMax(-1).data());
 
-    let bestThreshold = 0.3;
+    let bestThreshold = 0.5;
+    let bestRoi = -Infinity;
     let bestF1 = 0;
-    for (let t = 0.2; t <= 0.5; t += 0.05) {
+    const X3D = X as tf.Tensor3D; // Assert X as 3D tensor
+    const lastTimestep = X3D.shape[1] - 1; // Safe access with type assertion
+    const prices = (await X3D.slice(
+      [0, lastTimestep, 8],
+      [X3D.shape[0], 1, 1]
+    ).data()) as Float32Array;
+    for (let t = 0.1; t <= 0.9; t += 0.05) {
       const predictedLabels = predArray.map((p) => (p[1] > t ? 1 : 0));
       const metrics = Metrics.calculateMetrics(predictedLabels, yArray);
       const avgF1 = (metrics.f1Buy + metrics.f1Sell) / 2;
-      if (avgF1 > bestF1) {
-        bestF1 = avgF1;
+      const roi = Metrics.calculateROI(predictedLabels, prices, yArray);
+      if (roi > bestRoi) {
+        bestRoi = roi;
         bestThreshold = t;
+        bestF1 = avgF1;
       }
     }
-    console.log(`Optimal threshold: ${bestThreshold}`);
+    console.log(
+      `Optimal threshold: ${bestThreshold}, Best ROI: ${bestRoi.toFixed(
+        4
+      )}, Best Avg F1: ${bestF1.toFixed(4)}`
+    );
     const predictedLabels = predArray.map((p) =>
       p[1] > bestThreshold ? 1 : 0
     );
@@ -150,5 +163,45 @@ export class Metrics {
     console.log("Confusion Matrix:", await confusionMatrix.array());
 
     preds.dispose();
+  }
+
+  static calculateROI(
+    predictedLabels: number[],
+    prices: Float32Array,
+    yArray: number[]
+  ): number {
+    let capital = 1000;
+    let position = 0;
+    let returns = 0;
+    for (let i = 0; i < predictedLabels.length; i++) {
+      const price = prices[i];
+      if (predictedLabels[i] === 1 && position === 0) {
+        position = (capital * (1 - STRATEGY_CONFIG.COMMISSION)) / price;
+        capital = 0;
+      } else if (predictedLabels[i] === 0 && position > 0) {
+        capital = position * price * (1 - STRATEGY_CONFIG.COMMISSION);
+        position = 0;
+        returns += (capital - 1000) / 1000;
+      }
+      if (position > 0 && i > 0) {
+        const stopLoss =
+          prices[i - 1] *
+          (1 - STRATEGY_CONFIG.STOP_LOSS_MULTIPLIER_DEFAULT * 0.01);
+        const takeProfit =
+          prices[i - 1] *
+          (1 + STRATEGY_CONFIG.PROFIT_TAKE_MULTIPLIER_DEFAULT * 0.01);
+        if (price < stopLoss || price > takeProfit) {
+          capital = position * price * (1 - STRATEGY_CONFIG.COMMISSION);
+          position = 0;
+          returns += (capital - 1000) / 1000;
+        }
+      }
+    }
+    if (position > 0) {
+      capital =
+        position * prices[prices.length - 1] * (1 - STRATEGY_CONFIG.COMMISSION);
+      returns += (capital - 1000) / 1000;
+    }
+    return returns * 100;
   }
 }

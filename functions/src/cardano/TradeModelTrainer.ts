@@ -1,18 +1,18 @@
 import * as admin from "firebase-admin";
 import * as tf from "@tensorflow/tfjs-node";
 import dotenv from "dotenv";
-import { BestWeightsCallback } from "./callbacks/BestWeightsCallback";
+import { EarlyStoppingCallback } from "./callbacks/EarlyStoppingCallback";
 import { PredictionLoggerCallback } from "./callbacks/PredictionLoggerCallback";
-import { CyclicLearningRateCallback } from "./callbacks/CyclicLearningRateCallback";
-import TradeModelFactory from "./TradeModelFactory";
+import { ExponentialDecayLRCallback } from "./callbacks/ExponentialDecayLRCallback";
+import { GradientClippingCallback } from "./callbacks/GradientClippingCallback";
 import { ModelConfig } from "../types";
+import TradeModelFactory from "./TradeModelFactory";
 import { FirebaseService } from "../api/FirebaseService";
 import { FILE_NAMES, MODEL_CONFIG, TRAINING_CONFIG } from "../constants";
 import { DataProcessor } from "./DataProcessor";
 import { Metrics } from "./Metrics";
 
 dotenv.config();
-
 FirebaseService.getInstance();
 
 export class TradeModelTrainer {
@@ -30,8 +30,7 @@ export class TradeModelTrainer {
   constructor() {
     this.dataProcessor = new DataProcessor(
       this.config,
-      TRAINING_CONFIG.LOOKBACK_DAYS,
-      TRAINING_CONFIG.PREDICTION_DAYS
+      TRAINING_CONFIG.START_DAYS_AGO
     );
     console.log("TradeModelTrainer initialized");
   }
@@ -67,8 +66,6 @@ export class TradeModelTrainer {
       const numChunks = Math.ceil(
         totalSamples / TRAINING_CONFIG.SHUFFLE_CHUNK_SIZE
       );
-
-      // Create chunked indices
       const chunkedIndices: number[][] = [];
       for (let i = 0; i < numChunks; i++) {
         const start = i * TRAINING_CONFIG.SHUFFLE_CHUNK_SIZE;
@@ -80,15 +77,9 @@ export class TradeModelTrainer {
           Array.from({ length: end - start }, (_, j) => start + j)
         );
       }
-
-      // Shuffle the chunks
       const shuffledChunks = [...chunkedIndices];
       tf.util.shuffle(shuffledChunks);
-
-      // Flatten back to a single index array
       const shuffledIndices = shuffledChunks.flat();
-
-      // Split into train and val
       const trainSize = Math.floor(totalSamples * TRAINING_CONFIG.TRAIN_SPLIT);
       const trainIndices = shuffledIndices.slice(0, trainSize);
       const valIndices = shuffledIndices.slice(trainSize);
@@ -98,7 +89,6 @@ export class TradeModelTrainer {
       const X_val = tf.gather(X_normalized, valIndices);
       const y_val = tf.gather(y_tensor, valIndices);
 
-      // Log class distribution for diagnostics
       const y_train_array = await y_train.argMax(-1).data();
       const trainBuyCount = Array.from(y_train_array).filter(
         (l) => l === 1
@@ -123,7 +113,6 @@ export class TradeModelTrainer {
         })
         .batch(this.config.batchSize)
         .prefetch(TRAINING_CONFIG.PREFETCH_BUFFER);
-
       const valDataset = tf.data
         .zip({
           xs: tf.data.array(X_val.arraySync() as number[][][]),
@@ -137,12 +126,20 @@ export class TradeModelTrainer {
       );
       this.model = factory.createModel();
 
-      const bestWeightsCallback = new BestWeightsCallback();
-      const predictionLoggerCallback = new PredictionLoggerCallback(X_val);
-      const cyclicLRCallback = new CyclicLearningRateCallback(
-        TRAINING_CONFIG.MIN_LEARNING_RATE,
-        this.config.initialLearningRate,
-        TRAINING_CONFIG.CYCLIC_LR_STEP_SIZE
+      const earlyStoppingCallback = new EarlyStoppingCallback({
+        monitor: "val_loss",
+        patience: TRAINING_CONFIG.PATIENCE,
+        restoreBestWeights: true,
+      });
+      const predictionLoggerCallback = new PredictionLoggerCallback(
+        X_val,
+        y_val
+      ); // Pass X_val and y_val
+      const lrCallback = new ExponentialDecayLRCallback();
+      const gradientClippingCallback = new GradientClippingCallback(
+        this.lossFn,
+        X_val,
+        y_val
       );
 
       if (!this.model) throw new Error("Model initialization failed");
@@ -158,9 +155,9 @@ export class TradeModelTrainer {
         ],
       });
 
-      bestWeightsCallback.setModel(this.model);
       predictionLoggerCallback.setModel(this.model);
-      cyclicLRCallback.setModel(this.model);
+      lrCallback.setModel(this.model);
+      gradientClippingCallback.setModel(this.model);
 
       console.log("Model summary:");
       this.model.summary();
@@ -170,29 +167,22 @@ export class TradeModelTrainer {
         epochs: this.config.epochs,
         validationData: valDataset,
         callbacks: [
-          tf.callbacks.earlyStopping({
-            monitor: "val_loss",
-            patience: TRAINING_CONFIG.PATIENCE,
-          }),
-          bestWeightsCallback,
+          earlyStoppingCallback,
           predictionLoggerCallback,
-          cyclicLRCallback,
+          lrCallback,
+          gradientClippingCallback,
         ],
       });
 
-      bestWeightsCallback.applyBestWeights(this.model);
       console.log("Model training completed.");
-
       await Metrics.evaluateModel(this.model, X_normalized, y_tensor);
-
       console.log(
         `Training Buy Ratio: ${y.filter((l) => l === 1).length / y.length}`
       );
-
       console.log(
-        "Memory after training:",
-        tf.memory().numBytes / TRAINING_CONFIG.BYTES_TO_MB,
-        "MB"
+        `Memory after training: ${
+          tf.memory().numBytes / TRAINING_CONFIG.BYTES_TO_MB
+        } MB`
       );
 
       return { X_mean, X_std };
@@ -204,7 +194,6 @@ export class TradeModelTrainer {
   }
 
   private async saveModelWeights(
-    featureStats: { mean: number[]; std: number[] },
     X_mean: tf.Tensor,
     X_std: tf.Tensor
   ): Promise<void> {
@@ -293,9 +282,9 @@ export class TradeModelTrainer {
   public async train(): Promise<void> {
     try {
       const startTime = performance.now();
-      const { X, y, featureStats } = await this.dataProcessor.prepareData();
+      const { X, y } = await this.dataProcessor.prepareData();
       const { X_mean, X_std } = await this.trainModel(X, y);
-      await this.saveModelWeights(featureStats, X_mean, X_std);
+      await this.saveModelWeights(X_mean, X_std);
       const endTime = performance.now();
       const executionTime =
         (endTime - startTime) / TRAINING_CONFIG.MS_TO_SECONDS;

@@ -1,5 +1,5 @@
 import { CryptoCompareService } from "../api/CryptoCompareService";
-import { MODEL_CONFIG } from "../constants";
+import { MODEL_CONFIG, PERIODS } from "../constants";
 import { HistoricalData, ModelConfig } from "../types";
 import FeatureCalculator from "./FeatureCalculator";
 
@@ -7,28 +7,21 @@ const cryptoCompare = new CryptoCompareService();
 
 export class DataProcessor {
   private readonly config: ModelConfig;
-  private readonly backtestStartDays: number;
-  private readonly trainingPeriodDays: number;
+  private readonly startDaysAgo: number;
 
-  constructor(
-    config: ModelConfig,
-    backtestStartDays: number,
-    trainingPeriodDays: number
-  ) {
+  constructor(config: ModelConfig, startDaysAgo: number) {
     this.config = config;
-    this.backtestStartDays = backtestStartDays;
-    this.trainingPeriodDays = trainingPeriodDays;
+    this.startDaysAgo = startDaysAgo;
   }
 
   private async fetchHistoricalData(): Promise<{
     adaData: HistoricalData;
     btcData: HistoricalData;
   }> {
-    const startDaysAgo = this.backtestStartDays + this.trainingPeriodDays;
     console.log("Fetching historical data...");
     const [adaData, btcData] = await Promise.all([
-      cryptoCompare.getHistoricalData("ADA", startDaysAgo),
-      cryptoCompare.getHistoricalData("BTC", startDaysAgo),
+      cryptoCompare.getHistoricalData("ADA", this.startDaysAgo),
+      cryptoCompare.getHistoricalData("BTC", this.startDaysAgo),
     ]);
     console.log(
       `ADA data length: ${adaData.prices.length}, BTC data length: ${btcData.prices.length}`
@@ -54,7 +47,11 @@ export class DataProcessor {
         );
         return null;
       }
-      const scale = 0.9 + Math.random() * 0.2; // Increased range
+      const atr = new FeatureCalculator().calculateATR(
+        adaData.prices.slice(0, j + 1),
+        PERIODS.ATR
+      );
+      const scale = 1 + atr * (0.9 + Math.random() * 0.2); // Volatility-based noise
       const noisyFeatures = [
         ...this.addNoise(adaFeatures, scale),
         ...this.addNoise(btcFeatures, scale),
@@ -70,15 +67,14 @@ export class DataProcessor {
     index: number
   ): [number[], number[]] {
     const featureCalculator = new FeatureCalculator();
-
     const adaFeatures = featureCalculator.compute({
       prices: adaData.prices,
       volumes: adaData.volumes,
       dayIndex: index,
       currentPrice: adaData.prices[index],
       isBTC: false,
+      btcPrice: btcData.prices[index],
     });
-
     const btcFeatures = featureCalculator.compute({
       prices: btcData.prices,
       volumes: btcData.volumes,
@@ -86,7 +82,6 @@ export class DataProcessor {
       currentPrice: btcData.prices[index],
       isBTC: true,
     });
-
     return [adaFeatures, btcFeatures];
   }
 
@@ -103,7 +98,7 @@ export class DataProcessor {
   }
 
   private addNoise(features: number[], scale: number): number[] {
-    return features.map((f) => f * scale + (Math.random() - 0.5) * 0.1); // Increased noise
+    return features.map((f) => f * scale + (Math.random() - 0.5) * 0.05); // Reduced noise amplitude
   }
 
   private adjustSequenceLength(sequence: number[][]): number[][] {
@@ -179,15 +174,10 @@ export class DataProcessor {
     return { mean: means, std: stds };
   }
 
-  public async prepareData(): Promise<{
-    X: number[][][];
-    y: number[];
-    featureStats: { mean: number[]; std: number[] };
-  }> {
+  public async prepareData(): Promise<{ X: number[][][]; y: number[] }> {
     const { adaData, btcData } = await this.fetchHistoricalData();
     const X: number[][][] = [];
     const y: number[] = [];
-    const allFeatures: number[][] = [];
 
     for (
       let i = 34 + this.config.timesteps - 1;
@@ -199,12 +189,10 @@ export class DataProcessor {
       const label = this.labelData({ prices: adaData.prices, dayIndex: i });
       X.push(sequence);
       y.push(label);
-      allFeatures.push(sequence.flat());
     }
 
     const balancedData = this.balanceDataset(X, y);
     console.log(`Total samples: ${balancedData.X.length}`);
-    const featureStats = this.computeFeatureStats(allFeatures);
-    return { X: balancedData.X, y: balancedData.y, featureStats };
+    return { X: balancedData.X, y: balancedData.y };
   }
 }

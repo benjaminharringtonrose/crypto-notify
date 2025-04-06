@@ -1,14 +1,8 @@
 import { firestore } from "firebase-admin";
 
 export const PRICES = [0.8, 0.9, 1.0, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5];
-
-export const MERGE_PAYLOAD: firestore.SetOptions = {
-  merge: true,
-};
-
-export const FILE_NAMES = {
-  WEIGHTS: "tradePredictorWeights.json",
-};
+export const MERGE_PAYLOAD: firestore.SetOptions = { merge: true };
+export const FILE_NAMES = { WEIGHTS: "tradePredictorWeights.json" };
 
 export const PERIODS = {
   RSI: 14,
@@ -28,6 +22,8 @@ export const PERIODS = {
   VOL_SMA_LONG: 14,
   MOMENTUM: 10,
   ATR_BREAKOUT: 14,
+  SMA_50: 50,
+  SMA_200: 200,
 } as const;
 
 export const STRATEGY_CONFIG = {
@@ -36,9 +32,9 @@ export const STRATEGY_CONFIG = {
   BASE_POSITION_SIZE_DEFAULT: 0.1,
   SLIPPAGE: 0.001,
   COMMISSION: 0.1,
-  STOP_LOSS_MULTIPLIER_DEFAULT: 4, // Increased from 3.5 for more room
-  TRAILING_STOP_DEFAULT: 0.07, // Increased from 0.05 for more flexibility
-  MIN_HOLD_DAYS_DEFAULT: 5, // Increased from 3 for longer holds
+  STOP_LOSS_MULTIPLIER_DEFAULT: 4,
+  TRAILING_STOP_DEFAULT: 0.07,
+  MIN_HOLD_DAYS_DEFAULT: 5,
   BUY_PROB_THRESHOLD_DEFAULT: 0.45,
   SELL_PROB_THRESHOLD_DEFAULT: 0.3,
   MOMENTUM_WINDOW_THRESHOLD: 0.01,
@@ -74,9 +70,9 @@ export const STRATEGY_CONFIG = {
   TREND_STRENGTH_REVERSAL_THRESHOLD: -0.01,
   CONSECUTIVE_BUYS_MAX: 4,
   CONSECUTIVE_BUY_CONFIDENCE_LEVELS: [0.25, 0.3, 0.35, 0.4],
-  STRATEGY_PERSISTENCE_TRADES: 3, // New: Min trades to persist strategy
-  STRATEGY_PERSISTENCE_DAYS: 5, // New: Min days to persist strategy
-  STRATEGY_OVERRIDE_CONFIDENCE: 0.8, // New: Confidence threshold to override persistence
+  STRATEGY_PERSISTENCE_TRADES: 3,
+  STRATEGY_PERSISTENCE_DAYS: 5,
+  STRATEGY_OVERRIDE_CONFIDENCE: 0.8,
 };
 
 const MODEL_CONFIG_BASE = {
@@ -84,19 +80,19 @@ const MODEL_CONFIG_BASE = {
   CONV1D_FILTERS_2: 24,
   CONV1D_KERNEL_SIZE_1: 5,
   CONV1D_KERNEL_SIZE_2: 3,
-  LSTM_UNITS_1: 64,
-  LSTM_UNITS_2: 32,
+  LSTM_UNITS_1: 48,
+  LSTM_UNITS_2: 24,
   LSTM_UNITS_3: 8,
   TIME_DISTRIBUTED_DENSE_UNITS: 16,
   DENSE_UNITS_1: 24,
   OUTPUT_UNITS: 2,
-  L2_REGULARIZATION: 0.01,
+  L2_REGULARIZATION: 0.03,
   DROPOUT_RATE: 0.5,
   TIMESTEPS_AFTER_CONV: 24,
   TIMESTEPS: 30,
-  ADA_FEATURE_COUNT: 32,
+  ADA_FEATURE_COUNT: 33,
   BTC_FEATURE_COUNT: 29,
-  FEATURE_COUNT: 61,
+  FEATURE_COUNT: 62,
 };
 
 export const MODEL_CONFIG = {
@@ -152,22 +148,25 @@ export const MODEL_CONFIG = {
 };
 
 export const TRAINING_CONFIG = {
-  EPOCHS: 100,
+  EPOCHS: 75,
   BATCH_SIZE: 128,
   SHUFFLE_CHUNK_SIZE: 10,
-  INITIAL_LEARNING_RATE: 0.0008,
+  INITIAL_LEARNING_RATE: 0.0004,
   MIN_LEARNING_RATE: 0.00005,
-  CYCLIC_LR_STEP_SIZE: 10,
+  CYCLIC_LR_STEP_SIZE: 8, // Unused but kept for reference
   OUTPUT_CLASSES: 2,
-  LOOKBACK_DAYS: 450,
-  PREDICTION_DAYS: 365,
+  START_DAYS_AGO: 1000,
   TRAIN_SPLIT: 0.7,
   PREFETCH_BUFFER: 2,
-  PATIENCE: 40,
+  PATIENCE: 15,
   BYTES_TO_MB: 1024 * 1024,
   MS_TO_SECONDS: 1000,
   GAMMA: 2.0,
-  ALPHA: [0.6, 0.4] as [number, number],
+  ALPHA: [0.5, 0.5] as [number, number], // Adjusted from [0.55, 0.45]
+  GRADIENT_CLIP_NORM: 1.0,
+  LR_DECAY_RATE: 0.98,
+  WARMUP_EPOCHS: 5,
+  WARMUP_INITIAL_LR: 0.0001,
 };
 
 export const TIME_CONVERSIONS = {

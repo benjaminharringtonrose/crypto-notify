@@ -1,5 +1,5 @@
 import { Indicators } from "../types";
-import { MODEL_CONFIG, PERIODS, TIME_CONVERSIONS } from "../constants";
+import { MODEL_CONFIG, PERIODS } from "../constants";
 
 interface ComputeParams {
   prices: number[];
@@ -21,7 +21,7 @@ export default class FeatureCalculator {
   public calculateVWAP(
     prices: number[],
     volumes: number[],
-    period: number = 7
+    period: number = PERIODS.VWAP
   ): number {
     if (prices.length < period || volumes.length < period)
       return prices[prices.length - 1];
@@ -35,7 +35,7 @@ export default class FeatureCalculator {
     return priceVolumeSum / volumeSum;
   }
 
-  public calculateATR(prices: number[], period: number = 14): number {
+  public calculateATR(prices: number[], period: number = PERIODS.ATR): number {
     if (prices.length < period + 1) return 0;
     const trueRanges = [];
     for (let i = 1; i < prices.length; i++) {
@@ -49,20 +49,17 @@ export default class FeatureCalculator {
     return data.slice(-periods - offset, offset === 0 ? undefined : -offset);
   }
 
-  public calculateRSI(prices: number[], period = 14): number | undefined {
-    if (prices.length < period + 1) return undefined;
+  public calculateRSI(prices: number[], period = PERIODS.RSI): number {
+    if (prices.length < period + 1) return 50; // Default neutral value
     let gains = 0,
       losses = 0;
-
     for (let i = 1; i <= period; i++) {
       const change = prices[i] - prices[i - 1];
       if (change > 0) gains += change;
       else losses += Math.abs(change);
     }
-
     let avgGain = gains / period;
     let avgLoss = losses / period;
-
     for (let i = period + 1; i < prices.length; i++) {
       const change = prices[i] - prices[i - 1];
       const gain = change > 0 ? change : 0;
@@ -70,9 +67,8 @@ export default class FeatureCalculator {
       avgGain = (avgGain * (period - 1) + gain) / period;
       avgLoss = (avgLoss * (period - 1) + loss) / period;
     }
-
     const rs = avgGain / avgLoss;
-    return 100 - 100 / (1 + rs);
+    return rs === Infinity ? 100 : 100 - 100 / (1 + rs); // Handle division by zero
   }
 
   public calculateEMA(prices: number[], period: number): number {
@@ -103,7 +99,6 @@ export default class FeatureCalculator {
     if (prices.length < 20 || volumes.length < 20) return false;
     const recentPrices = prices.slice(-20);
     const recentVolumes = volumes.slice(-20);
-
     const valleys = [];
     for (let i = 1; i < recentPrices.length - 1; i++) {
       if (
@@ -118,7 +113,6 @@ export default class FeatureCalculator {
       }
     }
     if (valleys.length < 3) return false;
-
     const lastThreeValleys = valleys.slice(-3);
     const priceRange = Math.max(...recentPrices) - Math.min(...recentPrices);
     const areSimilar = lastThreeValleys.every(
@@ -133,13 +127,12 @@ export default class FeatureCalculator {
     const isVolumeSpike = breakoutVolume > avgValleyVolume * 1.5;
     const recentHigh = Math.max(...recentPrices.slice(-5));
     const isBreakingUp = currentPrice > recentHigh;
-
     return areSimilar && volumeDecreasing && isVolumeSpike && isBreakingUp;
   }
 
   public calculateFibonacciLevels(
     prices: number[],
-    period: number = TIME_CONVERSIONS.ONE_MONTH_IN_DAYS
+    period: number = PERIODS.FIBONACCI
   ): { levels: number[]; high: number; low: number } {
     if (prices.length < period)
       return {
@@ -147,12 +140,10 @@ export default class FeatureCalculator {
         high: prices[prices.length - 1],
         low: prices[0],
       };
-
     const recentPrices = prices.slice(-period);
     const high = Math.max(...recentPrices);
     const low = Math.min(...recentPrices);
     const range = high - low;
-
     const levels = [
       low + range * 0.236,
       low + range * 0.382,
@@ -176,7 +167,6 @@ export default class FeatureCalculator {
     let leftShoulderIndex = -1,
       headIndex = -1,
       rightShoulderIndex = -1;
-
     for (let i = 1; i < prices.length - 1; i++) {
       if (prices[i] > prices[i - 1] && prices[i] > prices[i + 1]) {
         if (leftShoulder === 0) {
@@ -201,7 +191,6 @@ export default class FeatureCalculator {
         }
       }
     }
-
     if (rightShoulder !== 0) {
       for (let i = leftShoulderIndex + 1; i < headIndex; i++) {
         if (prices[i] < leftTrough) leftTrough = prices[i];
@@ -210,14 +199,12 @@ export default class FeatureCalculator {
         if (prices[i] < rightTrough) rightTrough = prices[i];
       }
     }
-
     const neckline = Math.min(leftTrough, rightTrough);
     const avgVolume =
       volumes.reduce((sum, vol) => sum + vol, 0) / volumes.length;
     const headVolume = headIndex >= 0 ? volumes[headIndex] : 0;
     const rightShoulderVolume =
       rightShoulderIndex >= 0 ? volumes[rightShoulderIndex] : 0;
-
     return (
       rightShoulder !== 0 &&
       leftTrough !== Infinity &&
@@ -229,30 +216,26 @@ export default class FeatureCalculator {
 
   public calculateStochRSI(
     prices: number[],
-    rsiPeriod: number = 14,
-    stochPeriod: number = 14,
-    smoothPeriod: number = 3
+    rsiPeriod: number = PERIODS.STOCH_RSI,
+    stochPeriod: number = PERIODS.STOCH_RSI,
+    smoothPeriod: number = PERIODS.STOCH_SMOOTH
   ): { stochRsi: number; signal: number } {
     if (prices.length < rsiPeriod + stochPeriod)
       return { stochRsi: 50, signal: 50 };
-
     const rsiValues: number[] = [];
     for (let i = 0; i <= prices.length - rsiPeriod; i++) {
       const slice = prices.slice(i, i + rsiPeriod + 1);
       const rsi = this.calculateRSI(slice);
-      if (rsi) rsiValues.push(rsi);
+      rsiValues.push(rsi);
     }
-
     const recentRsis = rsiValues.slice(-stochPeriod);
     const currentRsi = recentRsis[recentRsis.length - 1];
     const lowestRsi = Math.min(...recentRsis);
     const highestRsi = Math.max(...recentRsis);
-
     const stochRsi =
       highestRsi === lowestRsi
         ? 50
         : ((currentRsi - lowestRsi) / (highestRsi - lowestRsi)) * 100;
-
     const recentStochRsis = rsiValues
       .slice(-stochPeriod - smoothPeriod + 1)
       .map((_, i) => {
@@ -266,7 +249,6 @@ export default class FeatureCalculator {
     const signal =
       recentStochRsis.slice(-smoothPeriod).reduce((sum, val) => sum + val, 0) /
       smoothPeriod;
-
     return { stochRsi, signal };
   }
 
@@ -280,7 +262,6 @@ export default class FeatureCalculator {
       trough = Infinity;
     let firstTopIndex = -1,
       secondTopIndex = -1;
-
     for (let i = 1; i < prices.length - 1; i++) {
       if (prices[i] > prices[i - 1] && prices[i] > prices[i + 1]) {
         if (firstTop === 0) {
@@ -296,13 +277,11 @@ export default class FeatureCalculator {
         }
       }
     }
-
     if (secondTop !== 0) {
       for (let i = firstTopIndex + 1; i < secondTopIndex; i++) {
         if (prices[i] < trough) trough = prices[i];
       }
     }
-
     const avgVolume =
       volumes.reduce((sum, vol) => sum + vol, 0) / volumes.length;
     const secondTopVolume = secondTopIndex >= 0 ? volumes[secondTopIndex] : 0;
@@ -310,7 +289,6 @@ export default class FeatureCalculator {
       secondTopIndex + 1 < volumes.length
         ? volumes[secondTopIndex + 1]
         : volumes[volumes.length - 1];
-
     return (
       secondTop !== 0 &&
       trough !== Infinity &&
@@ -332,7 +310,6 @@ export default class FeatureCalculator {
     let firstTopIndex = -1,
       secondTopIndex = -1,
       thirdTopIndex = -1;
-
     for (let i = 1; i < prices.length - 1; i++) {
       if (prices[i] > prices[i - 1] && prices[i] > prices[i + 1]) {
         if (firstTop === 0) {
@@ -356,7 +333,6 @@ export default class FeatureCalculator {
         }
       }
     }
-
     if (thirdTop !== 0) {
       for (let i = firstTopIndex + 1; i < secondTopIndex; i++) {
         if (prices[i] < firstTrough) firstTrough = prices[i];
@@ -365,7 +341,6 @@ export default class FeatureCalculator {
         if (prices[i] < secondTrough) secondTrough = prices[i];
       }
     }
-
     const supportLevel = Math.min(firstTrough, secondTrough);
     const avgVolume =
       volumes.reduce((sum, vol) => sum + vol, 0) / volumes.length;
@@ -374,7 +349,6 @@ export default class FeatureCalculator {
       thirdTopIndex + 1 < volumes.length
         ? volumes[thirdTopIndex + 1]
         : volumes[volumes.length - 1];
-
     return (
       thirdTop !== 0 &&
       firstTrough !== Infinity &&
@@ -452,36 +426,25 @@ export default class FeatureCalculator {
       obv += priceChange > 0 ? volumes[i] : priceChange < 0 ? -volumes[i] : 0;
       obvValues.push(obv);
     }
-    const atr = this.calculateATR(prices.slice(0, dayIndex + 1), PERIODS.ATR);
+    const atr = this.calculateATR(prices.slice(0, dayIndex + 1));
     const atrBaseline = this.calculateATR(
-      prices.slice(0, Math.max(0, dayIndex)),
-      PERIODS.ATR
+      prices.slice(0, Math.max(0, dayIndex))
     );
     const zScore =
       dayIndex >= PERIODS.SMA_MEDIUM ? (currentPrice - sma20) / stdDev20 : 0;
     const vwap = this.calculateVWAP(
       prices.slice(0, dayIndex + 1),
-      volumes.slice(0, dayIndex + 1),
-      PERIODS.VWAP
+      volumes.slice(0, dayIndex + 1)
     );
     const { stochRsi, signal: stochRsiSignal } = this.calculateStochRSI(
-      prices.slice(0, dayIndex + 1),
-      PERIODS.STOCH_RSI,
-      PERIODS.STOCH_RSI,
-      PERIODS.STOCH_SMOOTH
+      prices.slice(0, dayIndex + 1)
     );
     const prevStochRsi =
       dayIndex > 0
-        ? this.calculateStochRSI(
-            prices.slice(0, dayIndex),
-            PERIODS.STOCH_RSI,
-            PERIODS.STOCH_RSI,
-            PERIODS.STOCH_SMOOTH
-          ).stochRsi
+        ? this.calculateStochRSI(prices.slice(0, dayIndex)).stochRsi
         : 0;
     const { levels } = this.calculateFibonacciLevels(
-      prices.slice(0, dayIndex + 1),
-      PERIODS.FIBONACCI
+      prices.slice(0, dayIndex + 1)
     );
     const fib61_8 = levels[3] || 0;
     const volSmaShort = this.calculateSMA(
@@ -540,9 +503,18 @@ export default class FeatureCalculator {
         ? (currentPrice - prices[dayIndex - PERIODS.MOMENTUM]) / atr
         : 0;
     const sma50 =
-      dayIndex >= 49
-        ? this.calculateSMA(prices.slice(dayIndex - 49, dayIndex + 1))
+      dayIndex >= PERIODS.SMA_50
+        ? this.calculateSMA(
+            prices.slice(dayIndex - PERIODS.SMA_50 + 1, dayIndex + 1)
+          )
         : sma20;
+    const sma200 =
+      dayIndex >= PERIODS.SMA_200
+        ? this.calculateSMA(
+            prices.slice(dayIndex - PERIODS.SMA_200 + 1, dayIndex + 1)
+          )
+        : sma20;
+    const trendRegime = sma50 !== 0 ? (sma50 - sma200) / sma200 : 0;
     const adxProxy = sma50 !== 0 ? Math.abs((sma7 - sma50) / sma50) : 0;
 
     return {
@@ -554,7 +526,7 @@ export default class FeatureCalculator {
       prevSma21,
       macdLine,
       signalLine,
-      currentPrice: currentPrice,
+      currentPrice,
       upperBand,
       lowerBand,
       obvValues,
@@ -580,6 +552,7 @@ export default class FeatureCalculator {
       sma20,
       prices,
       volAdjustedMomentum,
+      trendRegime,
       adxProxy,
     };
   }
@@ -605,8 +578,8 @@ export default class FeatureCalculator {
       currentPrice,
     });
     const baseFeatures = [
-      indicators.rsi ?? 0,
-      indicators.prevRsi ?? 0,
+      indicators.rsi,
+      indicators.prevRsi,
       indicators.sma7,
       indicators.sma21,
       indicators.prevSma7,
@@ -631,8 +604,8 @@ export default class FeatureCalculator {
       indicators.prevMacdLine,
       indicators.isTripleTop ? 1 : 0,
       indicators.isVolumeSpike ? 1 : 0,
-      indicators.momentum ?? 0,
-      indicators.priceChangePct ?? 0,
+      indicators.momentum,
+      indicators.priceChangePct,
       indicators.volAdjustedMomentum,
     ];
 
@@ -642,6 +615,7 @@ export default class FeatureCalculator {
           ...baseFeatures,
           indicators.isTripleBottom ? 1 : 0,
           indicators.adxProxy,
+          indicators.trendRegime,
           btcPrice ? currentPrice / btcPrice : 0,
         ];
   }

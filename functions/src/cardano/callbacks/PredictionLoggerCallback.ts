@@ -1,26 +1,56 @@
 import * as tf from "@tensorflow/tfjs-node";
+import { Metrics } from "../Metrics";
+import { TRAINING_CONFIG } from "../../constants";
 
 export class PredictionLoggerCallback extends tf.CustomCallback {
-  public readonly validationData: tf.Tensor;
+  public readonly validationFeatures: tf.Tensor;
+  public readonly validationLabels: tf.Tensor;
   private model?: tf.LayersModel;
 
-  constructor(validationData: tf.Tensor) {
+  constructor(validationFeatures: tf.Tensor, validationLabels: tf.Tensor) {
     super({});
-    this.validationData = validationData;
+    this.validationFeatures = validationFeatures;
+    this.validationLabels = validationLabels;
   }
 
   async onEpochEnd(epoch: number, logs?: tf.Logs) {
     if (!this.model)
       throw new Error("Model not set in PredictionLoggerCallback");
-
     if (epoch % 5 !== 0) return;
 
-    const predsAllVal = this.model.predict(this.validationData) as tf.Tensor;
+    const predsAllVal = this.model.predict(
+      this.validationFeatures
+    ) as tf.Tensor;
     const predLabelsAllVal = predsAllVal.argMax(-1).dataSync();
+    const yVal = Array.from(
+      await this.validationLabels.argMax(-1).data()
+    ) as number[];
     const buyCountAllVal = Array.from(predLabelsAllVal).filter(
       (p) => p === 1
     ).length;
     const totalValSamples = predLabelsAllVal.length;
+    const metrics = Metrics.calculateMetrics(
+      Array.from(predLabelsAllVal),
+      yVal
+    );
+
+    // Log effective class weights from focal loss
+    const alpha = tf.tensor1d(TRAINING_CONFIG.ALPHA);
+    const yTrue = this.validationLabels;
+    const pt = yTrue.mul(predsAllVal).sum(-1).clipByValue(0, 1);
+    const focalWeight = tf.pow(tf.sub(1, pt), TRAINING_CONFIG.GAMMA);
+    const yTrueIndices = yTrue.argMax(-1);
+    const alphaWeighted = tf.gather(alpha, yTrueIndices);
+    const effectiveWeights = focalWeight
+      .mul(alphaWeighted)
+      .mean()
+      .dataSync()[0];
+    console.log(
+      `Epoch ${epoch + 1} Effective Class Weight: ${effectiveWeights.toFixed(
+        4
+      )}`
+    );
+
     console.log(
       `Epoch ${
         epoch + 1
@@ -28,15 +58,29 @@ export class PredictionLoggerCallback extends tf.CustomCallback {
         totalValSamples - buyCountAllVal
       }, Buy Ratio: ${(buyCountAllVal / totalValSamples).toFixed(3)}`
     );
-
+    console.log(
+      `Epoch ${epoch + 1} Val Precision Buy: ${metrics.precisionBuy.toFixed(
+        4
+      )}, Precision Sell: ${metrics.precisionSell.toFixed(4)}`
+    );
+    console.log(
+      `Epoch ${epoch + 1} Val Recall Buy: ${metrics.recallBuy.toFixed(
+        4
+      )}, Recall Sell: ${metrics.recallSell.toFixed(4)}`
+    );
+    console.log(
+      `Epoch ${epoch + 1} Val F1 Buy: ${metrics.f1Buy.toFixed(
+        4
+      )}, F1 Sell: ${metrics.f1Sell.toFixed(4)}`
+    );
     if (logs)
       console.log(`Epoch ${epoch + 1} Val Loss: ${logs.val_loss.toFixed(4)}`);
 
     predsAllVal.dispose();
-  }
-
-  setParams(params: tf.CustomCallbackArgs) {
-    // Required by tf.CustomCallback
+    alpha.dispose();
+    pt.dispose();
+    focalWeight.dispose();
+    alphaWeighted.dispose();
   }
 
   setModel(model: tf.LayersModel) {

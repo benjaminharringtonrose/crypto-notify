@@ -19,7 +19,6 @@ export class Metrics {
     return loss;
   }
 
-  // Named metric functions
   static precisionBuy(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
     const predLabels = yPred.argMax(-1);
     const trueLabels = yTrue.argMax(-1);
@@ -84,7 +83,6 @@ export class Metrics {
       .div(precision.add(recall).add(1e-6)) as tf.Scalar;
   }
 
-  // Legacy methods (kept for compatibility with PredictionLoggerCallback and evaluateModel)
   static customPrecision(
     yTrue: tf.Tensor,
     yPred: tf.Tensor
@@ -188,7 +186,8 @@ export class Metrics {
       [0, lastTimestep, 8],
       [X3D.shape[0], 1, 1]
     ).data()) as Float32Array;
-    for (let t = 0.1; t <= 0.9; t += 0.05) {
+    for (let t = 0.4; t <= 0.6; t += 0.05) {
+      // Adjusted range to 0.4-0.6
       const predictedLabels = predArray.map((p) => (p[1] > t ? 1 : 0));
       const metrics = Metrics.calculateMetrics(predictedLabels, yArray);
       const avgF1 = (metrics.f1Buy + metrics.f1Sell) / 2;

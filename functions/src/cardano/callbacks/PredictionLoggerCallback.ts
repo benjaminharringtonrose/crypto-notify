@@ -1,40 +1,44 @@
 import * as tf from "@tensorflow/tfjs-node";
 import { Metrics } from "../Metrics";
 import { TRAINING_CONFIG } from "../../constants";
+import { TradeModelTrainer } from "../TradeModelTrainer";
 
 export class PredictionLoggerCallback extends tf.CustomCallback {
   public readonly validationFeatures: tf.Tensor;
   public readonly validationLabels: tf.Tensor;
   private model?: tf.LayersModel;
+  private trainer: TradeModelTrainer;
 
-  constructor(validationFeatures: tf.Tensor, validationLabels: tf.Tensor) {
+  constructor(
+    validationFeatures: tf.Tensor,
+    validationLabels: tf.Tensor,
+    trainer: TradeModelTrainer
+  ) {
     super({});
     this.validationFeatures = validationFeatures;
     this.validationLabels = validationLabels;
+    this.trainer = trainer;
   }
 
   async onEpochEnd(epoch: number, logs?: tf.Logs) {
     if (!this.model)
       throw new Error("Model not set in PredictionLoggerCallback");
-    // Log every epoch instead of every 5
     const predsAllVal = this.model.predict(
       this.validationFeatures
     ) as tf.Tensor;
-    const predLabelsAllVal = predsAllVal.argMax(-1).dataSync();
+    const predArray = (await predsAllVal.array()) as number[][];
+    const bestThreshold = this.trainer.getBestThreshold();
+    const predLabelsAllVal = predArray.map((p) =>
+      p[1] > bestThreshold ? 1 : 0
+    );
     const yVal = Array.from(
       await this.validationLabels.argMax(-1).data()
     ) as number[];
-    const buyCountAllVal = Array.from(predLabelsAllVal).filter(
-      (p) => p === 1
-    ).length;
+    const buyCountAllVal = predLabelsAllVal.filter((p) => p === 1).length;
     const totalValSamples = predLabelsAllVal.length;
     const buyRatio = buyCountAllVal / totalValSamples;
-    const metrics = Metrics.calculateMetrics(
-      Array.from(predLabelsAllVal),
-      yVal
-    );
+    const metrics = Metrics.calculateMetrics(predLabelsAllVal, yVal);
 
-    // Log effective class weights from focal loss
     const alpha = tf.tensor1d(TRAINING_CONFIG.ALPHA);
     const yTrue = this.validationLabels;
     const pt = yTrue.mul(predsAllVal).sum(-1).clipByValue(0, 1);

@@ -26,6 +26,7 @@ export class TradeModelTrainer {
   private model: tf.LayersModel | null = null;
   private lossFn = Metrics.focalLoss.bind(Metrics);
   private dataProcessor: DataProcessor;
+  private bestThreshold: number = 0.5; // Global threshold updated by evaluateModel
 
   constructor() {
     this.dataProcessor = new DataProcessor(
@@ -127,13 +128,14 @@ export class TradeModelTrainer {
       this.model = factory.createModel();
 
       const earlyStoppingCallback = new EarlyStoppingCallback({
-        monitor: "val_customF1Buy", // Matches named metric
+        monitor: "val_customF1Buy",
         patience: TRAINING_CONFIG.PATIENCE,
         restoreBestWeights: true,
       });
       const predictionLoggerCallback = new PredictionLoggerCallback(
         X_val,
-        y_val
+        y_val,
+        this
       );
       const lrCallback = new ExponentialDecayLRCallback();
       const gradientClippingCallback = new GradientClippingCallback(
@@ -158,6 +160,8 @@ export class TradeModelTrainer {
         ],
       });
 
+      // Set model for all callbacks
+      earlyStoppingCallback.setModel(this.model);
       predictionLoggerCallback.setModel(this.model);
       lrCallback.setModel(this.model);
       gradientClippingCallback.setModel(this.model);
@@ -170,10 +174,48 @@ export class TradeModelTrainer {
         epochs: this.config.epochs,
         validationData: valDataset,
         callbacks: [
-          earlyStoppingCallback,
-          predictionLoggerCallback,
-          lrCallback,
-          gradientClippingCallback,
+          {
+            onEpochEnd: async (epoch: number, logs?: tf.Logs) => {
+              if (epoch % 5 === 0) {
+                const preds = this.model!.predict(X_normalized) as tf.Tensor;
+                const predArray = (await preds.array()) as number[][];
+                const yArray = Array.from(await y_tensor.argMax(-1).data());
+                let bestRoi = -Infinity;
+                for (let t = 0.4; t <= 0.6; t += 0.05) {
+                  const predictedLabels = predArray.map((p) =>
+                    p[1] > t ? 1 : 0
+                  );
+                  const X3D = X_normalized as tf.Tensor3D;
+                  const prices = (await X3D.slice(
+                    [0, X3D.shape[1] - 1, 8],
+                    [X3D.shape[0], 1, 1]
+                  ).data()) as Float32Array;
+                  const roi = Metrics.calculateROI(
+                    predictedLabels,
+                    prices,
+                    yArray
+                  );
+                  if (roi > bestRoi) {
+                    bestRoi = roi;
+                    this.bestThreshold = t;
+                  }
+                }
+                console.log(
+                  `Epoch ${epoch + 1} Updated Best Threshold: ${
+                    this.bestThreshold
+                  }`
+                );
+                preds.dispose();
+              }
+              await earlyStoppingCallback.onEpochEnd(epoch, logs);
+              await predictionLoggerCallback.onEpochEnd(epoch, logs);
+              await lrCallback.onEpochEnd(epoch, logs);
+              await gradientClippingCallback.onEpochEnd(epoch, logs);
+            },
+            onTrainEnd: async () => {
+              await earlyStoppingCallback.onTrainEnd();
+            },
+          },
         ],
       });
 
@@ -296,5 +338,9 @@ export class TradeModelTrainer {
       console.error("Training failed:", error);
       throw error;
     }
+  }
+
+  public getBestThreshold(): number {
+    return this.bestThreshold;
   }
 }

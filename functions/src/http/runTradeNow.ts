@@ -6,19 +6,19 @@ import { TradingStrategy } from "../cardano/TradingStrategy";
 import { TradeExecutor } from "../cardano/TradeExecutor";
 import { TIME_CONVERSIONS } from "../constants";
 
-const strategy = new TradingStrategy();
-
-const trader = new TradeExecutor({
-  apiKey: process.env.COINBASE_API_KEY,
-  apiSecret: process.env.COINBASE_API_SECRET,
-});
-
 const NOW_CONFIG: HttpsOptions = {
   memory: "512MiB",
 };
 
 export const runTradeNow = https.onRequest(NOW_CONFIG, async (_, res) => {
   try {
+    const strategy = new TradingStrategy();
+
+    const trader = new TradeExecutor({
+      apiKey: process.env.COINBASE_API_KEY,
+      apiSecret: process.env.COINBASE_API_SECRET,
+    });
+
     const now = Math.floor(Date.now() / 1000);
     const start = now - TIME_CONVERSIONS.TIMESTEP_IN_SECONDS;
 

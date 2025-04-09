@@ -6,13 +6,6 @@ import { sendSMS } from "../utils";
 import { CoinbaseProductIds, Granularity } from "../types";
 import { TIME_CONVERSIONS } from "../constants";
 
-const strategy = new TradingStrategy();
-
-const trader = new TradeExecutor({
-  apiKey: process.env.COINBASE_API_KEY,
-  apiSecret: process.env.COINBASE_API_SECRET,
-});
-
 const CONFIG: ScheduleOptions = {
   schedule: "every 24 hours",
   memory: "512MiB",
@@ -21,6 +14,13 @@ const CONFIG: ScheduleOptions = {
 // Scheduled function to run every 24 hours
 export const runDailyTrade = onSchedule(CONFIG, async () => {
   try {
+    const strategy = new TradingStrategy();
+
+    const trader = new TradeExecutor({
+      apiKey: process.env.COINBASE_API_KEY,
+      apiSecret: process.env.COINBASE_API_SECRET,
+    });
+
     const now = Math.floor(Date.now() / 1000);
     const start = now - TIME_CONVERSIONS.TIMESTEP_IN_SECONDS;
 

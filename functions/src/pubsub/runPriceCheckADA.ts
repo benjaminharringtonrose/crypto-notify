@@ -10,11 +10,6 @@ import {
 import { CoinbaseProductIds, Collections, Docs } from "../types";
 import { TradeExecutor } from "../cardano/TradeExecutor";
 
-const trader = new TradeExecutor({
-  apiKey: process.env.COINBASE_API_KEY,
-  apiSecret: process.env.COINBASE_API_SECRET,
-});
-
 const CONFIG: ScheduleOptions = {
   schedule: "*/10 * * * *",
   memory: "512MiB",
@@ -22,6 +17,11 @@ const CONFIG: ScheduleOptions = {
 
 export const runPriceCheckADA = onSchedule(CONFIG, async () => {
   try {
+    const trader = new TradeExecutor({
+      apiKey: process.env.COINBASE_API_KEY,
+      apiSecret: process.env.COINBASE_API_SECRET,
+    });
+
     const currentPrice = await trader.getCurrentPrice(CoinbaseProductIds.ADA);
 
     console.log(`Current Cardano price: $${currentPrice}`);

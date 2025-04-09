@@ -14,13 +14,6 @@ import { TradingStrategy } from "../cardano/TradingStrategy";
 import { TradeExecutor } from "../cardano/TradeExecutor";
 import { TIME_CONVERSIONS } from "../constants";
 
-const strategy = new TradingStrategy();
-
-const trader = new TradeExecutor({
-  apiKey: process.env.COINBASE_API_KEY,
-  apiSecret: process.env.COINBASE_API_SECRET,
-});
-
 const CONFIG: ScheduleOptions = {
   schedule: "*/10 * * * *",
   memory: "512MiB",
@@ -28,6 +21,13 @@ const CONFIG: ScheduleOptions = {
 
 export const runTradeModelADA = onSchedule(CONFIG, async () => {
   try {
+    const strategy = new TradingStrategy();
+
+    const trader = new TradeExecutor({
+      apiKey: process.env.COINBASE_API_KEY,
+      apiSecret: process.env.COINBASE_API_SECRET,
+    });
+
     const now = Math.floor(
       Date.now() / TIME_CONVERSIONS.ONE_SECOND_IN_MILLISECONDS
     );

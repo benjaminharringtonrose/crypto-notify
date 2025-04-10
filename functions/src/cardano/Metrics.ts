@@ -113,17 +113,7 @@ export class Metrics {
     };
   }
 
-  static calculateMetrics(
-    predictedLabels: number[],
-    yArray: number[]
-  ): {
-    precisionBuy: number;
-    precisionSell: number;
-    recallBuy: number;
-    recallSell: number;
-    f1Buy: number;
-    f1Sell: number;
-  } {
+  static calculateMetrics(predictedLabels: number[], yArray: number[]) {
     const truePositivesBuy = predictedLabels.reduce(
       (sum, p, i) => sum + (p === 1 && yArray[i] === 1 ? 1 : 0),
       0
@@ -176,15 +166,14 @@ export class Metrics {
     const preds = model.predict(X) as tf.Tensor;
     const predArray = (await preds.array()) as number[][];
     const yArray = Array.from(await y.argMax(-1).data());
-
     const predictedLabels = predArray.map((p) => (p[1] > 0.5 ? 1 : 0));
-
     const buyCount = predictedLabels.filter((p) => p === 1).length;
     console.log(
       `Predicted Buy: ${buyCount}, Sell: ${predictedLabels.length - buyCount}`
     );
 
     const metrics = Metrics.calculateMetrics(predictedLabels, yArray);
+    // Fixed: Corrected labels for precision and recall
     console.log(
       `Precision Buy: ${metrics.precisionBuy.toFixed(
         4

@@ -104,25 +104,30 @@ export class TradeModelBacktester {
       const currentPrice = adaPrices[adaPrices.length - 1];
 
       const portfolioValue = capital + holdings * currentPrice;
+
       portfolioHistory.push({
         timestamp: currentTimestamp,
         value: portfolioValue,
       });
 
-      const { trade, confidence, buyProb, sellProb } =
-        await this.strategy.decideTrade({
-          adaPrices,
-          adaVolumes,
-          btcPrices,
-          btcVolumes,
-          capital,
-          holdings,
-          lastBuyPrice,
-          peakPrice,
-          buyTimestamp,
-          currentTimestamp,
-          winStreak,
-        });
+      const {
+        trade,
+        confidence,
+        // buyProb,
+        sellProb,
+      } = await this.strategy.decideTrade({
+        adaPrices,
+        adaVolumes,
+        btcPrices,
+        btcVolumes,
+        capital,
+        holdings,
+        lastBuyPrice,
+        peakPrice,
+        buyTimestamp,
+        currentTimestamp,
+        winStreak,
+      });
 
       strategyCount[this.strategy.getCurrentStrategy()]++;
 
@@ -193,11 +198,11 @@ export class TradeModelBacktester {
           buyTimestamp = undefined;
         }
       } else {
-        console.log(
-          `Trade Skipped: Confidence=${confidence.toFixed(
-            4
-          )}, BuyProb=${buyProb.toFixed(4)}, SellProb=${sellProb.toFixed(4)}`
-        );
+        // console.log(
+        //   `Trade Skipped: Confidence=${confidence.toFixed(
+        //     4
+        //   )}, BuyProb=${buyProb.toFixed(4)}, SellProb=${sellProb.toFixed(4)}`
+        // );
       }
 
       if (holdings > 0) {
@@ -208,28 +213,28 @@ export class TradeModelBacktester {
         const prevValue = portfolioHistory[portfolioHistory.length - 2].value;
         returns.push((portfolioValue - prevValue) / prevValue);
         if (i % TIME_CONVERSIONS.ONE_MONTH_IN_DAYS === 0) {
-          console.log(
-            `Portfolio Trend at ${currentTimestamp}: Value: $${portfolioValue.toFixed(
-              2
-            )}, Change: ${(
-              ((portfolioValue - prevValue) / prevValue) *
-              100
-            ).toFixed(2)}%, Rolling Sharpe (30d): ${this.calculateRollingSharpe(
-              returns.slice(-TIME_CONVERSIONS.ONE_MONTH_IN_DAYS),
-              TIME_CONVERSIONS.ONE_MONTH_IN_DAYS
-            ).toFixed(2)}, Win Streak: ${winStreak}, Loss Streak: ${lossStreak}`
-          );
+          // console.log(
+          //   `Portfolio Trend at ${currentTimestamp}: Value: $${portfolioValue.toFixed(
+          //     2
+          //   )}, Change: ${(
+          //     ((portfolioValue - prevValue) / prevValue) *
+          //     100
+          //   ).toFixed(2)}%, Rolling Sharpe (30d): ${this.calculateRollingSharpe(
+          //     returns.slice(-TIME_CONVERSIONS.ONE_MONTH_IN_DAYS),
+          //     TIME_CONVERSIONS.ONE_MONTH_IN_DAYS
+          //   ).toFixed(2)}, Win Streak: ${winStreak}, Loss Streak: ${lossStreak}`
+          // );
         }
       }
     }
 
     const finalValue =
       capital + holdings * adaData.prices[adaData.prices.length - 1];
-    console.log(
-      `Period End: ${endDate.toISOString()}, Ending Capital: $${finalValue.toFixed(
-        2
-      )}`
-    );
+    // console.log(
+    //   `Period End: ${endDate.toISOString()}, Ending Capital: $${finalValue.toFixed(
+    //     2
+    //   )}`
+    // );
     const totalReturn =
       (finalValue - this.initialCapital) / this.initialCapital;
     const totalTrades = trades.length;
@@ -320,7 +325,7 @@ export class TradeModelBacktester {
       winRate,
       sharpeRatio,
       maxDrawdown,
-      portfolioHistory,
+      portfolioHistory: [],
       trades,
     };
   }

@@ -3,7 +3,7 @@ import { TradeModelBacktester } from "../cardano/TradeModelBacktester";
 async function runMultiPeriodBacktest() {
   const results: { period: string; result: any }[] = [];
 
-  const startYear = 2018;
+  const startYear = 2023;
   const endYear = 2025; // Extended to 2025 to reach today
   const periodLengthMonths = 6;
   const stepMonths = 3;

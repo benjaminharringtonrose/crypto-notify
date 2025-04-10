@@ -61,7 +61,7 @@ export class TradeModelPredictor {
       await this.loadWeightsAsync();
     }
 
-    const startTime = performance.now();
+    // const startTime = performance.now();
     const startIndex = Math.max(0, adaPrices.length - this.timesteps - 1);
     const endIndex = adaPrices.length - 1;
     const sequence = this.sequenceGenerator
@@ -103,8 +103,8 @@ export class TradeModelPredictor {
     const confidence = Math.max(buyProb, sellProb);
 
     // Manual variance calculation
-    const meanProb = tf.mean(probs).dataSync()[0];
-    const variance = tf.mean(tf.square(probs.sub(meanProb))).dataSync()[0];
+    // const meanProb = tf.mean(probs).dataSync()[0];
+    // const variance = tf.mean(tf.square(probs.sub(meanProb))).dataSync()[0];
 
     const atr = sequence[sequence.length - 1][11];
     const momentumWindowSize =
@@ -142,38 +142,38 @@ export class TradeModelPredictor {
         : atr;
     const atrBreakout = atr / atrSma;
 
-    const endTime = performance.now();
-    console.log(
-      `Prediction executed in ${(endTime - startTime).toFixed(2)} ms`
-    );
-    console.log(
-      `ATR: ${atr.toFixed(
-        4
-      )}, Momentum Window: ${momentumWindowSize}, Variance: ${variance.toFixed(
-        4
-      )}`
-    );
-    console.log(
-      `Logits: [Sell: ${sellLogit.toFixed(4)}, Buy: ${buyLogit.toFixed(4)}]`
-    );
-    console.log(
-      `Probs: [Sell: ${sellProb.toFixed(4)}, Buy: ${buyProb.toFixed(4)}]`
-    );
-    console.log(
-      `Confidence: ${confidence.toFixed(4)}, Momentum: ${momentum.toFixed(
-        4
-      )}, Short Momentum: ${shortMomentum.toFixed(
-        4
-      )}, Trend Slope: ${trendSlope.toFixed(
-        4
-      )}, Momentum Divergence: ${momentumDivergence.toFixed(
-        4
-      )}, Vol-Adj Momentum: ${volatilityAdjustedMomentum.toFixed(
-        4
-      )}, Trend Strength: ${trendStrength.toFixed(
-        4
-      )}, ATR Breakout: ${atrBreakout.toFixed(4)}`
-    );
+    // const endTime = performance.now();
+    // console.log(
+    //   `Prediction executed in ${(endTime - startTime).toFixed(2)} ms`
+    // );
+    // console.log(
+    //   `ATR: ${atr.toFixed(
+    //     4
+    //   )}, Momentum Window: ${momentumWindowSize}, Variance: ${variance.toFixed(
+    //     4
+    //   )}`
+    // );
+    // console.log(
+    //   `Logits: [Sell: ${sellLogit.toFixed(4)}, Buy: ${buyLogit.toFixed(4)}]`
+    // );
+    // console.log(
+    //   `Probs: [Sell: ${sellProb.toFixed(4)}, Buy: ${buyProb.toFixed(4)}]`
+    // );
+    // console.log(
+    //   `Confidence: ${confidence.toFixed(4)}, Momentum: ${momentum.toFixed(
+    //     4
+    //   )}, Short Momentum: ${shortMomentum.toFixed(
+    //     4
+    //   )}, Trend Slope: ${trendSlope.toFixed(
+    //     4
+    //   )}, Momentum Divergence: ${momentumDivergence.toFixed(
+    //     4
+    //   )}, Vol-Adj Momentum: ${volatilityAdjustedMomentum.toFixed(
+    //     4
+    //   )}, Trend Strength: ${trendStrength.toFixed(
+    //     4
+    //   )}, ATR Breakout: ${atrBreakout.toFixed(4)}`
+    // );
 
     features.dispose();
     featuresNormalized.dispose();

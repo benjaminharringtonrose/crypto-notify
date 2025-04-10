@@ -6,8 +6,8 @@ import {
   Recommendation,
 } from "../types";
 import { formatAnalysisResults, sendSMS } from "../utils";
-import { TradingStrategy } from "../cardano/TradingStrategy";
 import { TradeExecutor } from "../cardano/TradeExecutor";
+import { TradeModelPredictor } from "../cardano/TradeModelPredictor";
 import { TIME_CONVERSIONS } from "../constants";
 
 const CONFIG: https.HttpsOptions = {
@@ -16,12 +16,12 @@ const CONFIG: https.HttpsOptions = {
 
 export const receiveTextADA = https.onRequest(CONFIG, async (_, response) => {
   try {
-    const strategy = new TradingStrategy();
-
     const trader = new TradeExecutor({
       apiKey: process.env.COINBASE_API_KEY,
       apiSecret: process.env.COINBASE_API_SECRET,
     });
+
+    const predictor = new TradeModelPredictor();
 
     const now = Math.floor(Date.now() / 1000);
     const start = now - TIME_CONVERSIONS.TIMESTEP_IN_SECONDS;
@@ -42,10 +42,6 @@ export const receiveTextADA = https.onRequest(CONFIG, async (_, response) => {
       end: now.toString(),
     });
 
-    const balances = await trader.getAccountBalances();
-    const capital = parseFloat(balances.usd?.available_balance.value || "0");
-    const holdings = parseFloat(balances.ada?.available_balance.value || "0");
-
     if (
       adaData.prices.length < TIME_CONVERSIONS.ONE_MONTH_IN_DAYS ||
       btcData.prices.length < TIME_CONVERSIONS.ONE_MONTH_IN_DAYS
@@ -54,18 +50,23 @@ export const receiveTextADA = https.onRequest(CONFIG, async (_, response) => {
       throw new Error("Insufficient historical data for prediction");
     }
 
-    const { trade, buyProb, sellProb } = await strategy.decideTrade({
-      adaPrices: adaData.prices,
-      adaVolumes: adaData.volumes,
-      btcPrices: btcData.prices,
-      btcVolumes: btcData.volumes,
-      capital,
-      holdings,
-      lastBuyPrice: undefined, // Persist this in Firestore if needed
-      peakPrice: undefined,
-      buyTimestamp: undefined,
-      currentTimestamp: new Date().toISOString(),
-    });
+    const { buyProb, sellProb } = await predictor.predict(
+      adaData.prices,
+      adaData.volumes,
+      btcData.prices,
+      btcData.volumes
+    );
+
+    let recommendation = null;
+    const threshold = 0.73;
+
+    if (buyProb > sellProb && buyProb > threshold) {
+      recommendation = Recommendation.Buy;
+    } else if (sellProb > buyProb && sellProb > threshold) {
+      recommendation = Recommendation.Sell;
+    } else {
+      recommendation = Recommendation.Hold;
+    }
 
     const smsMessage = formatAnalysisResults({
       cryptoSymbol: CryptoIds.Cardano,
@@ -75,7 +76,7 @@ export const receiveTextADA = https.onRequest(CONFIG, async (_, response) => {
         sell: sellProb,
         hold: 1 - Math.max(buyProb, sellProb),
       },
-      recommendation: trade?.type ?? Recommendation.Hold,
+      recommendation,
     });
 
     await sendSMS(smsMessage);

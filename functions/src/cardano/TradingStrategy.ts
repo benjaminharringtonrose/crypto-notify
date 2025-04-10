@@ -200,7 +200,7 @@ export class TradingStrategy {
     );
 
     if (this.shouldPersistStrategy(currentTimestamp, confidence)) {
-      console.log(`Persisting Strategy: ${this.currentStrategy}`);
+      // console.log(`Persisting Strategy: ${this.currentStrategy}`);
       return this.currentStrategy;
     }
 
@@ -213,31 +213,31 @@ export class TradingStrategy {
       emaShort > emaLong
     ) {
       newStrategy = StrategyType.Momentum;
-      console.log("Selected Strategy: MomentumTrendHybrid");
+      // console.log("Selected Strategy: MomentumTrendHybrid");
     } else if (
       Math.abs(deviation) > STRATEGY_CONFIG.DEVIATION_THRESHOLD &&
       Math.abs(avgMomentum) < STRATEGY_CONFIG.MOMENTUM_THRESHOLD &&
       avgMomentumDivergence !== 0
     ) {
       newStrategy = StrategyType.MeanReversion;
-      console.log("Selected Strategy: Mean Reversion");
+      // console.log("Selected Strategy: Mean Reversion");
     } else if (
       avgAtrBreakout > this.breakoutThreshold &&
       currentVolume > avgVolume * STRATEGY_CONFIG.VOLUME_MULTIPLIER &&
       avgShortMomentum > STRATEGY_CONFIG.SHORT_MOMENTUM_THRESHOLD * 0.8
     ) {
       newStrategy = StrategyType.Breakout;
-      console.log("Selected Strategy: Breakout");
+      // console.log("Selected Strategy: Breakout");
     } else if (
       Math.abs(avgTrendSlope) > STRATEGY_CONFIG.TREND_SLOPE_THRESHOLD &&
       emaShort > emaLong &&
       avgTrendStrength > STRATEGY_CONFIG.TREND_STRENGTH_THRESHOLD
     ) {
       newStrategy = StrategyType.TrendFollowing;
-      console.log("Selected Strategy: Trend Following");
+      // console.log("Selected Strategy: Trend Following");
     } else {
       newStrategy = StrategyType.Momentum;
-      console.log("Selected Strategy: Momentum (default)");
+      // console.log("Selected Strategy: Momentum (default)");
     }
 
     if (newStrategy !== this.currentStrategy) {
@@ -305,15 +305,15 @@ export class TradingStrategy {
       confidence < STRATEGY_CONFIG.MIN_CONFIDENCE_DEFAULT ||
       atr > STRATEGY_CONFIG.MAX_ATR_THRESHOLD
     ) {
-      console.log(
-        `Trade Skipped: Confidence=${confidence.toFixed(
-          4
-        )} < ${STRATEGY_CONFIG.MIN_CONFIDENCE_DEFAULT.toFixed(
-          2
-        )} or ATR=${atr.toFixed(
-          4
-        )} > ${STRATEGY_CONFIG.MAX_ATR_THRESHOLD.toFixed(2)}`
-      );
+      // console.log(
+      //   `Trade Skipped: Confidence=${confidence.toFixed(
+      //     4
+      //   )} < ${STRATEGY_CONFIG.MIN_CONFIDENCE_DEFAULT.toFixed(
+      //     2
+      //   )} or ATR=${atr.toFixed(
+      //     4
+      //   )} > ${STRATEGY_CONFIG.MAX_ATR_THRESHOLD.toFixed(2)}`
+      // );
       return { trade: null, confidence, buyProb, sellProb };
     }
 

@@ -151,7 +151,7 @@ export const TRAINING_CONFIG = {
   EPOCHS: 75,
   BATCH_SIZE: 128,
   SHUFFLE_CHUNK_SIZE: 10,
-  INITIAL_LEARNING_RATE: 0.0004, // Reverted from 0.0002
+  INITIAL_LEARNING_RATE: 0.0004,
   MIN_LEARNING_RATE: 0.00005,
   CYCLIC_LR_STEP_SIZE: 8,
   OUTPUT_CLASSES: 2,
@@ -161,8 +161,8 @@ export const TRAINING_CONFIG = {
   PATIENCE: 25,
   BYTES_TO_MB: 1024 * 1024,
   MS_TO_SECONDS: 1000,
-  GAMMA: 3.0, // Changed from 2.0
-  ALPHA: [0.48, 0.52] as [number, number], // Reverted from [0.55, 0.45]
+  GAMMA: 3.0,
+  ALPHA: [0.48, 0.52] as [number, number],
   GRADIENT_CLIP_NORM: 2.0,
   LR_DECAY_RATE: 0.99,
   WARMUP_EPOCHS: 10,

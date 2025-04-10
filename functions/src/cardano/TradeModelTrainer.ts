@@ -185,32 +185,7 @@ export class TradeModelTrainer {
                   )}, Spread: ${accSpread.toFixed(4)}`
                 );
               }
-              if (epoch % 5 === 0) {
-                const preds = this.model!.predict(X_normalized) as tf.Tensor;
-                const predArray = (await preds.array()) as number[][];
-                let bestRoi = -Infinity;
-                for (let t = 0.4; t <= 0.6; t += 0.05) {
-                  const predictedLabels = predArray.map((p) =>
-                    p[1] > t ? 1 : 0
-                  );
-                  const X3D = X_normalized as tf.Tensor3D;
-                  const prices = (await X3D.slice(
-                    [0, X3D.shape[1] - 1, 8],
-                    [X3D.shape[0], 1, 1]
-                  ).data()) as Float32Array;
-                  const roi = Metrics.calculateROI(predictedLabels, prices);
-                  if (roi > bestRoi) {
-                    bestRoi = roi;
-                    this.bestThreshold = t;
-                  }
-                }
-                console.log(
-                  `Epoch ${epoch + 1} - ROI: ${bestRoi.toFixed(
-                    2
-                  )}%, Threshold: ${this.bestThreshold}`
-                );
-                preds.dispose();
-              }
+
               await earlyStoppingCallback.onEpochEnd(epoch, logs);
               await predictionLoggerCallback.onEpochEnd(epoch, logs);
               await lrCallback.onEpochEnd(epoch, logs);

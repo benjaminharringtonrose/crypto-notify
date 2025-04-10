@@ -1,5 +1,5 @@
 import * as tf from "@tensorflow/tfjs-node";
-import { TRAINING_CONFIG, STRATEGY_CONFIG } from "../constants";
+import { TRAINING_CONFIG } from "../constants";
 
 export class Metrics {
   static focalLoss(
@@ -177,34 +177,7 @@ export class Metrics {
     const predArray = (await preds.array()) as number[][];
     const yArray = Array.from(await y.argMax(-1).data());
 
-    let bestThreshold = 0.5;
-    let bestRoi = -Infinity;
-    let bestF1 = 0;
-    const X3D = X as tf.Tensor3D;
-    const lastTimestep = X3D.shape[1] - 1;
-    const prices = (await X3D.slice(
-      [0, lastTimestep, 8],
-      [X3D.shape[0], 1, 1]
-    ).data()) as Float32Array;
-    for (let t = 0.4; t <= 0.6; t += 0.05) {
-      const predictedLabels = predArray.map((p) => (p[1] > t ? 1 : 0));
-      const metrics = Metrics.calculateMetrics(predictedLabels, yArray);
-      const avgF1 = (metrics.f1Buy + metrics.f1Sell) / 2;
-      const roi = Metrics.calculateROI(predictedLabels, prices);
-      if (roi > bestRoi) {
-        bestRoi = roi;
-        bestThreshold = t;
-        bestF1 = avgF1;
-      }
-    }
-    console.log(
-      `Optimal threshold: ${bestThreshold}, Best ROI: ${bestRoi.toFixed(
-        4
-      )}, Best Avg F1: ${bestF1.toFixed(4)}`
-    );
-    const predictedLabels = predArray.map((p) =>
-      p[1] > bestThreshold ? 1 : 0
-    );
+    const predictedLabels = predArray.map((p) => (p[1] > 0.5 ? 1 : 0));
 
     const buyCount = predictedLabels.filter((p) => p === 1).length;
     console.log(
@@ -236,73 +209,5 @@ export class Metrics {
     console.log("Confusion Matrix:", await confusionMatrix.array());
 
     preds.dispose();
-  }
-
-  static calculateROI(predictedLabels: number[], prices: Float32Array): number {
-    let capital = 1000; // Starting capital
-    let position = 0; // Position size in ADA
-    let returns = 0; // Cumulative returns
-    let buyCount = 0;
-    let sellCount = 0;
-    let totalProfit = 0;
-    let buyPrice = 0; // Track buy price for profit calculation
-
-    for (let i = 0; i < predictedLabels.length; i++) {
-      const price = prices[i];
-      if (predictedLabels[i] === 1 && position === 0) {
-        // Buy signal
-        position = (capital * (1 - STRATEGY_CONFIG.COMMISSION)) / price;
-        buyPrice = price;
-        capital = 0;
-        buyCount++;
-      } else if (predictedLabels[i] === 0 && position > 0 && i > 0) {
-        // Sell signal
-        // Only sell if profitable or at end
-        const potentialProfit = (price - buyPrice) * position;
-        if (
-          potentialProfit > STRATEGY_CONFIG.MIN_PROFIT_THRESHOLD * 1000 ||
-          i === predictedLabels.length - 1
-        ) {
-          capital = position * price * (1 - STRATEGY_CONFIG.COMMISSION);
-          const profit = capital - 1000;
-          totalProfit += profit;
-          position = 0;
-          sellCount++;
-          returns += profit / 1000;
-        }
-      }
-      if (position > 0 && i > 0) {
-        // Check stop-loss/take-profit
-        const stopLoss =
-          buyPrice * (1 - STRATEGY_CONFIG.STOP_LOSS_MULTIPLIER_DEFAULT * 0.01);
-        const takeProfit =
-          buyPrice *
-          (1 + STRATEGY_CONFIG.PROFIT_TAKE_MULTIPLIER_DEFAULT * 0.01);
-        if (price < stopLoss || price > takeProfit) {
-          capital = position * price * (1 - STRATEGY_CONFIG.COMMISSION);
-          const profit = capital - 1000;
-          totalProfit += profit;
-          position = 0;
-          sellCount++;
-          returns += profit / 1000;
-        }
-      }
-    }
-    if (position > 0) {
-      // Close any open position
-      capital =
-        position * prices[prices.length - 1] * (1 - STRATEGY_CONFIG.COMMISSION);
-      const profit = capital - 1000;
-      totalProfit += profit;
-      sellCount++;
-      returns += profit / 1000;
-    }
-
-    console.log(
-      `ROI Calc - Buys: ${buyCount}, Sells: ${sellCount}, Total Profit: ${totalProfit.toFixed(
-        2
-      )}`
-    );
-    return returns * 100; // Return as percentage
   }
 }

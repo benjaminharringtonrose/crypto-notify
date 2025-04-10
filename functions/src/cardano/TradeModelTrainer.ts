@@ -1,4 +1,4 @@
-import * as admin from "firebase-admin";
+// import * as admin from "firebase-admin"; // Commented out: only used in saveModelWeights
 import * as tf from "@tensorflow/tfjs-node";
 import dotenv from "dotenv";
 import { EarlyStoppingCallback } from "./callbacks/EarlyStoppingCallback";
@@ -8,7 +8,7 @@ import { GradientClippingCallback } from "./callbacks/GradientClippingCallback";
 import { ModelConfig } from "../types";
 import TradeModelFactory from "./TradeModelFactory";
 import { FirebaseService } from "../api/FirebaseService";
-import { FILE_NAMES, MODEL_CONFIG, TRAINING_CONFIG } from "../constants";
+import { MODEL_CONFIG, TRAINING_CONFIG } from "../constants";
 import { DataProcessor } from "./DataProcessor";
 import { Metrics } from "./Metrics";
 
@@ -22,11 +22,11 @@ export class TradeModelTrainer {
     batchSize: TRAINING_CONFIG.BATCH_SIZE,
     initialLearningRate: TRAINING_CONFIG.INITIAL_LEARNING_RATE,
   };
-  private bucket = admin.storage().bucket();
+  // private bucket = admin.storage().bucket(); // Commented out: only used in saveModelWeights
   private model: tf.LayersModel | null = null;
   private lossFn = Metrics.focalLoss.bind(Metrics);
   private dataProcessor: DataProcessor;
-  private bestThreshold: number = 0.5; // Global threshold updated by evaluateModel
+  private bestThreshold: number = 0.5;
 
   constructor() {
     this.dataProcessor = new DataProcessor(
@@ -160,7 +160,6 @@ export class TradeModelTrainer {
         ],
       });
 
-      // Set model for all callbacks
       earlyStoppingCallback.setModel(this.model);
       predictionLoggerCallback.setModel(this.model);
       lrCallback.setModel(this.model);
@@ -179,7 +178,6 @@ export class TradeModelTrainer {
               if (epoch % 5 === 0) {
                 const preds = this.model!.predict(X_normalized) as tf.Tensor;
                 const predArray = (await preds.array()) as number[][];
-                const yArray = Array.from(await y_tensor.argMax(-1).data());
                 let bestRoi = -Infinity;
                 for (let t = 0.4; t <= 0.6; t += 0.05) {
                   const predictedLabels = predArray.map((p) =>
@@ -190,20 +188,16 @@ export class TradeModelTrainer {
                     [0, X3D.shape[1] - 1, 8],
                     [X3D.shape[0], 1, 1]
                   ).data()) as Float32Array;
-                  const roi = Metrics.calculateROI(
-                    predictedLabels,
-                    prices,
-                    yArray
-                  );
+                  const roi = Metrics.calculateROI(predictedLabels, prices);
                   if (roi > bestRoi) {
                     bestRoi = roi;
                     this.bestThreshold = t;
                   }
                 }
                 console.log(
-                  `Epoch ${epoch + 1} Updated Best Threshold: ${
-                    this.bestThreshold
-                  }`
+                  `Epoch ${epoch + 1} - ROI: ${bestRoi.toFixed(
+                    2
+                  )}%, Threshold: ${this.bestThreshold}`
                 );
                 preds.dispose();
               }
@@ -238,98 +232,97 @@ export class TradeModelTrainer {
     }
   }
 
-  private async saveModelWeights(
-    X_mean: tf.Tensor,
-    X_std: tf.Tensor
-  ): Promise<void> {
-    if (!this.model) throw new Error("Model not initialized");
-    const weights = {
-      conv1Weights: Array.from(
-        await this.model.getLayer("conv1d").getWeights()[0].data()
-      ),
-      conv1Bias: Array.from(
-        await this.model.getLayer("conv1d").getWeights()[1].data()
-      ),
-      conv2Weights: Array.from(
-        await this.model.getLayer("conv1d_2").getWeights()[0].data()
-      ),
-      conv2Bias: Array.from(
-        await this.model.getLayer("conv1d_2").getWeights()[1].data()
-      ),
-      lstm1Weights: Array.from(
-        await this.model.getLayer("lstm1").getWeights()[0].data()
-      ),
-      lstm1RecurrentWeights: Array.from(
-        await this.model.getLayer("lstm1").getWeights()[1].data()
-      ),
-      lstm1Bias: Array.from(
-        await this.model.getLayer("lstm1").getWeights()[2].data()
-      ),
-      lstm2Weights: Array.from(
-        await this.model.getLayer("lstm2").getWeights()[0].data()
-      ),
-      lstm2RecurrentWeights: Array.from(
-        await this.model.getLayer("lstm2").getWeights()[1].data()
-      ),
-      lstm2Bias: Array.from(
-        await this.model.getLayer("lstm2").getWeights()[2].data()
-      ),
-      lstm3Weights: Array.from(
-        await this.model.getLayer("lstm3").getWeights()[0].data()
-      ),
-      lstm3RecurrentWeights: Array.from(
-        await this.model.getLayer("lstm3").getWeights()[1].data()
-      ),
-      lstm3Bias: Array.from(
-        await this.model.getLayer("lstm3").getWeights()[2].data()
-      ),
-      timeDistributedWeights: Array.from(
-        await this.model.getLayer("time_distributed").getWeights()[0].data()
-      ),
-      timeDistributedBias: Array.from(
-        await this.model.getLayer("time_distributed").getWeights()[1].data()
-      ),
-      bnGamma: Array.from(
-        await this.model.getLayer("batchNormalization").getWeights()[0].data()
-      ),
-      bnBeta: Array.from(
-        await this.model.getLayer("batchNormalization").getWeights()[1].data()
-      ),
-      bnMovingMean: Array.from(
-        await this.model.getLayer("batchNormalization").getWeights()[2].data()
-      ),
-      bnMovingVariance: Array.from(
-        await this.model.getLayer("batchNormalization").getWeights()[3].data()
-      ),
-      dense1Weights: Array.from(
-        await this.model.getLayer("dense").getWeights()[0].data()
-      ),
-      dense1Bias: Array.from(
-        await this.model.getLayer("dense").getWeights()[1].data()
-      ),
-      dense2Weights: Array.from(
-        await this.model.getLayer("dense_1").getWeights()[0].data()
-      ),
-      dense2Bias: Array.from(
-        await this.model.getLayer("dense_1").getWeights()[1].data()
-      ),
-      featureMeans: Array.from(await X_mean.data()),
-      featureStds: Array.from(await X_std.data()),
-    };
-    const weightsJson = JSON.stringify({ weights });
-    const file = this.bucket.file(FILE_NAMES.WEIGHTS);
-    await file.save(weightsJson, { contentType: "application/json" });
-    console.log("Model weights saved to Firebase Storage");
-    X_mean.dispose();
-    X_std.dispose();
-  }
+  // private async saveModelWeights(
+  //   X_mean: tf.Tensor,
+  //   X_std: tf.Tensor
+  // ): Promise<void> {
+  //   if (!this.model) throw new Error("Model not initialized");
+  //   const weights = {
+  //     conv1Weights: Array.from(
+  //       await this.model.getLayer("conv1d").getWeights()[0].data()
+  //     ),
+  //     conv1Bias: Array.from(
+  //       await this.model.getLayer("conv1d").getWeights()[1].data()
+  //     ),
+  //     conv2Weights: Array.from(
+  //       await this.model.getLayer("conv1d_2").getWeights()[0].data()
+  //     ),
+  //     conv2Bias: Array.from(
+  //       await this.model.getLayer("conv1d_2").getWeights()[1].data()
+  //     ),
+  //     lstm1Weights: Array.from(
+  //       await this.model.getLayer("lstm1").getWeights()[0].data()
+  //     ),
+  //     lstm1RecurrentWeights: Array.from(
+  //       await this.model.getLayer("lstm1").getWeights()[1].data()
+  //     ),
+  //     lstm1Bias: Array.from(
+  //       await this.model.getLayer("lstm1").getWeights()[2].data()
+  //     ),
+  //     lstm2Weights: Array.from(
+  //       await this.model.getLayer("lstm2").getWeights()[0].data()
+  //     ),
+  //     lstm2RecurrentWeights: Array.from(
+  //       await this.model.getLayer("lstm2").getWeights()[1].data()
+  //     ),
+  //     lstm2Bias: Array.from(
+  //       await this.model.getLayer("lstm2").getWeights()[2].data()
+  //     ),
+  //     lstm3Weights: Array.from(
+  //       await this.model.getLayer("lstm3").getWeights()[0].data()
+  //     ),
+  //     lstm3RecurrentWeights: Array.from(
+  //       await this.model.getLayer("lstm3").getWeights()[1].data()
+  //     ),
+  //     lstm3Bias: Array.from(
+  //       await this.model.getLayer("lstm3").getWeights()[2].data()
+  //     ),
+  //     timeDistributedWeights: Array.from(
+  //       await this.model.getLayer("time_distributed").getWeights()[0].data()
+  //     ),
+  //     timeDistributedBias: Array.from(
+  //       await this.model.getLayer("time_distributed").getWeights()[1].data()
+  //     ),
+  //     bnGamma: Array.from(
+  //       await this.model.getLayer("batchNormalization").getWeights()[0].data()
+  //     ),
+  //     bnBeta: Array.from(
+  //       await this.model.getLayer("batchNormalization").getWeights()[1].data()
+  //     ),
+  //     bnMovingMean: Array.from(
+  //       await this.model.getLayer("batchNormalization").getWeights()[2].data()
+  //     ),
+  //     bnMovingVariance: Array.from(
+  //       await this.model.getLayer("batchNormalization").getWeights()[3].data()
+  //     ),
+  //     dense1Weights: Array.from(
+  //       await this.model.getLayer("dense").getWeights()[0].data()
+  //     ),
+  //     dense1Bias: Array.from(
+  //       await this.model.getLayer("dense").getWeights()[1].data()
+  //     ),
+  //     dense2Weights: Array.from(
+  //       await this.model.getLayer("dense_1").getWeights()[0].data()
+  //     ),
+  //     dense2Bias: Array.from(
+  //       await this.model.getLayer("dense_1").getWeights()[1].data()
+  //     ),
+  //     featureMeans: Array.from(await X_mean.data()),
+  //     featureStds: Array.from(await X_std.data()),
+  //   };
+  //   const weightsJson = JSON.stringify({ weights });
+  //   const file = this.bucket.file(FILE_NAMES.WEIGHTS);
+  //   await file.save(weightsJson, { contentType: "application/json" });
+  //   console.log("Model weights saved to Firebase Storage");
+  //   X_mean.dispose();
+  //   X_std.dispose();
+  // }
 
   public async train(): Promise<void> {
     try {
       const startTime = performance.now();
       const { X, y } = await this.dataProcessor.prepareData();
-      const { X_mean, X_std } = await this.trainModel(X, y);
-      await this.saveModelWeights(X_mean, X_std);
+      await this.trainModel(X, y);
       const endTime = performance.now();
       const executionTime =
         (endTime - startTime) / TRAINING_CONFIG.MS_TO_SECONDS;

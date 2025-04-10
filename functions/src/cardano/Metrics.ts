@@ -187,11 +187,10 @@ export class Metrics {
       [X3D.shape[0], 1, 1]
     ).data()) as Float32Array;
     for (let t = 0.4; t <= 0.6; t += 0.05) {
-      // Adjusted range to 0.4-0.6
       const predictedLabels = predArray.map((p) => (p[1] > t ? 1 : 0));
       const metrics = Metrics.calculateMetrics(predictedLabels, yArray);
       const avgF1 = (metrics.f1Buy + metrics.f1Sell) / 2;
-      const roi = Metrics.calculateROI(predictedLabels, prices, yArray);
+      const roi = Metrics.calculateROI(predictedLabels, prices);
       if (roi > bestRoi) {
         bestRoi = roi;
         bestThreshold = t;
@@ -239,43 +238,71 @@ export class Metrics {
     preds.dispose();
   }
 
-  static calculateROI(
-    predictedLabels: number[],
-    prices: Float32Array,
-    yArray: number[]
-  ): number {
-    let capital = 1000;
-    let position = 0;
-    let returns = 0;
+  static calculateROI(predictedLabels: number[], prices: Float32Array): number {
+    let capital = 1000; // Starting capital
+    let position = 0; // Position size in ADA
+    let returns = 0; // Cumulative returns
+    let buyCount = 0;
+    let sellCount = 0;
+    let totalProfit = 0;
+    let buyPrice = 0; // Track buy price for profit calculation
+
     for (let i = 0; i < predictedLabels.length; i++) {
       const price = prices[i];
       if (predictedLabels[i] === 1 && position === 0) {
+        // Buy signal
         position = (capital * (1 - STRATEGY_CONFIG.COMMISSION)) / price;
+        buyPrice = price;
         capital = 0;
-      } else if (predictedLabels[i] === 0 && position > 0) {
-        capital = position * price * (1 - STRATEGY_CONFIG.COMMISSION);
-        position = 0;
-        returns += (capital - 1000) / 1000;
+        buyCount++;
+      } else if (predictedLabels[i] === 0 && position > 0 && i > 0) {
+        // Sell signal
+        // Only sell if profitable or at end
+        const potentialProfit = (price - buyPrice) * position;
+        if (
+          potentialProfit > STRATEGY_CONFIG.MIN_PROFIT_THRESHOLD * 1000 ||
+          i === predictedLabels.length - 1
+        ) {
+          capital = position * price * (1 - STRATEGY_CONFIG.COMMISSION);
+          const profit = capital - 1000;
+          totalProfit += profit;
+          position = 0;
+          sellCount++;
+          returns += profit / 1000;
+        }
       }
       if (position > 0 && i > 0) {
+        // Check stop-loss/take-profit
         const stopLoss =
-          prices[i - 1] *
-          (1 - STRATEGY_CONFIG.STOP_LOSS_MULTIPLIER_DEFAULT * 0.01);
+          buyPrice * (1 - STRATEGY_CONFIG.STOP_LOSS_MULTIPLIER_DEFAULT * 0.01);
         const takeProfit =
-          prices[i - 1] *
+          buyPrice *
           (1 + STRATEGY_CONFIG.PROFIT_TAKE_MULTIPLIER_DEFAULT * 0.01);
         if (price < stopLoss || price > takeProfit) {
           capital = position * price * (1 - STRATEGY_CONFIG.COMMISSION);
+          const profit = capital - 1000;
+          totalProfit += profit;
           position = 0;
-          returns += (capital - 1000) / 1000;
+          sellCount++;
+          returns += profit / 1000;
         }
       }
     }
     if (position > 0) {
+      // Close any open position
       capital =
         position * prices[prices.length - 1] * (1 - STRATEGY_CONFIG.COMMISSION);
-      returns += (capital - 1000) / 1000;
+      const profit = capital - 1000;
+      totalProfit += profit;
+      sellCount++;
+      returns += profit / 1000;
     }
-    return returns * 100;
+
+    console.log(
+      `ROI Calc - Buys: ${buyCount}, Sells: ${sellCount}, Total Profit: ${totalProfit.toFixed(
+        2
+      )}`
+    );
+    return returns * 100; // Return as percentage
   }
 }

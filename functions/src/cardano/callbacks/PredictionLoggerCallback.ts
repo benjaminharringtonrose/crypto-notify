@@ -1,7 +1,7 @@
 import * as tf from "@tensorflow/tfjs-node";
-import { Metrics } from "../Metrics";
 import { TRAINING_CONFIG } from "../../constants";
 import { TradeModelTrainer } from "../TradeModelTrainer";
+import { Metrics } from "../Metrics";
 
 export class PredictionLoggerCallback extends tf.CustomCallback {
   public readonly validationFeatures: tf.Tensor;

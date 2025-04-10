@@ -1,4 +1,3 @@
-// import * as admin from "firebase-admin"; // Commented out: only used in saveModelWeights
 import * as tf from "@tensorflow/tfjs-node";
 import dotenv from "dotenv";
 import { EarlyStoppingCallback } from "./callbacks/EarlyStoppingCallback";
@@ -22,7 +21,6 @@ export class TradeModelTrainer {
     batchSize: TRAINING_CONFIG.BATCH_SIZE,
     initialLearningRate: TRAINING_CONFIG.INITIAL_LEARNING_RATE,
   };
-  // private bucket = admin.storage().bucket(); // Commented out: only used in saveModelWeights
   private model: tf.LayersModel | null = null;
   private lossFn = Metrics.focalLoss.bind(Metrics);
   private dataProcessor: DataProcessor;
@@ -175,6 +173,18 @@ export class TradeModelTrainer {
         callbacks: [
           {
             onEpochEnd: async (epoch: number, logs?: tf.Logs) => {
+              if (logs) {
+                const trainAcc = logs["binaryAccuracy"] || 0;
+                const valAcc = logs["val_binaryAccuracy"] || 0;
+                const accSpread = trainAcc - valAcc;
+                console.log(
+                  `Epoch ${epoch + 1} - Binary Accuracy: ${trainAcc.toFixed(
+                    4
+                  )}, Val Binary Accuracy: ${valAcc.toFixed(
+                    4
+                  )}, Spread: ${accSpread.toFixed(4)}`
+                );
+              }
               if (epoch % 5 === 0) {
                 const preds = this.model!.predict(X_normalized) as tf.Tensor;
                 const predArray = (await preds.array()) as number[][];
@@ -232,91 +242,91 @@ export class TradeModelTrainer {
     }
   }
 
-  // private async saveModelWeights(
-  //   X_mean: tf.Tensor,
-  //   X_std: tf.Tensor
-  // ): Promise<void> {
-  //   if (!this.model) throw new Error("Model not initialized");
-  //   const weights = {
-  //     conv1Weights: Array.from(
-  //       await this.model.getLayer("conv1d").getWeights()[0].data()
-  //     ),
-  //     conv1Bias: Array.from(
-  //       await this.model.getLayer("conv1d").getWeights()[1].data()
-  //     ),
-  //     conv2Weights: Array.from(
-  //       await this.model.getLayer("conv1d_2").getWeights()[0].data()
-  //     ),
-  //     conv2Bias: Array.from(
-  //       await this.model.getLayer("conv1d_2").getWeights()[1].data()
-  //     ),
-  //     lstm1Weights: Array.from(
-  //       await this.model.getLayer("lstm1").getWeights()[0].data()
-  //     ),
-  //     lstm1RecurrentWeights: Array.from(
-  //       await this.model.getLayer("lstm1").getWeights()[1].data()
-  //     ),
-  //     lstm1Bias: Array.from(
-  //       await this.model.getLayer("lstm1").getWeights()[2].data()
-  //     ),
-  //     lstm2Weights: Array.from(
-  //       await this.model.getLayer("lstm2").getWeights()[0].data()
-  //     ),
-  //     lstm2RecurrentWeights: Array.from(
-  //       await this.model.getLayer("lstm2").getWeights()[1].data()
-  //     ),
-  //     lstm2Bias: Array.from(
-  //       await this.model.getLayer("lstm2").getWeights()[2].data()
-  //     ),
-  //     lstm3Weights: Array.from(
-  //       await this.model.getLayer("lstm3").getWeights()[0].data()
-  //     ),
-  //     lstm3RecurrentWeights: Array.from(
-  //       await this.model.getLayer("lstm3").getWeights()[1].data()
-  //     ),
-  //     lstm3Bias: Array.from(
-  //       await this.model.getLayer("lstm3").getWeights()[2].data()
-  //     ),
-  //     timeDistributedWeights: Array.from(
-  //       await this.model.getLayer("time_distributed").getWeights()[0].data()
-  //     ),
-  //     timeDistributedBias: Array.from(
-  //       await this.model.getLayer("time_distributed").getWeights()[1].data()
-  //     ),
-  //     bnGamma: Array.from(
-  //       await this.model.getLayer("batchNormalization").getWeights()[0].data()
-  //     ),
-  //     bnBeta: Array.from(
-  //       await this.model.getLayer("batchNormalization").getWeights()[1].data()
-  //     ),
-  //     bnMovingMean: Array.from(
-  //       await this.model.getLayer("batchNormalization").getWeights()[2].data()
-  //     ),
-  //     bnMovingVariance: Array.from(
-  //       await this.model.getLayer("batchNormalization").getWeights()[3].data()
-  //     ),
-  //     dense1Weights: Array.from(
-  //       await this.model.getLayer("dense").getWeights()[0].data()
-  //     ),
-  //     dense1Bias: Array.from(
-  //       await this.model.getLayer("dense").getWeights()[1].data()
-  //     ),
-  //     dense2Weights: Array.from(
-  //       await this.model.getLayer("dense_1").getWeights()[0].data()
-  //     ),
-  //     dense2Bias: Array.from(
-  //       await this.model.getLayer("dense_1").getWeights()[1].data()
-  //     ),
-  //     featureMeans: Array.from(await X_mean.data()),
-  //     featureStds: Array.from(await X_std.data()),
-  //   };
-  //   const weightsJson = JSON.stringify({ weights });
-  //   const file = this.bucket.file(FILE_NAMES.WEIGHTS);
-  //   await file.save(weightsJson, { contentType: "application/json" });
-  //   console.log("Model weights saved to Firebase Storage");
-  //   X_mean.dispose();
-  //   X_std.dispose();
-  // }
+  //   private async saveModelWeights(
+  //     X_mean: tf.Tensor,
+  //     X_std: tf.Tensor
+  //   ): Promise<void> {
+  //     if (!this.model) throw new Error("Model not initialized");
+  //     const weights = {
+  //       conv1Weights: Array.from(
+  //         await this.model.getLayer("conv1d").getWeights()[0].data()
+  //       ),
+  //       conv1Bias: Array.from(
+  //         await this.model.getLayer("conv1d").getWeights()[1].data()
+  //       ),
+  //       conv2Weights: Array.from(
+  //         await this.model.getLayer("conv1d_2").getWeights()[0].data()
+  //       ),
+  //       conv2Bias: Array.from(
+  //         await this.model.getLayer("conv1d_2").getWeights()[1].data()
+  //       ),
+  //       lstm1Weights: Array.from(
+  //         await this.model.getLayer("lstm1").getWeights()[0].data()
+  //       ),
+  //       lstm1RecurrentWeights: Array.from(
+  //         await this.model.getLayer("lstm1").getWeights()[1].data()
+  //       ),
+  //       lstm1Bias: Array.from(
+  //         await this.model.getLayer("lstm1").getWeights()[2].data()
+  //       ),
+  //       lstm2Weights: Array.from(
+  //         await this.model.getLayer("lstm2").getWeights()[0].data()
+  //       ),
+  //       lstm2RecurrentWeights: Array.from(
+  //         await this.model.getLayer("lstm2").getWeights()[1].data()
+  //       ),
+  //       lstm2Bias: Array.from(
+  //         await this.model.getLayer("lstm2").getWeights()[2].data()
+  //       ),
+  //       lstm3Weights: Array.from(
+  //         await this.model.getLayer("lstm3").getWeights()[0].data()
+  //       ),
+  //       lstm3RecurrentWeights: Array.from(
+  //         await this.model.getLayer("lstm3").getWeights()[1].data()
+  //       ),
+  //       lstm3Bias: Array.from(
+  //         await this.model.getLayer("lstm3").getWeights()[2].data()
+  //       ),
+  //       timeDistributedWeights: Array.from(
+  //         await this.model.getLayer("time_distributed").getWeights()[0].data()
+  //       ),
+  //       timeDistributedBias: Array.from(
+  //         await this.model.getLayer("time_distributed").getWeights()[1].data()
+  //       ),
+  //       bnGamma: Array.from(
+  //         await this.model.getLayer("batchNormalization").getWeights()[0].data()
+  //       ),
+  //       bnBeta: Array.from(
+  //         await this.model.getLayer("batchNormalization").getWeights()[1].data()
+  //       ),
+  //       bnMovingMean: Array.from(
+  //         await this.model.getLayer("batchNormalization").getWeights()[2].data()
+  //       ),
+  //       bnMovingVariance: Array.from(
+  //         await this.model.getLayer("batchNormalization").getWeights()[3].data()
+  //       ),
+  //       dense1Weights: Array.from(
+  //         await this.model.getLayer("dense").getWeights()[0].data()
+  //       ),
+  //       dense1Bias: Array.from(
+  //         await this.model.getLayer("dense").getWeights()[1].data()
+  //       ),
+  //       dense2Weights: Array.from(
+  //         await this.model.getLayer("dense_1").getWeights()[0].data()
+  //       ),
+  //       dense2Bias: Array.from(
+  //         await this.model.getLayer("dense_1").getWeights()[1].data()
+  //       ),
+  //       featureMeans: Array.from(await X_mean.data()),
+  //       featureStds: Array.from(await X_std.data()),
+  //     };
+  //     const weightsJson = JSON.stringify({ weights });
+  //     const file = this.bucket.file(FILE_NAMES.WEIGHTS);
+  //     await file.save(weightsJson, { contentType: "application/json" });
+  //     console.log("Model weights saved to Firebase Storage");
+  //     X_mean.dispose();
+  //     X_std.dispose();
+  //   }
 
   public async train(): Promise<void> {
     try {

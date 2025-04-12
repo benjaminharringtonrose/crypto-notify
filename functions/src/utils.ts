@@ -40,7 +40,7 @@ export const formatAnalysisResults = ({
   const holdProb = `${(probabilities.hold * 100).toFixed(3)}%`;
   const rec = recommendation.charAt(0).toUpperCase() + recommendation.slice(1);
 
-  return `${symbol}: ${price}\n\nBuy Probability: ${buyProb}\nSell Probability: ${sellProb}\nHold Probability: ${holdProb}\n\nRecommendation: ${rec}\n\nThe probability is the model’s confidence in a near-term price drop exceeding 5% over 7 days.\n\nReply with a cryptocurrency to run the analysis again`;
+  return `${symbol}: ${price}\n\nBuy Probability: ${buyProb}\nSell Probability: ${sellProb}\nHold Probability: ${holdProb}\n\nRecommendation: ${rec}\n\nThe probability is the model’s confidence in a near-term price change exceeding 5% over 7 days.\n\nReply with a cryptocurrency to run the analysis again`;
 };
 
 export const fetchCardanoPriceErrorMessage = (error: any) => {

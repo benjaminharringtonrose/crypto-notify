@@ -10,9 +10,9 @@ import {
   formatPredictionExplanation,
   sendSMS,
 } from "../utils";
-import { TradeExecutor } from "../cardano/TradeExecutor";
 import { TradeModelPredictor } from "../cardano/TradeModelPredictor";
 import { TIME_CONVERSIONS } from "../constants";
+import { CoinbaseService } from "../api/CoinbaseService";
 
 const CONFIG: https.HttpsOptions = {
   memory: "512MiB",
@@ -20,7 +20,7 @@ const CONFIG: https.HttpsOptions = {
 
 export const receiveTextADA = https.onRequest(CONFIG, async (_, response) => {
   try {
-    const trader = new TradeExecutor({
+    const coinbase = new CoinbaseService({
       apiKey: process.env.COINBASE_API_KEY,
       apiSecret: process.env.COINBASE_API_SECRET,
     });
@@ -30,16 +30,16 @@ export const receiveTextADA = https.onRequest(CONFIG, async (_, response) => {
     const now = Math.floor(Date.now() / 1000);
     const start = now - TIME_CONVERSIONS.TIMESTEP_IN_SECONDS;
 
-    const currentPrice = await trader.getCurrentPrice(CoinbaseProductIds.ADA);
+    const currentPrice = await coinbase.getCurrentPrice(CoinbaseProductIds.ADA);
 
-    const adaData = await trader.getMarketData({
+    const adaData = await coinbase.getPricesAndVolumes({
       product_id: CoinbaseProductIds.ADA,
       granularity: Granularity.OneDay,
       start: start.toString(),
       end: now.toString(),
     });
 
-    const btcData = await trader.getMarketData({
+    const btcData = await coinbase.getPricesAndVolumes({
       product_id: CoinbaseProductIds.BTC,
       granularity: Granularity.OneDay,
       start: start.toString(),

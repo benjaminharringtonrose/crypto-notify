@@ -5,7 +5,11 @@ import {
   Granularity,
   Recommendation,
 } from "../types";
-import { formatAnalysisResults, sendSMS } from "../utils";
+import {
+  formatAnalysisResults,
+  formatPredictionExplanation,
+  sendSMS,
+} from "../utils";
 import { TradeExecutor } from "../cardano/TradeExecutor";
 import { TradeModelPredictor } from "../cardano/TradeModelPredictor";
 import { TIME_CONVERSIONS } from "../constants";
@@ -50,12 +54,15 @@ export const receiveTextADA = https.onRequest(CONFIG, async (_, response) => {
       throw new Error("Insufficient historical data for prediction");
     }
 
-    const { buyProb, sellProb } = await predictor.predict(
+    const prediction = await predictor.predict(
       adaData.prices,
       adaData.volumes,
       btcData.prices,
       btcData.volumes
     );
+
+    const { buyProb, sellProb, confidence, momentum, trendSlope, atr } =
+      prediction;
 
     let recommendation = null;
     const threshold = 0.73;
@@ -68,7 +75,7 @@ export const receiveTextADA = https.onRequest(CONFIG, async (_, response) => {
       recommendation = Recommendation.Hold;
     }
 
-    const smsMessage = formatAnalysisResults({
+    const analysisMessage = formatAnalysisResults({
       cryptoSymbol: CryptoIds.Cardano,
       currentPrice,
       probabilities: {
@@ -78,6 +85,18 @@ export const receiveTextADA = https.onRequest(CONFIG, async (_, response) => {
       },
       recommendation,
     });
+
+    const explanationMessage = formatPredictionExplanation({
+      recommendation,
+      buyProb,
+      sellProb,
+      confidence,
+      momentum,
+      trendSlope,
+      atr,
+    });
+
+    const smsMessage = `${analysisMessage}\n\n${explanationMessage}`;
 
     await sendSMS(smsMessage);
     response.status(200).send("Reply received and logged!");

@@ -72,3 +72,61 @@ export const sendSMS = async (message: string) => {
     throw error;
   }
 };
+
+// Add to utils.ts
+export const formatPredictionExplanation = ({
+  recommendation,
+  buyProb,
+  sellProb,
+  confidence,
+  momentum,
+  trendSlope,
+  atr,
+}: {
+  recommendation: Recommendation;
+  buyProb: number;
+  sellProb: number;
+  confidence: number;
+  momentum: number;
+  trendSlope: number;
+  atr: number;
+}) => {
+  const rec = recommendation.charAt(0).toUpperCase() + recommendation.slice(1);
+  let explanation = `Reason for ${rec} Recommendation:\n`;
+
+  if (recommendation === Recommendation.Buy) {
+    explanation += `- High buy confidence (${(buyProb * 100).toFixed(
+      1
+    )}%) suggests upward potential.\n`;
+    if (momentum > 0) {
+      explanation += `- Positive momentum (${(momentum * 100).toFixed(
+        2
+      )}%) indicates rising prices.\n`;
+    }
+    if (trendSlope > 0) {
+      explanation += `- Upward trend slope supports price growth.\n`;
+    }
+  } else if (recommendation === Recommendation.Sell) {
+    explanation += `- High sell confidence (${(sellProb * 100).toFixed(
+      1
+    )}%) suggests downward risk.\n`;
+    if (momentum < 0) {
+      explanation += `- Negative momentum (${(momentum * 100).toFixed(
+        2
+      )}%) indicates falling prices.\n`;
+    }
+    if (trendSlope < 0) {
+      explanation += `- Downward trend slope signals potential decline.\n`;
+    }
+  } else {
+    explanation += `- Balanced probabilities (Buy: ${(buyProb * 100).toFixed(
+      1
+    )}%, Sell: ${(sellProb * 100).toFixed(1)}%) suggest no clear trend.\n`;
+    explanation += `- Low volatility (ATR: ${atr.toFixed(
+      4
+    )}) or mixed signals favor holding.\n`;
+  }
+
+  explanation += `- Overall confidence: ${(confidence * 100).toFixed(1)}%.`;
+  return explanation;
+};

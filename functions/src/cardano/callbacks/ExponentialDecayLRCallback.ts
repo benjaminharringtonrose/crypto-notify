@@ -27,16 +27,15 @@ export class ExponentialDecayLRCallback extends tf.CustomCallback {
 
   private getLearningRate(epoch: number): number {
     if (epoch < this.warmupEpochs) {
-      // Linear warm-up from warmupInitialLR to initialLR over warmupEpochs
       const slope = (this.initialLR - this.warmupInitialLR) / this.warmupEpochs;
       return this.warmupInitialLR + slope * epoch;
     }
-    // Exponential decay after warm-up
     const decayEpochs = epoch - this.warmupEpochs;
     return this.initialLR * Math.pow(this.decayRate, decayEpochs);
   }
 
-  async onEpochBegin(epoch: number) {
+  async onEpochEnd(epoch: number, logs?: tf.Logs) {
+    // Changed to onEpochEnd for consistency
     if (!this.model)
       throw new Error("Model not set in ExponentialDecayLRCallback");
     const lr = this.getLearningRate(epoch);

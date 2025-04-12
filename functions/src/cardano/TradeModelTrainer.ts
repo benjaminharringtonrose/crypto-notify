@@ -1,13 +1,13 @@
+import * as admin from "firebase-admin";
 import * as tf from "@tensorflow/tfjs-node";
 import dotenv from "dotenv";
-import { EarlyStoppingCallback } from "./callbacks/EarlyStoppingCallback";
 import { PredictionLoggerCallback } from "./callbacks/PredictionLoggerCallback";
 import { ExponentialDecayLRCallback } from "./callbacks/ExponentialDecayLRCallback";
 import { GradientClippingCallback } from "./callbacks/GradientClippingCallback";
 import { ModelConfig } from "../types";
 import TradeModelFactory from "./TradeModelFactory";
 import { FirebaseService } from "../api/FirebaseService";
-import { MODEL_CONFIG, TRAINING_CONFIG } from "../constants";
+import { FILE_NAMES, MODEL_CONFIG, TRAINING_CONFIG } from "../constants";
 import { DataProcessor } from "./DataProcessor";
 import { Metrics } from "./Metrics";
 
@@ -21,10 +21,13 @@ export class TradeModelTrainer {
     batchSize: TRAINING_CONFIG.BATCH_SIZE,
     initialLearningRate: TRAINING_CONFIG.INITIAL_LEARNING_RATE,
   };
+  private bucket = admin.storage().bucket();
   private model: tf.LayersModel | null = null;
   private lossFn = Metrics.focalLoss.bind(Metrics);
   private dataProcessor: DataProcessor;
   private bestThreshold: number = 0.5;
+  private bestWeights: tf.Tensor[] = []; // Store best weights
+  private bestValF1Buy: number = -Infinity; // Track best F1 Buy
 
   constructor() {
     this.dataProcessor = new DataProcessor(
@@ -125,11 +128,6 @@ export class TradeModelTrainer {
       );
       this.model = factory.createModel();
 
-      const earlyStoppingCallback = new EarlyStoppingCallback({
-        monitor: "val_customF1Buy",
-        patience: TRAINING_CONFIG.PATIENCE,
-        restoreBestWeights: true,
-      });
       const predictionLoggerCallback = new PredictionLoggerCallback(
         X_val,
         y_val,
@@ -158,7 +156,6 @@ export class TradeModelTrainer {
         ],
       });
 
-      earlyStoppingCallback.setModel(this.model);
       predictionLoggerCallback.setModel(this.model);
       lrCallback.setModel(this.model);
       gradientClippingCallback.setModel(this.model);
@@ -184,15 +181,36 @@ export class TradeModelTrainer {
                     4
                   )}, Spread: ${accSpread.toFixed(4)}`
                 );
-              }
 
-              await earlyStoppingCallback.onEpochEnd(epoch, logs);
-              await predictionLoggerCallback.onEpochEnd(epoch, logs);
-              await lrCallback.onEpochEnd(epoch, logs);
-              await gradientClippingCallback.onEpochEnd(epoch, logs);
+                // Manual best weights tracking
+                const valF1Buy = logs["val_customF1Buy"] || 0;
+                if (valF1Buy > this.bestValF1Buy) {
+                  this.bestValF1Buy = valF1Buy;
+                  this.bestWeights = this.model!.getWeights().map((w) =>
+                    w.clone()
+                  );
+                  console.log(
+                    `New best val_customF1Buy: ${this.bestValF1Buy.toFixed(
+                      4
+                    )} at epoch ${epoch + 1}`
+                  );
+                }
+
+                await predictionLoggerCallback.onEpochEnd(epoch, logs);
+                await lrCallback.onEpochEnd(epoch, logs);
+                await gradientClippingCallback.onEpochEnd(epoch, logs);
+              }
             },
             onTrainEnd: async () => {
-              await earlyStoppingCallback.onTrainEnd();
+              if (this.bestWeights.length > 0) {
+                this.model!.setWeights(this.bestWeights);
+                console.log(
+                  `Restored weights from best val_customF1Buy: ${this.bestValF1Buy.toFixed(
+                    4
+                  )}`
+                );
+                this.bestWeights.forEach((w) => w.dispose());
+              }
             },
           },
         ],
@@ -217,97 +235,98 @@ export class TradeModelTrainer {
     }
   }
 
-  //   private async saveModelWeights(
-  //     X_mean: tf.Tensor,
-  //     X_std: tf.Tensor
-  //   ): Promise<void> {
-  //     if (!this.model) throw new Error("Model not initialized");
-  //     const weights = {
-  //       conv1Weights: Array.from(
-  //         await this.model.getLayer("conv1d").getWeights()[0].data()
-  //       ),
-  //       conv1Bias: Array.from(
-  //         await this.model.getLayer("conv1d").getWeights()[1].data()
-  //       ),
-  //       conv2Weights: Array.from(
-  //         await this.model.getLayer("conv1d_2").getWeights()[0].data()
-  //       ),
-  //       conv2Bias: Array.from(
-  //         await this.model.getLayer("conv1d_2").getWeights()[1].data()
-  //       ),
-  //       lstm1Weights: Array.from(
-  //         await this.model.getLayer("lstm1").getWeights()[0].data()
-  //       ),
-  //       lstm1RecurrentWeights: Array.from(
-  //         await this.model.getLayer("lstm1").getWeights()[1].data()
-  //       ),
-  //       lstm1Bias: Array.from(
-  //         await this.model.getLayer("lstm1").getWeights()[2].data()
-  //       ),
-  //       lstm2Weights: Array.from(
-  //         await this.model.getLayer("lstm2").getWeights()[0].data()
-  //       ),
-  //       lstm2RecurrentWeights: Array.from(
-  //         await this.model.getLayer("lstm2").getWeights()[1].data()
-  //       ),
-  //       lstm2Bias: Array.from(
-  //         await this.model.getLayer("lstm2").getWeights()[2].data()
-  //       ),
-  //       lstm3Weights: Array.from(
-  //         await this.model.getLayer("lstm3").getWeights()[0].data()
-  //       ),
-  //       lstm3RecurrentWeights: Array.from(
-  //         await this.model.getLayer("lstm3").getWeights()[1].data()
-  //       ),
-  //       lstm3Bias: Array.from(
-  //         await this.model.getLayer("lstm3").getWeights()[2].data()
-  //       ),
-  //       timeDistributedWeights: Array.from(
-  //         await this.model.getLayer("time_distributed").getWeights()[0].data()
-  //       ),
-  //       timeDistributedBias: Array.from(
-  //         await this.model.getLayer("time_distributed").getWeights()[1].data()
-  //       ),
-  //       bnGamma: Array.from(
-  //         await this.model.getLayer("batchNormalization").getWeights()[0].data()
-  //       ),
-  //       bnBeta: Array.from(
-  //         await this.model.getLayer("batchNormalization").getWeights()[1].data()
-  //       ),
-  //       bnMovingMean: Array.from(
-  //         await this.model.getLayer("batchNormalization").getWeights()[2].data()
-  //       ),
-  //       bnMovingVariance: Array.from(
-  //         await this.model.getLayer("batchNormalization").getWeights()[3].data()
-  //       ),
-  //       dense1Weights: Array.from(
-  //         await this.model.getLayer("dense").getWeights()[0].data()
-  //       ),
-  //       dense1Bias: Array.from(
-  //         await this.model.getLayer("dense").getWeights()[1].data()
-  //       ),
-  //       dense2Weights: Array.from(
-  //         await this.model.getLayer("dense_1").getWeights()[0].data()
-  //       ),
-  //       dense2Bias: Array.from(
-  //         await this.model.getLayer("dense_1").getWeights()[1].data()
-  //       ),
-  //       featureMeans: Array.from(await X_mean.data()),
-  //       featureStds: Array.from(await X_std.data()),
-  //     };
-  //     const weightsJson = JSON.stringify({ weights });
-  //     const file = this.bucket.file(FILE_NAMES.WEIGHTS);
-  //     await file.save(weightsJson, { contentType: "application/json" });
-  //     console.log("Model weights saved to Firebase Storage");
-  //     X_mean.dispose();
-  //     X_std.dispose();
-  //   }
+  private async saveModelWeights(
+    X_mean: tf.Tensor,
+    X_std: tf.Tensor
+  ): Promise<void> {
+    if (!this.model) throw new Error("Model not initialized");
+    const weights = {
+      conv1Weights: Array.from(
+        await this.model.getLayer("conv1d").getWeights()[0].data()
+      ),
+      conv1Bias: Array.from(
+        await this.model.getLayer("conv1d").getWeights()[1].data()
+      ),
+      conv2Weights: Array.from(
+        await this.model.getLayer("conv1d_2").getWeights()[0].data()
+      ),
+      conv2Bias: Array.from(
+        await this.model.getLayer("conv1d_2").getWeights()[1].data()
+      ),
+      lstm1Weights: Array.from(
+        await this.model.getLayer("lstm1").getWeights()[0].data()
+      ),
+      lstm1RecurrentWeights: Array.from(
+        await this.model.getLayer("lstm1").getWeights()[1].data()
+      ),
+      lstm1Bias: Array.from(
+        await this.model.getLayer("lstm1").getWeights()[2].data()
+      ),
+      lstm2Weights: Array.from(
+        await this.model.getLayer("lstm2").getWeights()[0].data()
+      ),
+      lstm2RecurrentWeights: Array.from(
+        await this.model.getLayer("lstm2").getWeights()[1].data()
+      ),
+      lstm2Bias: Array.from(
+        await this.model.getLayer("lstm2").getWeights()[2].data()
+      ),
+      lstm3Weights: Array.from(
+        await this.model.getLayer("lstm3").getWeights()[0].data()
+      ),
+      lstm3RecurrentWeights: Array.from(
+        await this.model.getLayer("lstm3").getWeights()[1].data()
+      ),
+      lstm3Bias: Array.from(
+        await this.model.getLayer("lstm3").getWeights()[2].data()
+      ),
+      timeDistributedWeights: Array.from(
+        await this.model.getLayer("time_distributed").getWeights()[0].data()
+      ),
+      timeDistributedBias: Array.from(
+        await this.model.getLayer("time_distributed").getWeights()[1].data()
+      ),
+      bnGamma: Array.from(
+        await this.model.getLayer("batchNormalization").getWeights()[0].data()
+      ),
+      bnBeta: Array.from(
+        await this.model.getLayer("batchNormalization").getWeights()[1].data()
+      ),
+      bnMovingMean: Array.from(
+        await this.model.getLayer("batchNormalization").getWeights()[2].data()
+      ),
+      bnMovingVariance: Array.from(
+        await this.model.getLayer("batchNormalization").getWeights()[3].data()
+      ),
+      dense1Weights: Array.from(
+        await this.model.getLayer("dense").getWeights()[0].data()
+      ),
+      dense1Bias: Array.from(
+        await this.model.getLayer("dense").getWeights()[1].data()
+      ),
+      dense2Weights: Array.from(
+        await this.model.getLayer("dense_1").getWeights()[0].data()
+      ),
+      dense2Bias: Array.from(
+        await this.model.getLayer("dense_1").getWeights()[1].data()
+      ),
+      featureMeans: Array.from(await X_mean.data()),
+      featureStds: Array.from(await X_std.data()),
+    };
+    const weightsJson = JSON.stringify({ weights });
+    const file = this.bucket.file(FILE_NAMES.WEIGHTS);
+    await file.save(weightsJson, { contentType: "application/json" });
+    console.log("Model weights saved to Firebase Storage");
+    X_mean.dispose();
+    X_std.dispose();
+  }
 
   public async train(): Promise<void> {
     try {
       const startTime = performance.now();
       const { X, y } = await this.dataProcessor.prepareData();
-      await this.trainModel(X, y);
+      const { X_mean, X_std } = await this.trainModel(X, y);
+      await this.saveModelWeights(X_mean, X_std);
       const endTime = performance.now();
       const executionTime =
         (endTime - startTime) / TRAINING_CONFIG.MS_TO_SECONDS;

@@ -86,8 +86,8 @@ const MODEL_CONFIG_BASE = {
   TIME_DISTRIBUTED_DENSE_UNITS: 16,
   DENSE_UNITS_1: 24,
   OUTPUT_UNITS: 2,
-  L2_REGULARIZATION: 0.015, // Changed from 0.02 to 0.015
-  DROPOUT_RATE: 0.7,
+  L2_REGULARIZATION: 0.015,
+  DROPOUT_RATE: 0.6, // Changed from 0.70 to 0.60
   TIMESTEPS_AFTER_CONV: 24,
   TIMESTEPS: 30,
   ADA_FEATURE_COUNT: 33,
@@ -162,7 +162,7 @@ export const TRAINING_CONFIG = {
   BYTES_TO_MB: 1024 * 1024,
   MS_TO_SECONDS: 1000,
   GAMMA: 3.0,
-  ALPHA: [0.45, 0.55] as [number, number],
+  ALPHA: [0.35, 0.65] as [number, number], // Changed from [0.4, 0.6] to [0.35, 0.65]
   GRADIENT_CLIP_NORM: 2.0,
   LR_DECAY_RATE: 0.99,
   WARMUP_EPOCHS: 10,

@@ -1,78 +1,34 @@
-import { TradeModelPredictor } from "./TradeModelPredictor";
-import { FeatureSequenceGenerator } from "./FeatureSequenceGenerator";
 import { TradingStrategy } from "./TradingStrategy";
-import { MODEL_CONFIG, STRATEGY_CONFIG, TIME_CONVERSIONS } from "../constants";
-import { HistoricalData, Recommendation } from "../types";
+import { HistoricalData, Recommendation, Trade } from "../types";
+import { TIME_CONVERSIONS } from "../constants";
 
-interface Trade {
-  entryPrice: number;
-  exitPrice: number | null;
-  entryIndex: number;
-  exitIndex: number | null;
-  position: "buy" | "sell";
-  profit: number | null;
-  holdingDays: number | null;
+interface BacktestTrade extends Trade {
   confidence: number;
-  stopLoss: number;
-  takeProfit: number;
-  trailingStop: number;
-  buyProb?: number;
-  atr: number;
+  buyProb: number;
   strategy: string;
-}
-
-interface BacktestResult {
-  totalReturn: number;
-  annualizedReturn: number;
-  winRate: number;
-  maxDrawdown: number;
-  sharpeRatio: number;
-  totalTrades: number;
-  winningTrades: number;
-  losingTrades: number;
-  averageHoldingDays: number;
-  equityCurve: number[];
-  trades: Trade[];
+  atrAdjustedHold: number;
+  holdToEndProfit?: number; // Added for hold-to-end logging
 }
 
 export class TradeModelBacktester {
-  private predictor: TradeModelPredictor;
-  private sequenceGenerator: FeatureSequenceGenerator;
-  private tradingStrategy: TradingStrategy;
   private initialCapital: number;
+  private tradingStrategy: TradingStrategy;
 
-  constructor(initialCapital: number = 10000) {
-    this.predictor = new TradeModelPredictor();
-    this.sequenceGenerator = new FeatureSequenceGenerator(
-      MODEL_CONFIG.TIMESTEPS
-    );
-    this.tradingStrategy = new TradingStrategy();
+  constructor(initialCapital: number) {
     this.initialCapital = initialCapital;
+    this.tradingStrategy = new TradingStrategy();
   }
 
-  private getStrategyConfig(strategy: string) {
-    switch (strategy.toLowerCase()) {
-      case "momentum":
-        return STRATEGY_CONFIG.MOMENTUM;
-      case "mean_reversion":
-        return STRATEGY_CONFIG.MEAN_REVERSION;
-      case "breakout":
-        return STRATEGY_CONFIG.BREAKOUT;
-      case "trend_following":
-        return STRATEGY_CONFIG.TREND_FOLLOWING;
-      default:
-        return STRATEGY_CONFIG;
-    }
-  }
-
-  public async backtest(
+  async backtest(
     adaData: HistoricalData,
     btcData: HistoricalData,
     startIndex: number,
     endIndex: number
-  ): Promise<BacktestResult> {
-    const { prices: adaPrices, volumes: adaVolumes } = adaData;
-    const { prices: btcPrices, volumes: btcVolumes } = btcData;
+  ): Promise<BacktestTrade[]> {
+    const adaPrices = adaData.prices;
+    const adaVolumes = adaData.volumes;
+    const btcPrices = btcData.prices;
+    const btcVolumes = btcData.volumes;
 
     if (
       adaPrices.length !== btcPrices.length ||
@@ -82,49 +38,25 @@ export class TradeModelBacktester {
       throw new Error("Input data arrays must have equal lengths");
     }
 
+    if (endIndex >= adaPrices.length) {
+      throw new Error("endIndex exceeds data length");
+    }
+
     let capital = this.initialCapital;
-    let equity = capital;
     let holdings = 0;
     let lastBuyPrice: number | undefined;
     let peakPrice: number | undefined;
     let buyTimestamp: string | undefined;
     let winStreak = 0;
-    const equityCurve: number[] = [equity];
-    const trades: Trade[] = [];
-    const returns: number[] = [];
-
-    if (
-      startIndex < MODEL_CONFIG.TIMESTEPS ||
-      endIndex <= startIndex ||
-      endIndex >= adaPrices.length
-    ) {
-      throw new Error("Invalid index range or insufficient data");
-    }
+    const trades: BacktestTrade[] = [];
 
     for (let i = startIndex; i <= endIndex; i++) {
-      const currentPrice = adaPrices[i];
       const currentTimestamp = new Date(
-        Date.now() - (endIndex - i) * TIME_CONVERSIONS.ONE_DAY_IN_MILLISECONDS
+        Date.now() -
+          (adaPrices.length - i - 1) * TIME_CONVERSIONS.ONE_DAY_IN_MILLISECONDS
       ).toISOString();
 
-      const sequence = this.sequenceGenerator.generateSequence(
-        adaPrices.slice(0, i + 1),
-        adaVolumes.slice(0, i + 1),
-        btcPrices.slice(0, i + 1),
-        btcVolumes.slice(0, i + 1),
-        Math.max(0, i - MODEL_CONFIG.TIMESTEPS + 1),
-        i
-      );
-
-      if (
-        sequence.length !== MODEL_CONFIG.TIMESTEPS ||
-        sequence[0].length !== MODEL_CONFIG.FEATURE_COUNT
-      ) {
-        console.warn(`Skipping index ${i} due to invalid sequence`);
-        continue;
-      }
-
-      const { trade, confidence, buyProb } =
+      const { trade, confidence, buyProb, sellProb } =
         await this.tradingStrategy.decideTrade({
           adaPrices: adaPrices.slice(0, i + 1),
           adaVolumes: adaVolumes.slice(0, i + 1),
@@ -139,241 +71,217 @@ export class TradeModelBacktester {
           winStreak,
         });
 
-      const prediction = await this.predictor.predict(
-        adaPrices.slice(0, i + 1),
-        adaVolumes.slice(0, i + 1),
-        btcPrices.slice(0, i + 1),
-        btcVolumes.slice(0, i + 1)
-      );
-      const atr = prediction.atr;
-      const currentStrategy = this.tradingStrategy.getCurrentStrategy();
-      const strategyConfig = this.getStrategyConfig(currentStrategy);
-      const atrAdjustedHold = Math.max(
-        3,
-        Math.min(12, strategyConfig.MIN_HOLD_DAYS_DEFAULT * (1 + atr))
-      );
+      if (!trade) continue;
 
-      if (trade) {
-        if (
-          trade.type === Recommendation.Buy &&
-          holdings === 0 &&
-          capital > 0
-        ) {
-          holdings = trade.adaAmount;
-          capital -= trade.usdValue;
-          lastBuyPrice = trade.price;
-          peakPrice = trade.price;
-          buyTimestamp = trade.timestamp;
-          const stopLoss =
-            trade.price *
-            (1 - strategyConfig.STOP_LOSS_MULTIPLIER_DEFAULT * atr);
-          const takeProfit =
-            trade.price *
-            (1 + strategyConfig.PROFIT_TAKE_MULTIPLIER_DEFAULT * atr);
-          const trailingStop =
-            trade.price * (1 - strategyConfig.TRAILING_STOP_DEFAULT);
-
-          trades.push({
-            entryPrice: trade.price,
-            exitPrice: null,
-            entryIndex: i,
-            exitIndex: null,
-            position: "buy",
-            profit: null,
-            holdingDays: null,
-            confidence,
-            stopLoss,
-            takeProfit,
-            trailingStop,
-            buyProb,
-            atr,
-            strategy: currentStrategy,
-          });
-          console.log(
-            `Trade Opened: Price=${trade.price.toFixed(
-              4
-            )}, BuyProb=${buyProb.toFixed(4)}, Confidence=${confidence.toFixed(
-              4
-            )}, Strategy=${currentStrategy}, PositionSize=${(
-              trade.usdValue / capital
-            ).toFixed(4)}, ATRAdjustedHold=${atrAdjustedHold.toFixed(2)}`
-          );
-        } else if (trade.type === Recommendation.Sell && holdings > 0) {
-          const currentTrade = trades[trades.length - 1];
-          currentTrade.exitPrice = trade.price;
-          currentTrade.exitIndex = i;
-          currentTrade.holdingDays = i - currentTrade.entryIndex;
-          currentTrade.profit =
-            (trade.price - currentTrade.entryPrice) / currentTrade.entryPrice;
-
-          capital += trade.usdValue;
-          equity = capital;
-          holdings = 0;
-          const positionSize = trade.usdValue / equity;
-          console.log(
-            `Trade Closed: Entry=${currentTrade.entryPrice.toFixed(
-              4
-            )}, Exit=${trade.price.toFixed(4)}, Profit=${(
-              currentTrade.profit * 100
-            ).toFixed(2)}%, Days Held=${
-              currentTrade.holdingDays
-            }, Reason=Sell, Strategy=${
-              currentTrade.strategy
-            }, PositionSize=${positionSize.toFixed(
-              4
-            )}, ATRAdjustedHold=${atrAdjustedHold.toFixed(2)}`
-          );
-
-          if (currentTrade.profit > 0) {
-            winStreak++;
-          } else {
-            winStreak = 0;
-          }
-          lastBuyPrice = undefined;
-          peakPrice = undefined;
-          buyTimestamp = undefined;
-        }
-      }
-
-      if (holdings > 0 && peakPrice && currentPrice > peakPrice) {
-        peakPrice = currentPrice;
-      }
-      equity = capital + holdings * currentPrice;
-      equityCurve.push(equity);
-      if (trades.length > 0 && trades[trades.length - 1].profit !== null) {
-        returns.push(trades[trades.length - 1].profit!);
+      if (trade.type === Recommendation.Buy && capital > 0) {
+        holdings += trade.adaAmount;
+        capital -= trade.usdValue;
+        lastBuyPrice = trade.price;
+        peakPrice = trade.price;
+        buyTimestamp = trade.timestamp;
+        console.log(
+          `Trade Opened: Price=${trade.price.toFixed(
+            4
+          )}, BuyProb=${buyProb.toFixed(4)}, Confidence=${confidence.toFixed(
+            4
+          )}, Strategy=${this.tradingStrategy.getCurrentStrategy()}, PositionSize=${trade.adaAmount.toFixed(
+            4
+          )}, ATRAdjustedHold=${(sellProb * 10).toFixed(2)}`
+        );
+        trades.push({
+          ...trade,
+          confidence,
+          buyProb,
+          strategy: this.tradingStrategy.getCurrentStrategy(),
+          atrAdjustedHold: sellProb * 10,
+        });
+      } else if (trade.type === Recommendation.Sell && holdings > 0) {
+        const profit = ((trade.price - lastBuyPrice!) / lastBuyPrice!) * 100;
+        const holdToEndProfit =
+          ((adaPrices[adaPrices.length - 1] - lastBuyPrice!) / lastBuyPrice!) *
+          100; // Added
+        capital += trade.usdValue;
+        holdings -= trade.adaAmount;
+        peakPrice = undefined;
+        buyTimestamp = undefined;
+        winStreak = profit > 0 ? winStreak + 1 : 0;
+        console.log(
+          `Trade Closed: Entry=${lastBuyPrice!.toFixed(
+            4
+          )}, Exit=${trade.price.toFixed(4)}, Profit=${profit.toFixed(
+            2
+          )}%, HoldToEndProfit=${holdToEndProfit.toFixed(2)}%, Days Held=${
+            buyTimestamp
+              ? Math.round(
+                  (new Date(trade.timestamp).getTime() -
+                    new Date(buyTimestamp).getTime()) /
+                    TIME_CONVERSIONS.ONE_DAY_IN_MILLISECONDS
+                )
+              : 0
+          }, Reason=Sell, Strategy=${this.tradingStrategy.getCurrentStrategy()}, PositionSize=${trade.adaAmount.toFixed(
+            4
+          )}, ATRAdjustedHold=${(sellProb * 10).toFixed(2)}`
+        );
+        trades.push({
+          ...trade,
+          confidence,
+          buyProb,
+          strategy: this.tradingStrategy.getCurrentStrategy(),
+          atrAdjustedHold: sellProb * 10,
+          holdToEndProfit, // Added
+        });
+        lastBuyPrice = undefined;
       }
     }
 
-    if (holdings > 0 && endIndex < adaPrices.length) {
-      const currentTrade = trades[trades.length - 1];
-      currentTrade.exitPrice = adaPrices[endIndex];
-      currentTrade.exitIndex = endIndex;
-      currentTrade.holdingDays = endIndex - currentTrade.entryIndex;
-      currentTrade.profit =
-        (currentTrade.exitPrice - currentTrade.entryPrice) /
-        currentTrade.entryPrice;
-
-      const tradeValue = holdings * currentTrade.exitPrice;
-      capital += tradeValue - STRATEGY_CONFIG.COMMISSION * tradeValue;
-      equity = capital;
-      holdings = 0;
+    if (holdings > 0 && lastBuyPrice && buyTimestamp) {
+      const finalPrice = adaPrices[adaPrices.length - 1];
+      const profit = ((finalPrice - lastBuyPrice) / lastBuyPrice) * 100;
+      const holdToEndProfit = profit; // Same as profit at end
+      const usdReceived =
+        holdings * finalPrice - this.tradingStrategy["commission"];
       console.log(
-        `Trade Closed (End of Backtest): Entry=${currentTrade.entryPrice.toFixed(
+        `Trade Closed (End of Backtest): Entry=${lastBuyPrice.toFixed(
           4
-        )}, Exit=${currentTrade.exitPrice.toFixed(4)}, Profit=${(
-          currentTrade.profit * 100
-        ).toFixed(2)}%, Days Held=${
-          currentTrade.holdingDays
-        }, Reason=End of Backtest, Strategy=${
-          currentTrade.strategy
-        }, PositionSize=${(tradeValue / equity).toFixed(4)}`
+        )}, Exit=${finalPrice.toFixed(4)}, Profit=${profit.toFixed(
+          2
+        )}%, HoldToEndProfit=${holdToEndProfit.toFixed(
+          2
+        )}%, Days Held=${Math.round(
+          (new Date().getTime() - new Date(buyTimestamp).getTime()) /
+            TIME_CONVERSIONS.ONE_DAY_IN_MILLISECONDS
+        )}, Reason=End of Backtest, Strategy=${this.tradingStrategy.getCurrentStrategy()}, PositionSize=${holdings.toFixed(
+          4
+        )}`
       );
-      equityCurve.push(equity);
+      trades.push({
+        type: Recommendation.Sell,
+        price: finalPrice,
+        timestamp: new Date().toISOString(),
+        adaAmount: holdings,
+        usdValue: usdReceived,
+        buyPrice: lastBuyPrice,
+        confidence: 0,
+        buyProb: 0,
+        strategy: this.tradingStrategy.getCurrentStrategy(),
+        atrAdjustedHold: 0,
+        holdToEndProfit,
+      });
+      capital += usdReceived;
+      holdings = 0;
     }
 
-    const totalReturn = (equity - this.initialCapital) / this.initialCapital;
-    const days = endIndex - startIndex;
-    const annualizedReturn =
-      days > 0 ? Math.pow(1 + totalReturn, 365 / days) - 1 : 0;
-    const winningTrades = trades.filter((t) => (t.profit || 0) > 0).length;
-    const totalTrades = trades.length;
-    const winRate = totalTrades > 0 ? winningTrades / totalTrades : 0;
-    const averageHoldingDays =
-      totalTrades > 0
-        ? trades.reduce((sum, t) => sum + (t.holdingDays || 0), 0) / totalTrades
-        : 0;
-
-    let maxDrawdown = 0;
-    let peak = equityCurve[0];
-    for (const eq of equityCurve) {
-      if (eq > peak) peak = eq;
-      const drawdown = (peak - eq) / peak;
-      maxDrawdown = Math.max(maxDrawdown, drawdown);
-    }
-
-    const meanReturn =
-      returns.length > 0
-        ? returns.reduce((a, b) => a + b, 0) / returns.length
-        : 0;
-    const stdReturn =
-      returns.length > 0
-        ? Math.sqrt(
-            returns.reduce((sum, r) => sum + Math.pow(r - meanReturn, 2), 0) /
-              returns.length
-          )
-        : 0;
-    const sharpeRatio =
-      stdReturn > 0 ? (meanReturn * Math.sqrt(365)) / stdReturn : 0;
-
-    return {
-      totalReturn,
-      annualizedReturn,
-      winRate,
-      maxDrawdown,
-      sharpeRatio,
-      totalTrades,
-      winningTrades,
-      losingTrades: totalTrades - winningTrades,
-      averageHoldingDays,
-      equityCurve,
-      trades,
-    };
+    return trades;
   }
 
-  public async evaluateBacktest(result: BacktestResult): Promise<void> {
-    console.log("Backtest Results:");
-    console.log(`Total Return: ${(result.totalReturn * 100).toFixed(2)}%`);
-    console.log(
-      `Annualized Return: ${(result.annualizedReturn * 100).toFixed(2)}%`
-    );
-    console.log(`Win Rate: ${(result.winRate * 100).toFixed(2)}%`);
-    console.log(`Max Drawdown: ${(result.maxDrawdown * 100).toFixed(2)}%`);
-    console.log(`Sharpe Ratio: ${result.sharpeRatio.toFixed(2)}`);
-    console.log(`Total Trades: ${result.totalTrades}`);
-    console.log(`Winning Trades: ${result.winningTrades}`);
-    console.log(`Losing Trades: ${result.losingTrades}`);
-    console.log(
-      `Average Holding Days: ${result.averageHoldingDays.toFixed(2)}`
-    );
-
-    const confidenceBuckets: { [key: string]: number } = {
+  async evaluateBacktest(trades: BacktestTrade[]): Promise<void> {
+    let capital = this.initialCapital;
+    let peakCapital = capital;
+    let maxDrawdown = 0;
+    let totalReturn = 0;
+    let winningTrades = 0;
+    let losingTrades = 0;
+    let totalDaysHeld = 0;
+    const confidenceDistribution: { [key: string]: number } = {
       "0.4-0.5": 0,
       "0.5-0.6": 0,
       "0.6-0.7": 0,
       "0.7-0.8": 0,
       "0.8+": 0,
     };
-    result.trades.forEach((trade) => {
-      if (trade.confidence >= 0.8) confidenceBuckets["0.8+"]++;
-      else if (trade.confidence >= 0.7) confidenceBuckets["0.7-0.8"]++;
-      else if (trade.confidence >= 0.6) confidenceBuckets["0.6-0.7"]++;
-      else if (trade.confidence >= 0.5) confidenceBuckets["0.5-0.6"]++;
-      else confidenceBuckets["0.4-0.5"]++;
-    });
-    console.log("\nTrade Confidence Distribution:");
-    Object.entries(confidenceBuckets).forEach(([bucket, count]) => {
-      console.log(`${bucket}: ${count} trades`);
-    });
-
-    const strategyBuckets: { [key: string]: number } = {
+    const strategyDistribution: { [key: string]: number } = {
       Momentum: 0,
       MeanReversion: 0,
       Breakout: 0,
       TrendFollowing: 0,
     };
-    result.trades.forEach((trade) => {
-      const strategyKey = trade.strategy.toLowerCase();
-      if (strategyKey === "momentum") strategyBuckets.Momentum++;
-      else if (strategyKey === "mean_reversion")
-        strategyBuckets.MeanReversion++;
-      else if (strategyKey === "breakout") strategyBuckets.Breakout++;
-      else if (strategyKey === "trend_following")
-        strategyBuckets.TrendFollowing++;
-    });
-    console.log("\nTrade Strategy Distribution:");
-    Object.entries(strategyBuckets).forEach(([strategy, count]) => {
+
+    const returns: number[] = [];
+
+    for (const trade of trades) {
+      if (trade.type === Recommendation.Buy) {
+        capital -= trade.usdValue;
+      } else {
+        capital += trade.usdValue;
+        const profit = trade.buyPrice
+          ? ((trade.price - trade.buyPrice) / trade.buyPrice) * 100
+          : 0;
+        returns.push(profit / 100);
+        peakCapital = Math.max(peakCapital, capital);
+        const drawdown =
+          peakCapital > 0 ? (peakCapital - capital) / peakCapital : 0;
+        maxDrawdown = Math.max(maxDrawdown, drawdown);
+        totalReturn = (capital - this.initialCapital) / this.initialCapital;
+        if (profit > 0) {
+          winningTrades++;
+        } else {
+          losingTrades++;
+        }
+        totalDaysHeld +=
+          trade.timestamp &&
+          trades.find(
+            (t) =>
+              t.type === Recommendation.Buy && t.timestamp < trade.timestamp
+          )
+            ? Math.round(
+                (new Date(trade.timestamp).getTime() -
+                  new Date(
+                    trades.find(
+                      (t) =>
+                        t.type === Recommendation.Buy &&
+                        t.timestamp < trade.timestamp
+                    )!.timestamp
+                  ).getTime()) /
+                  TIME_CONVERSIONS.ONE_DAY_IN_MILLISECONDS
+              )
+            : 0;
+      }
+
+      if (trade.confidence >= 0.8) confidenceDistribution["0.8+"]++;
+      else if (trade.confidence >= 0.7) confidenceDistribution["0.7-0.8"]++;
+      else if (trade.confidence >= 0.6) confidenceDistribution["0.6-0.7"]++;
+      else if (trade.confidence >= 0.5) confidenceDistribution["0.5-0.6"]++;
+      else confidenceDistribution["0.4-0.5"]++;
+
+      strategyDistribution[trade.strategy]++;
+    }
+
+    const totalTrades = winningTrades + losingTrades;
+    const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
+    const annualizedReturn =
+      totalTrades > 0
+        ? ((1 + totalReturn) ** (365 / (totalDaysHeld / totalTrades)) - 1) * 100
+        : 0;
+    const meanReturn =
+      returns.length > 0
+        ? returns.reduce((sum, r) => sum + r, 0) / returns.length
+        : 0;
+    const variance =
+      returns.length > 0
+        ? returns.reduce((sum, r) => sum + Math.pow(r - meanReturn, 2), 0) /
+          returns.length
+        : 0;
+    const stdDev = variance > 0 ? Math.sqrt(variance) : 0;
+    const sharpeRatio = stdDev > 0 ? (meanReturn / stdDev) * Math.sqrt(365) : 0;
+    const avgHoldingDays = totalTrades > 0 ? totalDaysHeld / totalTrades : 0;
+
+    console.log(`Backtest Results:`);
+    console.log(`Total Return: ${totalReturn * 100}%`);
+    console.log(`Annualized Return: ${annualizedReturn.toFixed(2)}%`);
+    console.log(`Win Rate: ${winRate.toFixed(2)}%`);
+    console.log(`Max Drawdown: ${(maxDrawdown * 100).toFixed(2)}%`);
+    console.log(`Sharpe Ratio: ${sharpeRatio.toFixed(2)}`);
+    console.log(`Total Trades: ${totalTrades}`);
+    console.log(`Winning Trades: ${winningTrades}`);
+    console.log(`Losing Trades: ${losingTrades}`);
+    console.log(`Average Holding Days: ${avgHoldingDays.toFixed(2)}`);
+    console.log(`\nTrade Confidence Distribution:`);
+    for (const [range, count] of Object.entries(confidenceDistribution)) {
+      console.log(`${range}: ${count} trades`);
+    }
+    console.log(`\nTrade Strategy Distribution:`);
+    for (const [strategy, count] of Object.entries(strategyDistribution)) {
       console.log(`${strategy}: ${count} trades`);
-    });
+    }
   }
 }

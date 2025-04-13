@@ -32,7 +32,9 @@ export default class FeatureCalculator {
       0
     );
     const volumeSum = recentVolumes.reduce((sum, vol) => sum + vol, 0);
-    return priceVolumeSum / volumeSum;
+    return volumeSum > 0
+      ? priceVolumeSum / volumeSum
+      : prices[prices.length - 1];
   }
 
   public calculateATR(prices: number[], period: number = PERIODS.ATR): number {
@@ -45,12 +47,44 @@ export default class FeatureCalculator {
     return recentRanges.reduce((sum, range) => sum + range, 0) / period;
   }
 
+  public calculateADX(
+    high: number[],
+    low: number[],
+    close: number[],
+    period: number = PERIODS.ADX
+  ): number {
+    if (
+      high.length < period + 1 ||
+      low.length < period + 1 ||
+      close.length < period + 1
+    )
+      return 0;
+    let plusDM = 0,
+      minusDM = 0,
+      trSum = 0;
+    for (let i = 1; i < high.length; i++) {
+      const upMove = high[i] - high[i - 1];
+      const downMove = low[i - 1] - low[i];
+      plusDM += upMove > downMove && upMove > 0 ? upMove : 0;
+      minusDM += downMove > upMove && downMove > 0 ? downMove : 0;
+      trSum += Math.max(
+        high[i] - low[i],
+        Math.abs(high[i] - close[i - 1]),
+        Math.abs(low[i] - close[i - 1])
+      );
+    }
+    const plusDI = (plusDM / trSum) * 100;
+    const minusDI = (minusDM / trSum) * 100;
+    const dx = (Math.abs(plusDI - minusDI) / (plusDI + minusDI)) * 100;
+    return dx || 0;
+  }
+
   public calculateSlice(data: number[], periods: number, offset = 0): number[] {
     return data.slice(-periods - offset, offset === 0 ? undefined : -offset);
   }
 
   public calculateRSI(prices: number[], period = PERIODS.RSI): number {
-    if (prices.length < period + 1) return 50; // Default neutral value
+    if (prices.length < period + 1) return 50;
     let gains = 0,
       losses = 0;
     for (let i = 1; i <= period; i++) {
@@ -67,11 +101,12 @@ export default class FeatureCalculator {
       avgGain = (avgGain * (period - 1) + gain) / period;
       avgLoss = (avgLoss * (period - 1) + loss) / period;
     }
-    const rs = avgGain / avgLoss;
-    return rs === Infinity ? 100 : 100 - 100 / (1 + rs); // Handle division by zero
+    const rs = avgLoss > 0 ? avgGain / avgLoss : Infinity;
+    return rs === Infinity ? 100 : 100 - 100 / (1 + rs);
   }
 
   public calculateEMA(prices: number[], period: number): number {
+    if (prices.length < 1) return 0;
     const k = 2 / (period + 1);
     let ema = prices[0];
     for (let i = 1; i < prices.length; i++) {
@@ -81,10 +116,13 @@ export default class FeatureCalculator {
   }
 
   public calculateSMA(prices: number[]): number {
-    return prices.reduce((sum, price) => sum + price, 0) / prices.length;
+    return prices.length > 0
+      ? prices.reduce((sum, price) => sum + price, 0) / prices.length
+      : 0;
   }
 
   public calculateStdDev(values: number[], mean: number): number {
+    if (values.length < 1) return 0;
     const variance =
       values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) /
       values.length;
@@ -134,12 +172,13 @@ export default class FeatureCalculator {
     prices: number[],
     period: number = PERIODS.FIBONACCI
   ): { levels: number[]; high: number; low: number } {
-    if (prices.length < period)
+    if (prices.length < period) {
       return {
         levels: [0, 0, 0, 0, 0],
-        high: prices[prices.length - 1],
-        low: prices[0],
+        high: prices[prices.length - 1] || 0,
+        low: prices[0] || 0,
       };
+    }
     const recentPrices = prices.slice(-period);
     const high = Math.max(...recentPrices);
     const low = Math.min(...recentPrices);
@@ -515,7 +554,11 @@ export default class FeatureCalculator {
           )
         : sma20;
     const trendRegime = sma50 !== 0 ? (sma50 - sma200) / sma200 : 0;
-    const adxProxy = sma50 !== 0 ? Math.abs((sma7 - sma50) / sma50) : 0;
+    const adxProxy = this.calculateADX(
+      prices.slice(0, dayIndex + 1),
+      prices.slice(0, dayIndex + 1),
+      prices.slice(0, dayIndex + 1)
+    );
 
     return {
       rsi,

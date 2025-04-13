@@ -32,10 +32,9 @@ export class TradingStrategy {
   private sellProbThreshold: number;
   private smaPeriod: number;
   private breakoutThreshold: number;
-  private strategyStartTimestamp: string | null = null; // Track strategy start time
-  private strategyTradeCount: number = 0; // Track trades under current strategy
+  private strategyStartTimestamp: string | null = null;
+  private strategyTradeCount: number = 0;
   private recentIndicators: { [key: string]: number[] } = {
-    // Store 3-day history
     shortMomentum: [],
     momentum: [],
     trendSlope: [],
@@ -61,7 +60,7 @@ export class TradingStrategy {
       breakoutThreshold = STRATEGY_CONFIG.DYNAMIC_BREAKOUT_THRESHOLD,
     } = params ?? {};
     this.predictor = new TradeModelPredictor();
-    this.currentStrategy = StrategyType.Momentum; // Default
+    this.currentStrategy = StrategyType.Momentum;
     this.basePositionSize = basePositionSize;
     this.slippage = slippage;
     this.commission = commission;
@@ -122,7 +121,7 @@ export class TradingStrategy {
     keys.forEach((key, index) => {
       this.recentIndicators[key].push(values[index]);
       if (this.recentIndicators[key].length > 3) {
-        this.recentIndicators[key].shift(); // Keep only last 3 days
+        this.recentIndicators[key].shift();
       }
     });
   }
@@ -200,7 +199,6 @@ export class TradingStrategy {
     );
 
     if (this.shouldPersistStrategy(currentTimestamp, confidence)) {
-      // console.log(`Persisting Strategy: ${this.currentStrategy}`);
       return this.currentStrategy;
     }
 
@@ -213,40 +211,98 @@ export class TradingStrategy {
       emaShort > emaLong
     ) {
       newStrategy = StrategyType.Momentum;
-      // console.log("Selected Strategy: MomentumTrendHybrid");
-    } else if (
-      Math.abs(deviation) > STRATEGY_CONFIG.DEVIATION_THRESHOLD &&
-      Math.abs(avgMomentum) < STRATEGY_CONFIG.MOMENTUM_THRESHOLD &&
-      avgMomentumDivergence !== 0
-    ) {
-      newStrategy = StrategyType.MeanReversion;
-      // console.log("Selected Strategy: Mean Reversion");
     } else if (
       avgAtrBreakout > this.breakoutThreshold &&
       currentVolume > avgVolume * STRATEGY_CONFIG.VOLUME_MULTIPLIER &&
       avgShortMomentum > STRATEGY_CONFIG.SHORT_MOMENTUM_THRESHOLD * 0.8
     ) {
       newStrategy = StrategyType.Breakout;
-      // console.log("Selected Strategy: Breakout");
     } else if (
       Math.abs(avgTrendSlope) > STRATEGY_CONFIG.TREND_SLOPE_THRESHOLD &&
       emaShort > emaLong &&
       avgTrendStrength > STRATEGY_CONFIG.TREND_STRENGTH_THRESHOLD
     ) {
       newStrategy = StrategyType.TrendFollowing;
-      // console.log("Selected Strategy: Trend Following");
+    } else if (
+      Math.abs(deviation) > STRATEGY_CONFIG.DEVIATION_THRESHOLD &&
+      Math.abs(avgMomentum) < STRATEGY_CONFIG.MOMENTUM_THRESHOLD &&
+      avgMomentumDivergence !== 0
+    ) {
+      newStrategy = StrategyType.MeanReversion;
     } else {
-      newStrategy = StrategyType.Momentum;
-      // console.log("Selected Strategy: Momentum (default)");
+      newStrategy = StrategyType.TrendFollowing; // Favor trends in ambiguous cases
     }
 
     if (newStrategy !== this.currentStrategy) {
       this.currentStrategy = newStrategy;
       this.strategyStartTimestamp = currentTimestamp;
       this.strategyTradeCount = 0;
+      this.updateStrategyParameters();
     }
 
     return this.currentStrategy;
+  }
+
+  private updateStrategyParameters() {
+    switch (this.currentStrategy) {
+      case StrategyType.Momentum:
+        this.minHoldDays = STRATEGY_CONFIG.MOMENTUM.MIN_HOLD_DAYS_DEFAULT;
+        this.stopLossMultiplier =
+          STRATEGY_CONFIG.MOMENTUM.STOP_LOSS_MULTIPLIER_DEFAULT;
+        this.trailingStop = STRATEGY_CONFIG.MOMENTUM.TRAILING_STOP_DEFAULT;
+        this.profitTakeMultiplier =
+          STRATEGY_CONFIG.MOMENTUM.PROFIT_TAKE_MULTIPLIER_DEFAULT;
+        this.minConfidence = STRATEGY_CONFIG.MOMENTUM.MIN_CONFIDENCE_DEFAULT;
+        this.buyProbThreshold =
+          STRATEGY_CONFIG.MOMENTUM.BUY_PROB_THRESHOLD_DEFAULT;
+        break;
+      case StrategyType.MeanReversion:
+        this.minHoldDays = STRATEGY_CONFIG.MEAN_REVERSION.MIN_HOLD_DAYS_DEFAULT;
+        this.stopLossMultiplier =
+          STRATEGY_CONFIG.MEAN_REVERSION.STOP_LOSS_MULTIPLIER_DEFAULT;
+        this.trailingStop =
+          STRATEGY_CONFIG.MEAN_REVERSION.TRAILING_STOP_DEFAULT;
+        this.profitTakeMultiplier =
+          STRATEGY_CONFIG.MEAN_REVERSION.PROFIT_TAKE_MULTIPLIER_DEFAULT;
+        this.minConfidence =
+          STRATEGY_CONFIG.MEAN_REVERSION.MIN_CONFIDENCE_DEFAULT;
+        this.buyProbThreshold =
+          STRATEGY_CONFIG.MEAN_REVERSION.BUY_PROB_THRESHOLD_DEFAULT;
+        break;
+      case StrategyType.Breakout:
+        this.minHoldDays = STRATEGY_CONFIG.BREAKOUT.MIN_HOLD_DAYS_DEFAULT;
+        this.stopLossMultiplier =
+          STRATEGY_CONFIG.BREAKOUT.STOP_LOSS_MULTIPLIER_DEFAULT;
+        this.trailingStop = STRATEGY_CONFIG.BREAKOUT.TRAILING_STOP_DEFAULT;
+        this.profitTakeMultiplier =
+          STRATEGY_CONFIG.BREAKOUT.PROFIT_TAKE_MULTIPLIER_DEFAULT;
+        this.minConfidence = STRATEGY_CONFIG.BREAKOUT.MIN_CONFIDENCE_DEFAULT;
+        this.buyProbThreshold =
+          STRATEGY_CONFIG.BREAKOUT.BUY_PROB_THRESHOLD_DEFAULT;
+        break;
+      case StrategyType.TrendFollowing:
+        this.minHoldDays =
+          STRATEGY_CONFIG.TREND_FOLLOWING.MIN_HOLD_DAYS_DEFAULT;
+        this.stopLossMultiplier =
+          STRATEGY_CONFIG.TREND_FOLLOWING.STOP_LOSS_MULTIPLIER_DEFAULT;
+        this.trailingStop =
+          STRATEGY_CONFIG.TREND_FOLLOWING.TRAILING_STOP_DEFAULT;
+        this.profitTakeMultiplier =
+          STRATEGY_CONFIG.TREND_FOLLOWING.PROFIT_TAKE_MULTIPLIER_DEFAULT;
+        this.minConfidence =
+          STRATEGY_CONFIG.TREND_FOLLOWING.MIN_CONFIDENCE_DEFAULT;
+        this.buyProbThreshold =
+          STRATEGY_CONFIG.TREND_FOLLOWING.BUY_PROB_THRESHOLD_DEFAULT;
+        break;
+      default:
+        this.minHoldDays = STRATEGY_CONFIG.MIN_HOLD_DAYS_DEFAULT;
+        this.stopLossMultiplier = STRATEGY_CONFIG.STOP_LOSS_MULTIPLIER_DEFAULT;
+        this.trailingStop = STRATEGY_CONFIG.TRAILING_STOP_DEFAULT;
+        this.profitTakeMultiplier =
+          STRATEGY_CONFIG.PROFIT_TAKE_MULTIPLIER_DEFAULT;
+        this.minConfidence = STRATEGY_CONFIG.MIN_CONFIDENCE_DEFAULT;
+        this.buyProbThreshold = STRATEGY_CONFIG.BUY_PROB_THRESHOLD_DEFAULT;
+    }
   }
 
   public async decideTrade({
@@ -302,18 +358,9 @@ export class TradingStrategy {
     } = prediction;
 
     if (
-      confidence < STRATEGY_CONFIG.MIN_CONFIDENCE_DEFAULT ||
+      confidence < this.minConfidence ||
       atr > STRATEGY_CONFIG.MAX_ATR_THRESHOLD
     ) {
-      // console.log(
-      //   `Trade Skipped: Confidence=${confidence.toFixed(
-      //     4
-      //   )} < ${STRATEGY_CONFIG.MIN_CONFIDENCE_DEFAULT.toFixed(
-      //     2
-      //   )} or ATR=${atr.toFixed(
-      //     4
-      //   )} > ${STRATEGY_CONFIG.MAX_ATR_THRESHOLD.toFixed(2)}`
-      // );
       return { trade: null, confidence, buyProb, sellProb };
     }
 
@@ -358,6 +405,11 @@ export class TradingStrategy {
       STRATEGY_CONFIG.MAX_PROFIT_TAKE
     );
 
+    const atrAdjustedHold = Math.max(
+      3,
+      Math.min(12, this.minHoldDays * (1 + atr))
+    );
+
     if (holdings > 0 && lastBuyPrice && buyTimestamp) {
       const daysHeld =
         (new Date(currentTimestamp).getTime() -
@@ -373,7 +425,7 @@ export class TradingStrategy {
           ? (peakPrice || lastBuyPrice) * (1 - dynamicTrailingStop)
           : Infinity;
 
-      if (daysHeld >= this.minHoldDays) {
+      if (daysHeld >= atrAdjustedHold) {
         const sellConditions = this.getSellConditions(
           sellProb,
           momentum,
@@ -644,8 +696,9 @@ export class TradingStrategy {
 
   public setStrategy(strategyType: StrategyType): void {
     this.currentStrategy = strategyType;
-    this.strategyStartTimestamp = null; // Reset on manual set
+    this.strategyStartTimestamp = null;
     this.strategyTradeCount = 0;
+    this.updateStrategyParameters();
     console.log(`Strategy manually set to: ${strategyType}`);
   }
 

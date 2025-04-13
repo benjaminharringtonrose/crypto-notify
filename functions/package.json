@@ -11,7 +11,7 @@
     "logs": "firebase functions:log",
     "test": "npx ts-node src/test.ts",
     "train": "npx ts-node src/scripts/train.ts",
-    "backtest": "TF_CPP_MIN_LOG_LEVEL=1 npx ts-node src/scripts/backtest.ts",
+    "backtest": "TF_CPP_MIN_LOG_LEVEL=0 npx ts-node src/scripts/backtest.ts",
     "train:full": "npm run train && npm run backtest"
   },
   "engines": {

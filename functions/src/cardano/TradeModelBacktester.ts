@@ -15,6 +15,8 @@ interface Trade {
   stopLoss: number;
   takeProfit: number;
   trailingStop: number;
+  buyProb?: number;
+  atr: number;
 }
 
 interface BacktestResult {
@@ -35,7 +37,6 @@ export class TradeModelBacktester {
   private predictor: TradeModelPredictor;
   private sequenceGenerator: FeatureSequenceGenerator;
   private initialCapital: number;
-  private positionSize: number;
 
   constructor(initialCapital: number = 10000) {
     this.predictor = new TradeModelPredictor();
@@ -43,7 +44,6 @@ export class TradeModelBacktester {
       MODEL_CONFIG.TIMESTEPS
     );
     this.initialCapital = initialCapital;
-    this.positionSize = STRATEGY_CONFIG.BASE_POSITION_SIZE_DEFAULT;
   }
 
   public async backtest(
@@ -118,25 +118,45 @@ export class TradeModelBacktester {
           (openTrade.position === "buy" ? 1 : -1);
 
         // Check stop-loss, take-profit, trailing stop, or minimum hold period
-        if (
-          currentPrice <= openTrade.stopLoss ||
-          currentPrice >= openTrade.takeProfit ||
-          (currentPrice <= openTrade.trailingStop &&
-            openTrade.position === "buy") ||
-          daysHeld >= STRATEGY_CONFIG.MIN_HOLD_DAYS_DEFAULT
+        let exitReason = "";
+        if (currentPrice <= openTrade.stopLoss) {
+          exitReason = "Stop Loss";
+        } else if (currentPrice >= openTrade.takeProfit) {
+          exitReason = "Take Profit";
+        } else if (
+          currentPrice <= openTrade.trailingStop &&
+          openTrade.position === "buy"
         ) {
+          exitReason = "Trailing Stop";
+        } else if (daysHeld >= STRATEGY_CONFIG.MIN_HOLD_DAYS_DEFAULT) {
+          exitReason = "Min Hold Days Reached";
+        }
+
+        if (exitReason) {
           openTrade.exitPrice = currentPrice;
           openTrade.exitIndex = i;
           openTrade.profit = currentProfit;
           openTrade.holdingDays = daysHeld;
 
+          const positionSize = this.calculatePositionSize(openTrade.atr);
           capital +=
             (currentProfit -
               STRATEGY_CONFIG.COMMISSION -
               STRATEGY_CONFIG.SLIPPAGE) *
             capital *
-            this.positionSize;
+            positionSize;
           equity = capital;
+          console.log(
+            `Trade Closed: Entry=${openTrade.entryPrice.toFixed(
+              4
+            )}, Exit=${currentPrice.toFixed(4)}, Profit=${(
+              currentProfit * 100
+            ).toFixed(
+              2
+            )}%, Days Held=${daysHeld}, Reason=${exitReason}, PositionSize=${positionSize.toFixed(
+              4
+            )}`
+          );
           trades.push(openTrade);
           openTrade = null;
         } else if (openTrade.position === "buy") {
@@ -168,6 +188,7 @@ export class TradeModelBacktester {
             (1 + STRATEGY_CONFIG.PROFIT_TAKE_MULTIPLIER_DEFAULT * atr);
           const trailingStop =
             currentPrice * (1 - STRATEGY_CONFIG.TRAILING_STOP_DEFAULT);
+          const positionSize = this.calculatePositionSize(atr);
 
           openTrade = {
             entryPrice: currentPrice,
@@ -181,7 +202,22 @@ export class TradeModelBacktester {
             stopLoss,
             takeProfit,
             trailingStop,
+            buyProb: prediction.buyProb,
+            atr,
           };
+          console.log(
+            `Trade Opened: Price=${currentPrice.toFixed(
+              4
+            )}, BuyProb=${prediction.buyProb.toFixed(
+              4
+            )}, Confidence=${prediction.confidence.toFixed(
+              4
+            )}, VolatilityAdjustedMomentum=${prediction.volatilityAdjustedMomentum.toFixed(
+              4
+            )}, TrendStrength=${prediction.trendStrength.toFixed(
+              4
+            )}, PositionSize=${positionSize.toFixed(4)}`
+          );
         }
       }
 
@@ -201,11 +237,21 @@ export class TradeModelBacktester {
         (openTrade.position === "buy" ? 1 : -1);
       openTrade.profit = profit;
       openTrade.holdingDays = openTrade.exitIndex - openTrade.entryIndex;
+      const positionSize = this.calculatePositionSize(openTrade.atr);
       capital +=
         (profit - STRATEGY_CONFIG.COMMISSION - STRATEGY_CONFIG.SLIPPAGE) *
         capital *
-        this.positionSize;
+        positionSize;
       equity = capital;
+      console.log(
+        `Trade Closed (End of Backtest): Entry=${openTrade.entryPrice.toFixed(
+          4
+        )}, Exit=${openTrade.exitPrice.toFixed(4)}, Profit=${(
+          profit * 100
+        ).toFixed(2)}%, Days Held=${
+          openTrade.holdingDays
+        }, Reason=End of Backtest, PositionSize=${positionSize.toFixed(4)}`
+      );
       trades.push(openTrade);
       equityCurve.push(equity);
     }
@@ -260,6 +306,20 @@ export class TradeModelBacktester {
       equityCurve,
       trades,
     };
+  }
+
+  private calculatePositionSize(atr: number): number {
+    let positionSize = STRATEGY_CONFIG.BASE_POSITION_SIZE_DEFAULT;
+
+    // Adjust for volatility
+    positionSize = Math.min(
+      positionSize / (atr > 0 ? atr : 0.01),
+      atr > STRATEGY_CONFIG.ATR_POSITION_THRESHOLD
+        ? STRATEGY_CONFIG.POSITION_SIZE_MAX_HIGH_ATR
+        : STRATEGY_CONFIG.POSITION_SIZE_MAX
+    );
+
+    return positionSize;
   }
 
   public async evaluateBacktest(result: BacktestResult): Promise<void> {

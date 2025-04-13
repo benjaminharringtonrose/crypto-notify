@@ -29,7 +29,6 @@ export class TradeModelPredictor {
       await this.weightManager.loadWeights();
       this.weightManager.setWeights(this.model);
       this.isWeightsLoaded = true;
-      console.log("Weights loaded successfully");
     } catch (error) {
       console.error("Failed to load weights:", error);
       throw error;
@@ -57,7 +56,6 @@ export class TradeModelPredictor {
     atrBreakout: number;
   }> {
     if (!this.isWeightsLoaded) {
-      console.log("Weights not yet loaded, awaiting load...");
       await this.loadWeightsAsync();
     }
 

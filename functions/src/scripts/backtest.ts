@@ -20,6 +20,7 @@ async function runBacktest() {
     startIndex,
     endIndex
   );
+
   await backtester.evaluateBacktest(result);
 
   // Optionally, save or visualize equityCurve

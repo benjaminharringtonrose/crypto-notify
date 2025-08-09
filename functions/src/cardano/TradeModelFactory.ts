@@ -117,7 +117,7 @@ export default class TradeModelFactory {
         kernelRegularizer: tf.regularizers.l2({
           l2: MODEL_CONFIG.L2_REGULARIZATION,
         }),
-        name: "dense",
+        name: "dense_1",
       })
     );
     model.add(tf.layers.batchNormalization({ name: "bn_dense1" }));
@@ -128,7 +128,7 @@ export default class TradeModelFactory {
         units: MODEL_CONFIG.OUTPUT_UNITS,
         activation: "softmax",
         kernelInitializer: "heNormal",
-        name: "dense_1",
+        name: "dense_2",
       })
     );
 

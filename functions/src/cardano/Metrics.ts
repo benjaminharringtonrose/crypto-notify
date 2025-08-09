@@ -20,49 +20,73 @@ export class Metrics {
   }
 
   static precisionBuy(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
-    const predLabels = yPred.argMax(-1);
-    const trueLabels = yTrue.argMax(-1);
-    const buyMask = predLabels.equal(1).cast("float32");
-    const truePosBuy = tf
-      .logicalAnd(trueLabels.equal(1), predLabels.equal(1))
-      .cast("float32")
-      .sum();
-    const predBuy = buyMask.sum();
-    return truePosBuy.div(predBuy.add(tf.scalar(1e-6))) as tf.Scalar;
+    try {
+      const predLabels = yPred.argMax(-1);
+      const trueLabels = yTrue.argMax(-1);
+      const buyMask = predLabels.equal(1).cast("float32");
+      const truePosBuy = tf
+        .logicalAnd(trueLabels.equal(1), predLabels.equal(1))
+        .cast("float32")
+        .sum();
+      const predBuy = buyMask.sum();
+      const precision = truePosBuy.div(predBuy.add(tf.scalar(1e-8))); // Increased epsilon
+      return precision as tf.Scalar;
+    } catch (error) {
+      console.warn("Error in precisionBuy calculation:", error);
+      return tf.scalar(0) as tf.Scalar;
+    }
   }
 
   static precisionSell(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
-    const predLabels = yPred.argMax(-1);
-    const trueLabels = yTrue.argMax(-1);
-    const sellMask = predLabels.equal(0).cast("float32");
-    const truePosSell = tf
-      .logicalAnd(trueLabels.equal(0), predLabels.equal(0))
-      .cast("float32")
-      .sum();
-    const predSell = sellMask.sum();
-    return truePosSell.div(predSell.add(tf.scalar(1e-6))) as tf.Scalar;
+    try {
+      const predLabels = yPred.argMax(-1);
+      const trueLabels = yTrue.argMax(-1);
+      const sellMask = predLabels.equal(0).cast("float32");
+      const truePosSell = tf
+        .logicalAnd(trueLabels.equal(0), predLabels.equal(0))
+        .cast("float32")
+        .sum();
+      const predSell = sellMask.sum();
+      const precision = truePosSell.div(predSell.add(tf.scalar(1e-8))); // Increased epsilon
+      return precision as tf.Scalar;
+    } catch (error) {
+      console.warn("Error in precisionSell calculation:", error);
+      return tf.scalar(0) as tf.Scalar;
+    }
   }
 
   static recallBuy(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
-    const predLabels = yPred.argMax(-1);
-    const trueLabels = yTrue.argMax(-1);
-    const truePosBuy = tf
-      .logicalAnd(trueLabels.equal(1), predLabels.equal(1))
-      .cast("float32")
-      .sum();
-    const actualBuy = trueLabels.equal(1).cast("float32").sum();
-    return truePosBuy.div(actualBuy.add(tf.scalar(1e-6))) as tf.Scalar;
+    try {
+      const predLabels = yPred.argMax(-1);
+      const trueLabels = yTrue.argMax(-1);
+      const truePosBuy = tf
+        .logicalAnd(trueLabels.equal(1), predLabels.equal(1))
+        .cast("float32")
+        .sum();
+      const actualBuy = trueLabels.equal(1).cast("float32").sum();
+      const recall = truePosBuy.div(actualBuy.add(tf.scalar(1e-8))); // Increased epsilon
+      return recall as tf.Scalar;
+    } catch (error) {
+      console.warn("Error in recallBuy calculation:", error);
+      return tf.scalar(0) as tf.Scalar;
+    }
   }
 
   static recallSell(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
-    const predLabels = yPred.argMax(-1);
-    const trueLabels = yTrue.argMax(-1);
-    const truePosSell = tf
-      .logicalAnd(trueLabels.equal(0), predLabels.equal(0))
-      .cast("float32")
-      .sum();
-    const actualSell = trueLabels.equal(0).cast("float32").sum();
-    return truePosSell.div(actualSell.add(tf.scalar(1e-6))) as tf.Scalar;
+    try {
+      const predLabels = yPred.argMax(-1);
+      const trueLabels = yTrue.argMax(-1);
+      const truePosSell = tf
+        .logicalAnd(trueLabels.equal(0), predLabels.equal(0))
+        .cast("float32")
+        .sum();
+      const actualSell = trueLabels.equal(0).cast("float32").sum();
+      const recall = truePosSell.div(actualSell.add(tf.scalar(1e-8))); // Increased epsilon
+      return recall as tf.Scalar;
+    } catch (error) {
+      console.warn("Error in recallSell calculation:", error);
+      return tf.scalar(0) as tf.Scalar;
+    }
   }
 
   static customF1Buy(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
@@ -163,40 +187,96 @@ export class Metrics {
     X: tf.Tensor,
     y: tf.Tensor
   ): Promise<void> {
-    const preds = model.predict(X) as tf.Tensor;
-    const predArray = (await preds.array()) as number[][];
+    console.log("\n=== Model Evaluation ===");
+    const predictions = model.predict(X) as tf.Tensor;
+    const predictedLabels = Array.from(await predictions.argMax(-1).data());
     const yArray = Array.from(await y.argMax(-1).data());
-    const predictedLabels = predArray.map((p) => (p[1] > 0.5 ? 1 : 0));
-    const buyCount = predictedLabels.filter((p) => p === 1).length;
-    console.log(
-      `Predicted Buy: ${buyCount}, Sell: ${predictedLabels.length - buyCount}`
-    );
 
     const metrics = Metrics.calculateMetrics(predictedLabels, yArray);
-    // Fixed: Corrected labels for precision and recall
     console.log(
-      `Precision Buy: ${metrics.precisionBuy.toFixed(
+      `Precision - Buy: ${metrics.precisionBuy.toFixed(
         4
-      )}, Precision Sell: ${metrics.precisionSell.toFixed(4)}`
+      )}, Sell: ${metrics.precisionSell.toFixed(4)}`
     );
     console.log(
-      `Recall Buy: ${metrics.recallBuy.toFixed(
+      `Recall - Buy: ${metrics.recallBuy.toFixed(
         4
-      )}, Recall Sell: ${metrics.recallSell.toFixed(4)}`
+      )}, Sell: ${metrics.recallSell.toFixed(4)}`
     );
     console.log(
-      `F1 Buy: ${metrics.f1Buy.toFixed(4)}, F1 Sell: ${metrics.f1Sell.toFixed(
+      `F1 Score - Buy: ${metrics.f1Buy.toFixed(
         4
-      )}`
+      )}, Sell: ${metrics.f1Sell.toFixed(4)}`
     );
 
-    const confusionMatrix = tf.math.confusionMatrix(
-      tf.tensor1d(yArray, "int32"),
-      tf.tensor1d(predictedLabels, "int32"),
-      2
-    );
-    console.log("Confusion Matrix:", await confusionMatrix.array());
+    // Calculate additional metrics
+    const balancedAccuracy = (metrics.recallBuy + metrics.recallSell) / 2;
+    console.log(`Balanced Accuracy: ${balancedAccuracy.toFixed(4)}`);
 
-    preds.dispose();
+    // Calculate Matthews Correlation Coefficient
+    const mcc = this.calculateMCC(predictedLabels, yArray);
+    console.log(`Matthews Correlation Coefficient: ${mcc.toFixed(4)}`);
+
+    // Calculate confusion matrix
+    const confusionMatrix = this.calculateConfusionMatrix(
+      predictedLabels,
+      yArray
+    );
+    console.log("Confusion Matrix:");
+    console.log(`[ [ ${confusionMatrix[0][0]}, ${confusionMatrix[0][1]} ],`);
+    console.log(`  [ ${confusionMatrix[1][0]}, ${confusionMatrix[1][1]} ] ]`);
+
+    // Calculate class distribution
+    const buyCount = yArray.filter((l) => l === 1).length;
+    const sellCount = yArray.filter((l) => l === 0).length;
+    console.log(`Class Distribution - Buy: ${buyCount}, Sell: ${sellCount}`);
+
+    predictions.dispose();
+  }
+
+  private static calculateMCC(
+    predictedLabels: number[],
+    trueLabels: number[]
+  ): number {
+    let tp = 0,
+      tn = 0,
+      fp = 0,
+      fn = 0;
+
+    for (let i = 0; i < predictedLabels.length; i++) {
+      if (predictedLabels[i] === 1 && trueLabels[i] === 1) tp++;
+      else if (predictedLabels[i] === 0 && trueLabels[i] === 0) tn++;
+      else if (predictedLabels[i] === 1 && trueLabels[i] === 0) fp++;
+      else if (predictedLabels[i] === 0 && trueLabels[i] === 1) fn++;
+    }
+
+    const numerator = tp * tn - fp * fn;
+    const denominator = Math.sqrt(
+      (tp + fp) * (tp + fn) * (tn + fp) * (tn + fn)
+    );
+
+    return denominator === 0 ? 0 : numerator / denominator;
+  }
+
+  private static calculateConfusionMatrix(
+    predictedLabels: number[],
+    trueLabels: number[]
+  ): number[][] {
+    let tp = 0,
+      tn = 0,
+      fp = 0,
+      fn = 0;
+
+    for (let i = 0; i < predictedLabels.length; i++) {
+      if (predictedLabels[i] === 1 && trueLabels[i] === 1) tp++;
+      else if (predictedLabels[i] === 0 && trueLabels[i] === 0) tn++;
+      else if (predictedLabels[i] === 1 && trueLabels[i] === 0) fp++;
+      else if (predictedLabels[i] === 0 && trueLabels[i] === 1) fn++;
+    }
+
+    return [
+      [tn, fp],
+      [fn, tp],
+    ]; // [Sell, Buy] x [Sell, Buy]
   }
 }

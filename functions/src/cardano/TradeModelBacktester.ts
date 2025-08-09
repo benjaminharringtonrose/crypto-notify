@@ -190,10 +190,10 @@ export class TradeModelBacktester {
       "0.8+": 0,
     };
     const strategyDistribution: { [key: string]: number } = {
-      Momentum: 0,
-      MeanReversion: 0,
-      Breakout: 0,
-      TrendFollowing: 0,
+      momentum: 0,
+      mean_reversion: 0,
+      breakout: 0,
+      trend_following: 0,
     };
 
     const returns: number[] = [];

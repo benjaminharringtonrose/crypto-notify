@@ -117,18 +117,18 @@ export const STRATEGY_CONFIG = {
 };
 
 const MODEL_CONFIG_BASE = {
-  CONV1D_FILTERS_1: 12,
-  CONV1D_FILTERS_2: 24,
+  CONV1D_FILTERS_1: 8, // Reduced from 12
+  CONV1D_FILTERS_2: 16, // Reduced from 24
   CONV1D_KERNEL_SIZE_1: 5,
   CONV1D_KERNEL_SIZE_2: 3,
-  LSTM_UNITS_1: 48,
-  LSTM_UNITS_2: 24,
+  LSTM_UNITS_1: 32, // Reduced from 48
+  LSTM_UNITS_2: 16, // Reduced from 24
   LSTM_UNITS_3: 8,
-  TIME_DISTRIBUTED_DENSE_UNITS: 16,
-  DENSE_UNITS_1: 24,
+  TIME_DISTRIBUTED_DENSE_UNITS: 12, // Reduced from 16
+  DENSE_UNITS_1: 16, // Reduced from 24
   OUTPUT_UNITS: 2,
-  L2_REGULARIZATION: 0.015,
-  DROPOUT_RATE: 0.6,
+  L2_REGULARIZATION: 0.01, // Reduced from 0.015
+  DROPOUT_RATE: 0.4, // Reduced from 0.6
   TIMESTEPS_AFTER_CONV: 24,
   TIMESTEPS: 30,
   ADA_FEATURE_COUNT: 33,
@@ -189,24 +189,24 @@ export const MODEL_CONFIG = {
 };
 
 export const TRAINING_CONFIG = {
-  EPOCHS: 75,
-  BATCH_SIZE: 128,
+  EPOCHS: 100, // Increased from 75
+  BATCH_SIZE: 64, // Reduced from 128 for better generalization
   SHUFFLE_CHUNK_SIZE: 10,
-  INITIAL_LEARNING_RATE: 0.0004,
-  MIN_LEARNING_RATE: 0.00005,
+  INITIAL_LEARNING_RATE: 0.001, // Increased from 0.0004
+  MIN_LEARNING_RATE: 0.00001, // Reduced from 0.00005
   CYCLIC_LR_STEP_SIZE: 8,
   OUTPUT_CLASSES: 2,
   START_DAYS_AGO: 1000,
-  TRAIN_SPLIT: 0.7,
+  TRAIN_SPLIT: 0.8, // Increased from 0.7 for more training data
   PREFETCH_BUFFER: 2,
-  PATIENCE: 25,
+  PATIENCE: 15, // Reduced from 25 for earlier stopping
   BYTES_TO_MB: 1024 * 1024,
   MS_TO_SECONDS: 1000,
-  GAMMA: 3.0,
-  ALPHA: [0.35, 0.65] as [number, number],
-  GRADIENT_CLIP_NORM: 2.0,
-  LR_DECAY_RATE: 0.99,
-  WARMUP_EPOCHS: 10,
+  GAMMA: 2.0, // Reduced from 3.0 for less aggressive focal loss
+  ALPHA: [0.4, 0.6] as [number, number], // More balanced class weights
+  GRADIENT_CLIP_NORM: 1.5, // Reduced from 2.0
+  LR_DECAY_RATE: 0.95, // Reduced from 0.99
+  WARMUP_EPOCHS: 5, // Reduced from 10
   WARMUP_INITIAL_LR: 0.0001,
 };
 

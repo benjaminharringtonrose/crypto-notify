@@ -28,6 +28,8 @@ export class TradeModelTrainer {
   private bestThreshold: number = 0.5;
   private bestWeights: tf.Tensor[] = []; // Store best weights
   private bestValF1Buy: number = -Infinity; // Track best F1 Buy
+  private bestValLoss: number = Infinity; // Track best validation loss
+  private patienceCounter: number = 0; // Early stopping counter
 
   constructor() {
     this.dataProcessor = new DataProcessor(
@@ -173,27 +175,52 @@ export class TradeModelTrainer {
               if (logs) {
                 const trainAcc = logs["binaryAccuracy"] || 0;
                 const valAcc = logs["val_binaryAccuracy"] || 0;
+                const valLoss = logs["val_loss"] || Infinity;
                 const accSpread = trainAcc - valAcc;
                 console.log(
                   `Epoch ${epoch + 1} - Binary Accuracy: ${trainAcc.toFixed(
                     4
                   )}, Val Binary Accuracy: ${valAcc.toFixed(
                     4
+                  )}, Val Loss: ${valLoss.toFixed(
+                    4
                   )}, Spread: ${accSpread.toFixed(4)}`
                 );
 
-                // Manual best weights tracking
+                // Improved best weights tracking using validation loss and F1 score
                 const valF1Buy = logs["val_customF1Buy"] || 0;
-                if (valF1Buy > this.bestValF1Buy) {
-                  this.bestValF1Buy = valF1Buy;
+                const valF1Sell = logs["val_customF1Sell"] || 0;
+                const combinedScore = valF1Buy + valF1Sell - valLoss * 0.1; // Balance F1 scores and loss
+
+                if (
+                  combinedScore > this.bestValF1Buy ||
+                  valLoss < this.bestValLoss
+                ) {
+                  if (combinedScore > this.bestValF1Buy) {
+                    this.bestValF1Buy = combinedScore;
+                  }
+                  if (valLoss < this.bestValLoss) {
+                    this.bestValLoss = valLoss;
+                  }
+
+                  // Store best weights
                   this.bestWeights = this.model!.getWeights().map((w) =>
                     w.clone()
                   );
+                  this.patienceCounter = 0; // Reset patience counter
                   console.log(
-                    `New best val_customF1Buy: ${this.bestValF1Buy.toFixed(
+                    `New best weights - Combined Score: ${combinedScore.toFixed(
                       4
-                    )} at epoch ${epoch + 1}`
+                    )}, Val Loss: ${valLoss.toFixed(4)} at epoch ${epoch + 1}`
                   );
+                } else {
+                  this.patienceCounter++;
+                  if (this.patienceCounter >= TRAINING_CONFIG.PATIENCE) {
+                    console.log(
+                      `Early stopping triggered at epoch ${epoch + 1}`
+                    );
+                    this.model!.stopTraining = true;
+                  }
                 }
 
                 await predictionLoggerCallback.onEpochEnd(epoch, logs);
@@ -247,11 +274,35 @@ export class TradeModelTrainer {
       conv1Bias: Array.from(
         await this.model.getLayer("conv1d").getWeights()[1].data()
       ),
+      bnConv1Gamma: Array.from(
+        await this.model.getLayer("bn_conv1").getWeights()[0].data()
+      ),
+      bnConv1Beta: Array.from(
+        await this.model.getLayer("bn_conv1").getWeights()[1].data()
+      ),
+      bnConv1MovingMean: Array.from(
+        await this.model.getLayer("bn_conv1").getWeights()[2].data()
+      ),
+      bnConv1MovingVariance: Array.from(
+        await this.model.getLayer("bn_conv1").getWeights()[3].data()
+      ),
       conv2Weights: Array.from(
         await this.model.getLayer("conv1d_2").getWeights()[0].data()
       ),
       conv2Bias: Array.from(
         await this.model.getLayer("conv1d_2").getWeights()[1].data()
+      ),
+      bnConv2Gamma: Array.from(
+        await this.model.getLayer("bn_conv2").getWeights()[0].data()
+      ),
+      bnConv2Beta: Array.from(
+        await this.model.getLayer("bn_conv2").getWeights()[1].data()
+      ),
+      bnConv2MovingMean: Array.from(
+        await this.model.getLayer("bn_conv2").getWeights()[2].data()
+      ),
+      bnConv2MovingVariance: Array.from(
+        await this.model.getLayer("bn_conv2").getWeights()[3].data()
       ),
       lstm1Weights: Array.from(
         await this.model.getLayer("lstm1").getWeights()[0].data()
@@ -262,6 +313,18 @@ export class TradeModelTrainer {
       lstm1Bias: Array.from(
         await this.model.getLayer("lstm1").getWeights()[2].data()
       ),
+      bnLstm1Gamma: Array.from(
+        await this.model.getLayer("bn_lstm1").getWeights()[0].data()
+      ),
+      bnLstm1Beta: Array.from(
+        await this.model.getLayer("bn_lstm1").getWeights()[1].data()
+      ),
+      bnLstm1MovingMean: Array.from(
+        await this.model.getLayer("bn_lstm1").getWeights()[2].data()
+      ),
+      bnLstm1MovingVariance: Array.from(
+        await this.model.getLayer("bn_lstm1").getWeights()[3].data()
+      ),
       lstm2Weights: Array.from(
         await this.model.getLayer("lstm2").getWeights()[0].data()
       ),
@@ -271,6 +334,18 @@ export class TradeModelTrainer {
       lstm2Bias: Array.from(
         await this.model.getLayer("lstm2").getWeights()[2].data()
       ),
+      bnLstm2Gamma: Array.from(
+        await this.model.getLayer("bn_lstm2").getWeights()[0].data()
+      ),
+      bnLstm2Beta: Array.from(
+        await this.model.getLayer("bn_lstm2").getWeights()[1].data()
+      ),
+      bnLstm2MovingMean: Array.from(
+        await this.model.getLayer("bn_lstm2").getWeights()[2].data()
+      ),
+      bnLstm2MovingVariance: Array.from(
+        await this.model.getLayer("bn_lstm2").getWeights()[3].data()
+      ),
       lstm3Weights: Array.from(
         await this.model.getLayer("lstm3").getWeights()[0].data()
       ),
@@ -279,6 +354,18 @@ export class TradeModelTrainer {
       ),
       lstm3Bias: Array.from(
         await this.model.getLayer("lstm3").getWeights()[2].data()
+      ),
+      bnLstm3Gamma: Array.from(
+        await this.model.getLayer("bn_lstm3").getWeights()[0].data()
+      ),
+      bnLstm3Beta: Array.from(
+        await this.model.getLayer("bn_lstm3").getWeights()[1].data()
+      ),
+      bnLstm3MovingMean: Array.from(
+        await this.model.getLayer("bn_lstm3").getWeights()[2].data()
+      ),
+      bnLstm3MovingVariance: Array.from(
+        await this.model.getLayer("bn_lstm3").getWeights()[3].data()
       ),
       timeDistributedWeights: Array.from(
         await this.model.getLayer("time_distributed").getWeights()[0].data()
@@ -303,6 +390,18 @@ export class TradeModelTrainer {
       ),
       dense1Bias: Array.from(
         await this.model.getLayer("dense").getWeights()[1].data()
+      ),
+      bnDense1Gamma: Array.from(
+        await this.model.getLayer("bn_dense1").getWeights()[0].data()
+      ),
+      bnDense1Beta: Array.from(
+        await this.model.getLayer("bn_dense1").getWeights()[1].data()
+      ),
+      bnDense1MovingMean: Array.from(
+        await this.model.getLayer("bn_dense1").getWeights()[2].data()
+      ),
+      bnDense1MovingVariance: Array.from(
+        await this.model.getLayer("bn_dense1").getWeights()[3].data()
       ),
       dense2Weights: Array.from(
         await this.model.getLayer("dense_1").getWeights()[0].data()

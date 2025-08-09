@@ -117,22 +117,73 @@ export class DataProcessor {
     console.log(
       `Before balancing - Buy samples: ${buySamples.length}, Sell samples: ${sellSamples.length}`
     );
-    const maxSamples = Math.max(buySamples.length, sellSamples.length);
+
+    // Use SMOTE-like oversampling for minority class
+    const minorityClass =
+      buySamples.length < sellSamples.length ? buySamples : sellSamples;
+    const majorityClass =
+      buySamples.length < sellSamples.length ? sellSamples : buySamples;
+    const minorityLabel = buySamples.length < sellSamples.length ? 1 : 0;
+
     const balancedX: number[][][] = [];
     const balancedY: number[] = [];
-    [sellSamples, buySamples].forEach((samples, label) => {
-      for (let i = 0; i < maxSamples; i++) {
-        const idx = i % samples.length;
-        balancedX.push(samples[idx]);
-        balancedY.push(label);
-      }
+
+    // Add all majority class samples
+    majorityClass.forEach((sample, i) => {
+      balancedX.push(sample);
+      balancedY.push(buySamples.length < sellSamples.length ? 0 : 1);
     });
+
+    // Add minority class samples with augmentation
+    minorityClass.forEach((sample, i) => {
+      balancedX.push(sample);
+      balancedY.push(minorityLabel);
+
+      // Add augmented samples for minority class
+      const augmentedSamples = this.augmentSample(sample, 2); // Create 2 augmented samples
+      augmentedSamples.forEach((augSample) => {
+        balancedX.push(augSample);
+        balancedY.push(minorityLabel);
+      });
+    });
+
+    // Shuffle the balanced dataset
+    const indices = Array.from({ length: balancedX.length }, (_, i) => i);
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+
+    const shuffledX = indices.map((i) => balancedX[i]);
+    const shuffledY = indices.map((i) => balancedY[i]);
+
     console.log(
       `After balancing - Buy samples: ${
-        balancedY.filter((l) => l === 1).length
-      }, Sell samples: ${balancedY.filter((l) => l === 0).length}`
+        shuffledY.filter((l) => l === 1).length
+      }, Sell samples: ${shuffledY.filter((l) => l === 0).length}`
     );
-    return { X: balancedX, y: balancedY };
+    return { X: shuffledX, y: shuffledY };
+  }
+
+  private augmentSample(
+    sample: number[][],
+    numAugmentations: number
+  ): number[][][] {
+    const augmented: number[][][] = [];
+
+    for (let i = 0; i < numAugmentations; i++) {
+      const augmentedSample = sample.map((timestep) =>
+        timestep.map((feature) => {
+          // Add small random noise and scaling
+          const noise = (Math.random() - 0.5) * 0.02; // Reduced noise
+          const scale = 1 + (Math.random() - 0.5) * 0.1; // Small scaling variation
+          return feature * scale + noise;
+        })
+      );
+      augmented.push(augmentedSample);
+    }
+
+    return augmented;
   }
 
   private labelData({
@@ -163,14 +214,35 @@ export class DataProcessor {
     const numFeatures = features[0].length;
     const means = Array(numFeatures).fill(0);
     const stds = Array(numFeatures).fill(0);
+
+    // Compute means
     features.forEach((seq) => seq.forEach((val, i) => (means[i] += val)));
     means.forEach((sum, i) => (means[i] = sum / features.length));
+
+    // Compute robust standard deviations
     features.forEach((seq) =>
       seq.forEach((val, i) => (stds[i] += (val - means[i]) ** 2))
     );
-    stds.forEach((sum, i) => (stds[i] = Math.sqrt(sum / features.length) || 1));
-    console.log(`Feature means: ${means.slice(0, 5)}...`);
-    console.log(`Feature stds: ${stds.slice(0, 5)}...`);
+    stds.forEach((sum, i) => {
+      const variance = sum / features.length;
+      // Use robust std calculation with minimum threshold
+      stds[i] = Math.sqrt(variance) || 0.01; // Minimum std to prevent division by zero
+    });
+
+    // Clip extreme values to prevent outliers from dominating
+    const maxStd = 10; // Maximum allowed standard deviation
+    stds.forEach((std, i) => {
+      if (std > maxStd) {
+        stds[i] = maxStd;
+      }
+    });
+
+    console.log(
+      `Feature means: ${means.slice(0, 5).map((m) => m.toFixed(4))}...`
+    );
+    console.log(
+      `Feature stds: ${stds.slice(0, 5).map((s) => s.toFixed(4))}...`
+    );
     return { mean: means, std: stds };
   }
 

@@ -488,7 +488,13 @@ export class TradingStrategy {
         adaVolumes,
         dynamicBreakoutThreshold
       );
-      if (buyConditions && capital > 0) {
+      // Trade quality filtering - only take high-quality trades
+      const tradeQuality = buyProb * confidence > 0.25; // Combined quality metric
+      const minProfitPotential = 0.05; // 5% minimum profit potential
+      const profitPotential = (dynamicProfitTake - currentPrice) / currentPrice;
+      const hasProfitPotential = profitPotential >= minProfitPotential;
+
+      if (buyConditions && tradeQuality && hasProfitPotential && capital > 0) {
         const volatilityAdjustedSize = Math.min(
           this.basePositionSize / (atr > 0 ? atr : 0.01),
           atr > STRATEGY_CONFIG.ATR_POSITION_THRESHOLD
@@ -659,20 +665,32 @@ export class TradingStrategy {
   ): boolean {
     switch (this.currentStrategy) {
       case StrategyType.Momentum:
+        // Enhanced sell conditions with momentum-based exits
+        const momentumExitMomentum =
+          shortMomentum < -0.01 && trendStrength < 0.05;
+        const profitPotentialExitMomentum = priceChange >= 0.05; // Exit if 5% profit reached
         return (
           sellProb > this.sellProbThreshold + 0.05 ||
           momentum < STRATEGY_CONFIG.NEGATIVE_MOMENTUM_THRESHOLD ||
           shortMomentum < STRATEGY_CONFIG.NEGATIVE_SHORT_MOMENTUM_THRESHOLD ||
           trendStrength < STRATEGY_CONFIG.TREND_STRENGTH_REVERSAL_THRESHOLD ||
+          momentumExitMomentum || // New: momentum-based exit
+          profitPotentialExitMomentum || // New: profit potential exit
           priceChange <= -stopLossLevel ||
           currentPrice <= trailingStopLevel ||
           currentPrice >= profitTakeLevel
         );
       case StrategyType.MeanReversion:
+        // Enhanced sell conditions with momentum-based exits
+        const momentumExitMeanRev =
+          shortMomentum < -0.01 && trendStrength < 0.05;
+        const profitPotentialExitMeanRev = priceChange >= 0.03; // Exit if 3% profit reached
         return (
           sellProb > this.sellProbThreshold ||
           momentum > STRATEGY_CONFIG.MOMENTUM_MAX ||
           priceChange >= STRATEGY_CONFIG.MEAN_REVERSION_THRESHOLD ||
+          momentumExitMeanRev || // New: momentum-based exit
+          profitPotentialExitMeanRev || // New: profit potential exit
           priceChange <= -stopLossLevel ||
           currentPrice <= trailingStopLevel
         );

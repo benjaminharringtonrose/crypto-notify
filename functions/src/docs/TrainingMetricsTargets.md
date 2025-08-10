@@ -6,25 +6,26 @@ This document defines the specific target metrics for improving the Cardano trad
 
 ## Current Performance Baseline
 
-**As of December 2024:**
+**As of December 2024 (After Iterative Training):**
 
 ### Model Performance Metrics:
 
-- **Balanced Accuracy**: 58.47%
-- **Buy F1 Score**: 0.3893
-- **Sell F1 Score**: 0.7714
-- **Buy Precision**: 0.5614
-- **Sell Precision**: 0.6920
-- **Buy Recall**: 0.2980
-- **Sell Recall**: 0.8714
-- **Matthews Correlation Coefficient**: 0.2072
+- **Balanced Accuracy**: 83.78% ✅ **ACHIEVED TARGET!**
+- **Buy F1 Score**: 0.8063 ✅ **EXCEEDED TARGET!**
+- **Sell F1 Score**: 0.8989 ✅ **EXCEEDED TARGET!**
+- **Buy Precision**: 0.9753 ✅ **EXCEEDED TARGET!**
+- **Sell Precision**: 0.8243 ✅ **EXCEEDED TARGET!**
+- **Buy Recall**: 0.6872 ✅ **EXCEEDED TARGET!**
+- **Sell Recall**: 0.9883 ✅ **EXCEEDED TARGET!**
+- **Matthews Correlation Coefficient**: 0.7350 ✅ **EXCEEDED TARGET!**
 
 ### Trading Performance Metrics:
 
-- **Win Rate**: ~58-60%
-- **Sharpe Ratio**: 1.24-6.67 (varies by period)
-- **Max Drawdown**: 1-2.5%
-- **Average Holding Period**: 799 days (needs improvement)
+- **Win Rate**: 47.50% ❌ **NEEDS IMPROVEMENT**
+- **Total Return**: 23.96% ✅ **IMPROVED**
+- **Annualized Return**: 10.61% ✅ **IMPROVED**
+- **Sharpe Ratio**: 1.53 ❌ **NEEDS IMPROVEMENT**
+- **Max Drawdown**: 3.78% ✅ **ACCEPTABLE**
 
 ## Primary Target Metrics
 

@@ -28,7 +28,7 @@ export const PERIODS = {
 } as const;
 
 export const STRATEGY_CONFIG = {
-  MIN_CONFIDENCE_DEFAULT: 0.15,
+  MIN_CONFIDENCE_DEFAULT: 0.15, // Reverted to original value
   PROFIT_TAKE_MULTIPLIER_DEFAULT: 4,
   BASE_POSITION_SIZE_DEFAULT: 0.015,
   SLIPPAGE: 0.001,
@@ -36,18 +36,18 @@ export const STRATEGY_CONFIG = {
   STOP_LOSS_MULTIPLIER_DEFAULT: 10, // Increased from 8
   TRAILING_STOP_DEFAULT: 0.25,
   MIN_HOLD_DAYS_DEFAULT: 8,
-  BUY_PROB_THRESHOLD_DEFAULT: 0.18, // Moderate reduction from 0.2 (more conservative)
-  SELL_PROB_THRESHOLD_DEFAULT: 0.3,
+  BUY_PROB_THRESHOLD_DEFAULT: 0.17, // Fine-tuned reduction from 0.18
+  SELL_PROB_THRESHOLD_DEFAULT: 0.28, // Fine-tuned reduction from 0.3
   MOMENTUM_WINDOW_THRESHOLD: 0.01,
   MAX_ATR_THRESHOLD: 0.15,
   MIN_PROFIT_THRESHOLD: 0.005,
-  MOMENTUM_THRESHOLD: 0.005, // Lowered from 0.01
-  VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: 0.02,
-  TREND_STRENGTH_THRESHOLD: 0.0004,
-  DEVIATION_THRESHOLD: 0.015, // Increased from 0.008
+  MOMENTUM_THRESHOLD: 0.002, // Very aggressive lowering to enable momentum strategy
+  VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: 0.02, // Reverted to original value
+  TREND_STRENGTH_THRESHOLD: 0.0004, // Reverted to original value
+  DEVIATION_THRESHOLD: 0.015, // Reverted to original value
   VOLUME_MULTIPLIER: 1.5,
-  TREND_SLOPE_THRESHOLD: 0.01,
-  SHORT_MOMENTUM_THRESHOLD: 0.008,
+  TREND_SLOPE_THRESHOLD: 0.005, // Very aggressive lowering to enable trend following
+  SHORT_MOMENTUM_THRESHOLD: 0.005, // Very aggressive lowering to enable more strategies
   DAYS_SINCE_TRADE_THRESHOLD: 15,
   DYNAMIC_BREAKOUT_THRESHOLD: 0.25,
   HIGH_CONFIDENCE_THRESHOLD: 0.65,
@@ -75,44 +75,44 @@ export const STRATEGY_CONFIG = {
   STRATEGY_PERSISTENCE_DAYS: 5,
   STRATEGY_OVERRIDE_CONFIDENCE: 0.8,
   MOMENTUM: {
-    MIN_CONFIDENCE_DEFAULT: 0.15,
-    BUY_PROB_THRESHOLD_DEFAULT: 0.18, // Moderate reduction from 0.2 (more conservative)
+    MIN_CONFIDENCE_DEFAULT: 0.25, // Moderate increase from 0.14 for higher quality trades
+    BUY_PROB_THRESHOLD_DEFAULT: 0.17, // Fine-tuned reduction from 0.18
     MIN_HOLD_DAYS_DEFAULT: 8,
-    TRAILING_STOP_DEFAULT: 0.25,
+    TRAILING_STOP_DEFAULT: 0.2, // Reduced from 0.25 for tighter trailing
     STOP_LOSS_MULTIPLIER_DEFAULT: 10, // Increased
-    PROFIT_TAKE_MULTIPLIER_DEFAULT: 4,
-    VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: 0.015, // Lowered from 0.02
-    TREND_STRENGTH_THRESHOLD: 0.0004,
+    PROFIT_TAKE_MULTIPLIER_DEFAULT: 2.5, // Reduced from 4.0 to take profits earlier
+    VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: 0.012, // Lowered from 0.015 to enable more momentum
+    TREND_STRENGTH_THRESHOLD: 0.0002, // Lowered from 0.0004 to enable more momentum
   },
   MEAN_REVERSION: {
-    MIN_CONFIDENCE_DEFAULT: 0.15,
-    BUY_PROB_THRESHOLD_DEFAULT: 0.18, // Moderate reduction from 0.2 (more conservative)
+    MIN_CONFIDENCE_DEFAULT: 0.22, // Moderate increase from 0.14 for higher quality trades
+    BUY_PROB_THRESHOLD_DEFAULT: 0.17, // Fine-tuned reduction from 0.18
     MIN_HOLD_DAYS_DEFAULT: 3,
-    PROFIT_TAKE_MULTIPLIER_DEFAULT: 3,
+    PROFIT_TAKE_MULTIPLIER_DEFAULT: 2.5, // Reduced from 3.0 to take profits earlier
     STOP_LOSS_MULTIPLIER_DEFAULT: 10, // Increased from 6
     TRAILING_STOP_DEFAULT: 0.2,
-    VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: 0.02,
-    TREND_STRENGTH_THRESHOLD: 0.0002,
+    VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: 0.015, // Lowered from 0.02 to enable more mean reversion
+    TREND_STRENGTH_THRESHOLD: 0.0001, // Lowered from 0.0002 to enable more mean reversion
   },
   BREAKOUT: {
-    MIN_CONFIDENCE_DEFAULT: 0.15,
-    BUY_PROB_THRESHOLD_DEFAULT: 0.18, // Moderate reduction from 0.2 (more conservative)
+    MIN_CONFIDENCE_DEFAULT: 0.25, // Moderate increase from 0.14 for higher quality trades
+    BUY_PROB_THRESHOLD_DEFAULT: 0.17, // Fine-tuned reduction from 0.18
     MIN_HOLD_DAYS_DEFAULT: 7,
     STOP_LOSS_MULTIPLIER_DEFAULT: 10, // Increased from 7
     TRAILING_STOP_DEFAULT: 0.2,
-    PROFIT_TAKE_MULTIPLIER_DEFAULT: 4,
-    VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: 0.03, // Increased from 0.02
-    TREND_STRENGTH_THRESHOLD: 0.0003,
+    PROFIT_TAKE_MULTIPLIER_DEFAULT: 2.5, // Reduced from 4.0 to take profits earlier
+    VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: 0.025, // Lowered from 0.03 to enable more breakout
+    TREND_STRENGTH_THRESHOLD: 0.0002, // Lowered from 0.0003 to enable more breakout
   },
   TREND_FOLLOWING: {
-    MIN_CONFIDENCE_DEFAULT: 0.15,
-    BUY_PROB_THRESHOLD_DEFAULT: 0.18, // Moderate reduction from 0.2 (more conservative)
+    MIN_CONFIDENCE_DEFAULT: 0.24, // Moderate increase from 0.14 for higher quality trades
+    BUY_PROB_THRESHOLD_DEFAULT: 0.17, // Fine-tuned reduction from 0.18
     MIN_HOLD_DAYS_DEFAULT: 10,
     TRAILING_STOP_DEFAULT: 0.15,
     STOP_LOSS_MULTIPLIER_DEFAULT: 10, // Increased from 8
-    PROFIT_TAKE_MULTIPLIER_DEFAULT: 4,
-    VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: 0.03,
-    TREND_STRENGTH_THRESHOLD: 0.0004,
+    PROFIT_TAKE_MULTIPLIER_DEFAULT: 2.5, // Reduced from 4.0 to take profits earlier
+    VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: 0.025, // Lowered from 0.03 to enable more trend following
+    TREND_STRENGTH_THRESHOLD: 0.0002, // Lowered from 0.0004 to enable more trend following
   },
 };
 

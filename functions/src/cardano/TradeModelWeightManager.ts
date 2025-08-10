@@ -60,7 +60,7 @@ export class ModelWeightManager {
       }
 
       model
-        .getLayer("conv1d")
+        .getLayer("conv1d_input")
         .setWeights([
           tf.tensor3d(
             this.weights.conv1Weights,
@@ -116,21 +116,51 @@ export class ModelWeightManager {
           ),
           tf.tensor1d(this.weights.lstm3Bias),
         ]);
+      // Set batch normalization weights for conv layers
       model
-        .getLayer("time_distributed")
+        .getLayer("bn_conv1")
         .setWeights([
-          tf.tensor2d(
-            this.weights.timeDistributedWeights,
-            MODEL_CONFIG.TIME_DISTRIBUTED_WEIGHT_SHAPE
-          ),
-          tf.tensor1d(this.weights.timeDistributedBias),
+          tf.tensor1d(this.weights.bnConv1Gamma),
+          tf.tensor1d(this.weights.bnConv1Beta),
+          tf.tensor1d(this.weights.bnConv1MovingMean),
+          tf.tensor1d(this.weights.bnConv1MovingVariance),
         ]);
       model
-        .getLayer("batchNormalization")
+        .getLayer("bn_conv2")
         .setWeights([
-          tf.tensor1d(this.weights.bnGamma),
-          tf.tensor1d(this.weights.bnBeta),
+          tf.tensor1d(this.weights.bnConv2Gamma),
+          tf.tensor1d(this.weights.bnConv2Beta),
+          tf.tensor1d(this.weights.bnConv2MovingMean),
+          tf.tensor1d(this.weights.bnConv2MovingVariance),
         ]);
+
+      // Set batch normalization weights for LSTM layers
+      model
+        .getLayer("bn_lstm1")
+        .setWeights([
+          tf.tensor1d(this.weights.bnLstm1Gamma),
+          tf.tensor1d(this.weights.bnLstm1Beta),
+          tf.tensor1d(this.weights.bnLstm1MovingMean),
+          tf.tensor1d(this.weights.bnLstm1MovingVariance),
+        ]);
+      model
+        .getLayer("bn_lstm2")
+        .setWeights([
+          tf.tensor1d(this.weights.bnLstm2Gamma),
+          tf.tensor1d(this.weights.bnLstm2Beta),
+          tf.tensor1d(this.weights.bnLstm2MovingMean),
+          tf.tensor1d(this.weights.bnLstm2MovingVariance),
+        ]);
+      model
+        .getLayer("bn_lstm3")
+        .setWeights([
+          tf.tensor1d(this.weights.bnLstm3Gamma),
+          tf.tensor1d(this.weights.bnLstm3Beta),
+          tf.tensor1d(this.weights.bnLstm3MovingMean),
+          tf.tensor1d(this.weights.bnLstm3MovingVariance),
+        ]);
+
+      // Set dense layer weights
       model
         .getLayer("dense_1")
         .setWeights([
@@ -140,14 +170,45 @@ export class ModelWeightManager {
           ),
           tf.tensor1d(this.weights.dense1Bias),
         ]);
+
+      // Set batch normalization for dense layers
       model
-        .getLayer("dense_2")
+        .getLayer("bn_dense1")
+        .setWeights([
+          tf.tensor1d(this.weights.bnDense1Gamma),
+          tf.tensor1d(this.weights.bnDense1Beta),
+          tf.tensor1d(this.weights.bnDense1MovingMean),
+          tf.tensor1d(this.weights.bnDense1MovingVariance),
+        ]);
+
+      model
+        .getLayer("dense_1_5")
         .setWeights([
           tf.tensor2d(
             this.weights.dense2Weights,
             MODEL_CONFIG.DENSE_2_WEIGHT_SHAPE
           ),
           tf.tensor1d(this.weights.dense2Bias),
+        ]);
+
+      model
+        .getLayer("bn_dense1_5")
+        .setWeights([
+          tf.tensor1d(this.weights.bnDense2Gamma),
+          tf.tensor1d(this.weights.bnDense2Beta),
+          tf.tensor1d(this.weights.bnDense2MovingVariance),
+          tf.tensor1d(this.weights.bnDense2MovingMean),
+        ]);
+
+      // Set output layer weights
+      model
+        .getLayer("output")
+        .setWeights([
+          tf.tensor2d(
+            this.weights.outputWeights,
+            MODEL_CONFIG.DENSE_2_WEIGHT_SHAPE
+          ),
+          tf.tensor1d(this.weights.outputBias),
         ]);
     } catch (error) {
       console.error("Error setting weights:", error);

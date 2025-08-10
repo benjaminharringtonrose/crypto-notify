@@ -36,7 +36,7 @@ export const STRATEGY_CONFIG = {
   STOP_LOSS_MULTIPLIER_DEFAULT: 10, // Increased from 8
   TRAILING_STOP_DEFAULT: 0.25,
   MIN_HOLD_DAYS_DEFAULT: 8,
-  BUY_PROB_THRESHOLD_DEFAULT: 0.2,
+  BUY_PROB_THRESHOLD_DEFAULT: 0.18, // Moderate reduction from 0.2 (more conservative)
   SELL_PROB_THRESHOLD_DEFAULT: 0.3,
   MOMENTUM_WINDOW_THRESHOLD: 0.01,
   MAX_ATR_THRESHOLD: 0.15,
@@ -76,7 +76,7 @@ export const STRATEGY_CONFIG = {
   STRATEGY_OVERRIDE_CONFIDENCE: 0.8,
   MOMENTUM: {
     MIN_CONFIDENCE_DEFAULT: 0.15,
-    BUY_PROB_THRESHOLD_DEFAULT: 0.2,
+    BUY_PROB_THRESHOLD_DEFAULT: 0.18, // Moderate reduction from 0.2 (more conservative)
     MIN_HOLD_DAYS_DEFAULT: 8,
     TRAILING_STOP_DEFAULT: 0.25,
     STOP_LOSS_MULTIPLIER_DEFAULT: 10, // Increased
@@ -86,7 +86,7 @@ export const STRATEGY_CONFIG = {
   },
   MEAN_REVERSION: {
     MIN_CONFIDENCE_DEFAULT: 0.15,
-    BUY_PROB_THRESHOLD_DEFAULT: 0.2,
+    BUY_PROB_THRESHOLD_DEFAULT: 0.18, // Moderate reduction from 0.2 (more conservative)
     MIN_HOLD_DAYS_DEFAULT: 3,
     PROFIT_TAKE_MULTIPLIER_DEFAULT: 3,
     STOP_LOSS_MULTIPLIER_DEFAULT: 10, // Increased from 6
@@ -96,7 +96,7 @@ export const STRATEGY_CONFIG = {
   },
   BREAKOUT: {
     MIN_CONFIDENCE_DEFAULT: 0.15,
-    BUY_PROB_THRESHOLD_DEFAULT: 0.2,
+    BUY_PROB_THRESHOLD_DEFAULT: 0.18, // Moderate reduction from 0.2 (more conservative)
     MIN_HOLD_DAYS_DEFAULT: 7,
     STOP_LOSS_MULTIPLIER_DEFAULT: 10, // Increased from 7
     TRAILING_STOP_DEFAULT: 0.2,
@@ -106,7 +106,7 @@ export const STRATEGY_CONFIG = {
   },
   TREND_FOLLOWING: {
     MIN_CONFIDENCE_DEFAULT: 0.15,
-    BUY_PROB_THRESHOLD_DEFAULT: 0.2,
+    BUY_PROB_THRESHOLD_DEFAULT: 0.18, // Moderate reduction from 0.2 (more conservative)
     MIN_HOLD_DAYS_DEFAULT: 10,
     TRAILING_STOP_DEFAULT: 0.15,
     STOP_LOSS_MULTIPLIER_DEFAULT: 10, // Increased from 8
@@ -117,18 +117,21 @@ export const STRATEGY_CONFIG = {
 };
 
 const MODEL_CONFIG_BASE = {
-  CONV1D_FILTERS_1: 8, // Reduced from 12
-  CONV1D_FILTERS_2: 16, // Reduced from 24
+  CONV1D_FILTERS_1: 12, // Increased from 8 for better feature extraction
+  CONV1D_FILTERS_2: 24, // Increased from 16 for better feature extraction
   CONV1D_KERNEL_SIZE_1: 5,
   CONV1D_KERNEL_SIZE_2: 3,
-  LSTM_UNITS_1: 32, // Reduced from 48
-  LSTM_UNITS_2: 16, // Reduced from 24
-  LSTM_UNITS_3: 8,
-  TIME_DISTRIBUTED_DENSE_UNITS: 12, // Reduced from 16
-  DENSE_UNITS_1: 16, // Reduced from 24
+  LSTM_UNITS_1: 48, // Increased from 32 for better temporal modeling
+  LSTM_UNITS_2: 24, // Increased from 16 for better temporal modeling
+  LSTM_UNITS_3: 12, // Increased from 8 for better temporal modeling
+  TIME_DISTRIBUTED_DENSE_UNITS: 16, // Increased from 12 for better feature learning
+  DENSE_UNITS_1: 24, // Increased from 16 for better feature learning
   OUTPUT_UNITS: 2,
-  L2_REGULARIZATION: 0.01, // Reduced from 0.015
-  DROPOUT_RATE: 0.4, // Reduced from 0.6
+  L2_REGULARIZATION: 0.008, // Reduced from 0.01 for better generalization
+  DROPOUT_RATE: 0.35, // Reduced from 0.4 for better training stability
+  ATTENTION_UNITS_1: 16, // New: units for first attention layer
+  ATTENTION_UNITS_2: 12, // New: units for second attention layer
+  RESIDUAL_FILTERS: 8, // New: filters for residual connections
   TIMESTEPS_AFTER_CONV: 24,
   TIMESTEPS: 30,
   ADA_FEATURE_COUNT: 33,
@@ -166,7 +169,7 @@ export const MODEL_CONFIG = {
     MODEL_CONFIG_BASE.LSTM_UNITS_2 * 4,
   ] as [number, number],
   LSTM3_WEIGHT_SHAPE: [
-    MODEL_CONFIG_BASE.LSTM_UNITS_2,
+    MODEL_CONFIG_BASE.TIMESTEPS_AFTER_CONV * MODEL_CONFIG_BASE.LSTM_UNITS_2,
     MODEL_CONFIG_BASE.LSTM_UNITS_3 * 4,
   ] as [number, number],
   LSTM3_RECURRENT_SHAPE: [
@@ -178,36 +181,38 @@ export const MODEL_CONFIG = {
     MODEL_CONFIG_BASE.TIME_DISTRIBUTED_DENSE_UNITS,
   ] as [number, number],
   DENSE_1_WEIGHT_SHAPE: [
-    MODEL_CONFIG_BASE.TIMESTEPS_AFTER_CONV *
-      MODEL_CONFIG_BASE.TIME_DISTRIBUTED_DENSE_UNITS,
+    MODEL_CONFIG_BASE.LSTM_UNITS_3,
     MODEL_CONFIG_BASE.DENSE_UNITS_1,
   ] as [number, number],
   DENSE_2_WEIGHT_SHAPE: [
-    MODEL_CONFIG_BASE.DENSE_UNITS_1,
+    Math.floor(MODEL_CONFIG_BASE.DENSE_UNITS_1 / 2),
     MODEL_CONFIG_BASE.OUTPUT_UNITS,
   ] as [number, number],
 };
 
 export const TRAINING_CONFIG = {
-  EPOCHS: 100, // Increased from 75
-  BATCH_SIZE: 64, // Reduced from 128 for better generalization
+  EPOCHS: 120, // Increased from 100 for better convergence
+  BATCH_SIZE: 32, // Reduced from 64 for better generalization with complex model
   SHUFFLE_CHUNK_SIZE: 10,
-  INITIAL_LEARNING_RATE: 0.001, // Increased from 0.0004
-  MIN_LEARNING_RATE: 0.00001, // Reduced from 0.00005
-  CYCLIC_LR_STEP_SIZE: 8,
+  INITIAL_LEARNING_RATE: 0.0008, // Reduced from 0.001 for more stable training
+  MIN_LEARNING_RATE: 0.000005, // Reduced from 0.00001 for better fine-tuning
+  CYCLIC_LR_STEP_SIZE: 12, // Increased from 8 for longer cycles
   OUTPUT_CLASSES: 2,
-  START_DAYS_AGO: 1000,
-  TRAIN_SPLIT: 0.8, // Increased from 0.7 for more training data
-  PREFETCH_BUFFER: 2,
-  PATIENCE: 15, // Reduced from 25 for earlier stopping
+  START_DAYS_AGO: 1200, // Increased from 1000 for more training data
+  TRAIN_SPLIT: 0.85, // Increased from 0.8 for more training data
+  PREFETCH_BUFFER: 4, // Increased from 2 for better data loading
+  PATIENCE: 20, // Increased from 15 for more stable training
   BYTES_TO_MB: 1024 * 1024,
   MS_TO_SECONDS: 1000,
-  GAMMA: 2.0, // Reduced from 3.0 for less aggressive focal loss
-  ALPHA: [0.4, 0.6] as [number, number], // More balanced class weights
-  GRADIENT_CLIP_NORM: 1.5, // Reduced from 2.0
-  LR_DECAY_RATE: 0.95, // Reduced from 0.99
-  WARMUP_EPOCHS: 5, // Reduced from 10
-  WARMUP_INITIAL_LR: 0.0001,
+  GAMMA: 1.5, // Reduced from 2.0 for less aggressive focal loss
+  ALPHA: [0.35, 0.65] as [number, number], // Moderate buy emphasis (more conservative)
+  GRADIENT_CLIP_NORM: 1.0, // Reduced from 1.5 for more stable gradients
+  LR_DECAY_RATE: 0.92, // Reduced from 0.95 for slower decay
+  WARMUP_EPOCHS: 8, // Increased from 5 for better initialization
+  WARMUP_INITIAL_LR: 0.00005, // Reduced from 0.0001 for gentler warmup
+  ATTENTION_DROPOUT: 0.1, // New: dropout for attention mechanisms
+  RESIDUAL_DROPOUT: 0.15, // New: dropout for residual connections
+  LAYER_NORM_EPSILON: 1e-6, // New: epsilon for layer normalization
 };
 
 export const TIME_CONVERSIONS = {

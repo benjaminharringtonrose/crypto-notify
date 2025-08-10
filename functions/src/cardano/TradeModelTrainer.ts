@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import { PredictionLoggerCallback } from "./callbacks/PredictionLoggerCallback";
 import { ExponentialDecayLRCallback } from "./callbacks/ExponentialDecayLRCallback";
 import { GradientClippingCallback } from "./callbacks/GradientClippingCallback";
+import { CurriculumLearningCallback } from "./callbacks/CurriculumLearningCallback";
 import { ModelConfig } from "../types";
 import TradeModelFactory from "./TradeModelFactory";
 import { FirebaseService } from "../api/FirebaseService";
@@ -141,6 +142,10 @@ export class TradeModelTrainer {
         X_val,
         y_val
       );
+      const curriculumLearningCallback = new CurriculumLearningCallback(
+        this.config.epochs,
+        this.dataProcessor
+      );
 
       if (!this.model) throw new Error("Model initialization failed");
 
@@ -161,6 +166,7 @@ export class TradeModelTrainer {
       predictionLoggerCallback.setModel(this.model);
       lrCallback.setModel(this.model);
       gradientClippingCallback.setModel(this.model);
+      curriculumLearningCallback.setModel(this.model);
 
       console.log("Model summary:");
       this.model.summary();
@@ -226,6 +232,7 @@ export class TradeModelTrainer {
                 await predictionLoggerCallback.onEpochEnd(epoch, logs);
                 await lrCallback.onEpochEnd(epoch, logs);
                 await gradientClippingCallback.onEpochEnd(epoch, logs);
+                await curriculumLearningCallback.onEpochEnd(epoch, logs);
               }
             },
             onTrainEnd: async () => {
@@ -269,10 +276,10 @@ export class TradeModelTrainer {
     if (!this.model) throw new Error("Model not initialized");
     const weights = {
       conv1Weights: Array.from(
-        await this.model.getLayer("conv1d").getWeights()[0].data()
+        await this.model.getLayer("conv1d_input").getWeights()[0].data()
       ),
       conv1Bias: Array.from(
-        await this.model.getLayer("conv1d").getWeights()[1].data()
+        await this.model.getLayer("conv1d_input").getWeights()[1].data()
       ),
       bnConv1Gamma: Array.from(
         await this.model.getLayer("bn_conv1").getWeights()[0].data()
@@ -367,29 +374,23 @@ export class TradeModelTrainer {
       bnLstm3MovingVariance: Array.from(
         await this.model.getLayer("bn_lstm3").getWeights()[3].data()
       ),
-      timeDistributedWeights: Array.from(
-        await this.model.getLayer("time_distributed").getWeights()[0].data()
-      ),
-      timeDistributedBias: Array.from(
-        await this.model.getLayer("time_distributed").getWeights()[1].data()
-      ),
-      bnGamma: Array.from(
-        await this.model.getLayer("batchNormalization").getWeights()[0].data()
-      ),
-      bnBeta: Array.from(
-        await this.model.getLayer("batchNormalization").getWeights()[1].data()
-      ),
-      bnMovingMean: Array.from(
-        await this.model.getLayer("batchNormalization").getWeights()[2].data()
-      ),
-      bnMovingVariance: Array.from(
-        await this.model.getLayer("batchNormalization").getWeights()[3].data()
-      ),
       dense1Weights: Array.from(
-        await this.model.getLayer("dense").getWeights()[0].data()
+        await this.model.getLayer("dense_1").getWeights()[0].data()
       ),
       dense1Bias: Array.from(
-        await this.model.getLayer("dense").getWeights()[1].data()
+        await this.model.getLayer("dense_1").getWeights()[1].data()
+      ),
+      dense2Weights: Array.from(
+        await this.model.getLayer("dense_1_5").getWeights()[0].data()
+      ),
+      dense2Bias: Array.from(
+        await this.model.getLayer("dense_1_5").getWeights()[1].data()
+      ),
+      outputWeights: Array.from(
+        await this.model.getLayer("output").getWeights()[0].data()
+      ),
+      outputBias: Array.from(
+        await this.model.getLayer("output").getWeights()[1].data()
       ),
       bnDense1Gamma: Array.from(
         await this.model.getLayer("bn_dense1").getWeights()[0].data()
@@ -403,11 +404,17 @@ export class TradeModelTrainer {
       bnDense1MovingVariance: Array.from(
         await this.model.getLayer("bn_dense1").getWeights()[3].data()
       ),
-      dense2Weights: Array.from(
-        await this.model.getLayer("dense_1").getWeights()[0].data()
+      bnDense2Gamma: Array.from(
+        await this.model.getLayer("bn_dense1_5").getWeights()[0].data()
       ),
-      dense2Bias: Array.from(
-        await this.model.getLayer("dense_1").getWeights()[1].data()
+      bnDense2Beta: Array.from(
+        await this.model.getLayer("bn_dense1_5").getWeights()[1].data()
+      ),
+      bnDense2MovingMean: Array.from(
+        await this.model.getLayer("bn_dense1_5").getWeights()[2].data()
+      ),
+      bnDense2MovingVariance: Array.from(
+        await this.model.getLayer("bn_dense1_5").getWeights()[3].data()
       ),
       featureMeans: Array.from(await X_mean.data()),
       featureStds: Array.from(await X_std.data()),

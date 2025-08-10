@@ -8,10 +8,88 @@ const cryptoCompare = new CryptoCompareService();
 export class DataProcessor {
   private readonly config: ModelConfig;
   private readonly startDaysAgo: number;
+  private difficultyLevel: number = 1.0; // New: curriculum learning difficulty level
 
   constructor(config: ModelConfig, startDaysAgo: number) {
     this.config = config;
     this.startDaysAgo = startDaysAgo;
+  }
+
+  // New: Set difficulty level for curriculum learning
+  public setDifficultyLevel(level: number): void {
+    this.difficultyLevel = Math.max(0.1, Math.min(1.0, level));
+    console.log(
+      `DataProcessor: Difficulty level set to ${(
+        this.difficultyLevel * 100
+      ).toFixed(1)}%`
+    );
+  }
+
+  // New: Get current difficulty level
+  public getDifficultyLevel(): number {
+    return this.difficultyLevel;
+  }
+
+  // New: Filter data based on difficulty level
+  private filterDataByDifficulty(
+    X: number[][][],
+    y: number[]
+  ): { X: number[][][]; y: number[] } {
+    if (this.difficultyLevel >= 1.0) {
+      return { X, y }; // Use all data
+    }
+
+    // Calculate sample difficulty scores based on volatility and trend complexity
+    const difficultyScores: { index: number; score: number }[] = [];
+
+    for (let i = 0; i < X.length; i++) {
+      const sample = X[i];
+      let volatilityScore = 0;
+      let trendScore = 0;
+
+      // Calculate volatility score
+      for (let j = 1; j < sample.length; j++) {
+        const priceChange = Math.abs(sample[j][0] - sample[j - 1][0]); // Assuming first feature is price
+        volatilityScore += priceChange;
+      }
+
+      // Calculate trend complexity score
+      let trendChanges = 0;
+      for (let j = 2; j < sample.length; j++) {
+        const prevTrend = sample[j - 1][0] - sample[j - 2][0];
+        const currTrend = sample[j][0] - sample[j - 1][0];
+        if (
+          (prevTrend > 0 && currTrend < 0) ||
+          (prevTrend < 0 && currTrend > 0)
+        ) {
+          trendChanges++;
+        }
+      }
+      trendScore = trendChanges / (sample.length - 2);
+
+      const totalScore = (volatilityScore + trendScore * 10) / sample.length;
+      difficultyScores.push({ index: i, score: totalScore });
+    }
+
+    // Sort by difficulty score (easiest first)
+    difficultyScores.sort((a, b) => a.score - b.score);
+
+    // Select easiest samples based on difficulty level
+    const numSamples = Math.floor(X.length * this.difficultyLevel);
+    const selectedIndices = difficultyScores
+      .slice(0, numSamples)
+      .map((item) => item.index);
+
+    const filteredX = selectedIndices.map((i) => X[i]);
+    const filteredY = selectedIndices.map((i) => y[i]);
+
+    console.log(
+      `Curriculum Learning: Selected ${filteredX.length}/${
+        X.length
+      } samples (${(this.difficultyLevel * 100).toFixed(1)}% difficulty)`
+    );
+
+    return { X: filteredX, y: filteredY };
   }
 
   private async fetchHistoricalData(): Promise<{
@@ -140,7 +218,7 @@ export class DataProcessor {
       balancedY.push(minorityLabel);
 
       // Add augmented samples for minority class
-      const augmentedSamples = this.augmentSample(sample, 2); // Create 2 augmented samples
+      const augmentedSamples = this.augmentSample(sample, 2); // Create 2 augmented samples (back to original)
       augmentedSamples.forEach((augSample) => {
         balancedX.push(augSample);
         balancedY.push(minorityLabel);
@@ -189,7 +267,7 @@ export class DataProcessor {
   private labelData({
     prices,
     dayIndex,
-    threshold = 0.07, // Increased from 0.05
+    threshold = 0.06, // Moderate reduction from 0.07 (more conservative)
     horizon = 7,
   }: {
     prices: number[];
@@ -264,7 +342,16 @@ export class DataProcessor {
     }
 
     const balancedData = this.balanceDataset(X, y);
-    console.log(`Total samples: ${balancedData.X.length}`);
-    return { X: balancedData.X, y: balancedData.y };
+
+    // Apply curriculum learning filter based on difficulty level
+    const filteredData = this.filterDataByDifficulty(
+      balancedData.X,
+      balancedData.y
+    );
+
+    console.log(
+      `Total samples: ${balancedData.X.length}, Filtered samples: ${filteredData.X.length}`
+    );
+    return { X: filteredData.X, y: filteredData.y };
   }
 }

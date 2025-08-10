@@ -80,7 +80,7 @@ export const STRATEGY_CONFIG = {
     MIN_HOLD_DAYS_DEFAULT: 8,
     TRAILING_STOP_DEFAULT: 0.2, // Reduced from 0.25 for tighter trailing
     STOP_LOSS_MULTIPLIER_DEFAULT: 10, // Increased
-    PROFIT_TAKE_MULTIPLIER_DEFAULT: 2.5, // Reduced from 4.0 to take profits earlier
+    PROFIT_TAKE_MULTIPLIER_DEFAULT: 3.5, // Increased from 2.5 for better returns
     VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: 0.012, // Lowered from 0.015 to enable more momentum
     TREND_STRENGTH_THRESHOLD: 0.0002, // Lowered from 0.0004 to enable more momentum
   },
@@ -88,7 +88,7 @@ export const STRATEGY_CONFIG = {
     MIN_CONFIDENCE_DEFAULT: 0.22, // Moderate increase from 0.14 for higher quality trades
     BUY_PROB_THRESHOLD_DEFAULT: 0.17, // Fine-tuned reduction from 0.18
     MIN_HOLD_DAYS_DEFAULT: 3,
-    PROFIT_TAKE_MULTIPLIER_DEFAULT: 2.5, // Reduced from 3.0 to take profits earlier
+    PROFIT_TAKE_MULTIPLIER_DEFAULT: 3.0, // Increased from 2.5 for better returns
     STOP_LOSS_MULTIPLIER_DEFAULT: 10, // Increased from 6
     TRAILING_STOP_DEFAULT: 0.2,
     VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: 0.015, // Lowered from 0.02 to enable more mean reversion
@@ -100,7 +100,7 @@ export const STRATEGY_CONFIG = {
     MIN_HOLD_DAYS_DEFAULT: 7,
     STOP_LOSS_MULTIPLIER_DEFAULT: 10, // Increased from 7
     TRAILING_STOP_DEFAULT: 0.2,
-    PROFIT_TAKE_MULTIPLIER_DEFAULT: 2.5, // Reduced from 4.0 to take profits earlier
+    PROFIT_TAKE_MULTIPLIER_DEFAULT: 4.0, // Increased from 2.5 for better returns
     VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: 0.025, // Lowered from 0.03 to enable more breakout
     TREND_STRENGTH_THRESHOLD: 0.0002, // Lowered from 0.0003 to enable more breakout
   },
@@ -110,7 +110,7 @@ export const STRATEGY_CONFIG = {
     MIN_HOLD_DAYS_DEFAULT: 10,
     TRAILING_STOP_DEFAULT: 0.15,
     STOP_LOSS_MULTIPLIER_DEFAULT: 10, // Increased from 8
-    PROFIT_TAKE_MULTIPLIER_DEFAULT: 2.5, // Reduced from 4.0 to take profits earlier
+    PROFIT_TAKE_MULTIPLIER_DEFAULT: 3.5, // Increased from 2.5 for better returns
     VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: 0.025, // Lowered from 0.03 to enable more trend following
     TREND_STRENGTH_THRESHOLD: 0.0002, // Lowered from 0.0004 to enable more trend following
   },

@@ -488,15 +488,19 @@ export class TradingStrategy {
         adaVolumes,
         dynamicBreakoutThreshold
       );
-      // Trade quality filtering - only take high-quality trades
-      const tradeQuality = buyProb * confidence > 0.25; // Combined quality metric
-      const minProfitPotential = 0.05; // 5% minimum profit potential
+      // Trade quality filtering - relaxed for better returns
+      const tradeQuality = buyProb * confidence > 0.2; // Reduced from 0.25 for more trades
+      const minProfitPotential = 0.03; // Reduced from 0.05 (3% minimum profit potential)
       const profitPotential = (dynamicProfitTake - currentPrice) / currentPrice;
       const hasProfitPotential = profitPotential >= minProfitPotential;
 
       if (buyConditions && tradeQuality && hasProfitPotential && capital > 0) {
+        // Enhanced position sizing for better returns
+        const confidenceBoostSize = confidence > 0.55 ? 1.5 : 1.0; // Boost for high confidence
+        const buyProbBoostSize = buyProb > 0.55 ? 1.3 : 1.0; // Boost for high buy probability
         const volatilityAdjustedSize = Math.min(
-          this.basePositionSize / (atr > 0 ? atr : 0.01),
+          (this.basePositionSize * confidenceBoostSize * buyProbBoostSize) /
+            (atr > 0 ? atr : 0.01),
           atr > STRATEGY_CONFIG.ATR_POSITION_THRESHOLD
             ? STRATEGY_CONFIG.POSITION_SIZE_MAX_HIGH_ATR
             : STRATEGY_CONFIG.POSITION_SIZE_MAX
@@ -668,7 +672,7 @@ export class TradingStrategy {
         // Enhanced sell conditions with momentum-based exits
         const momentumExitMomentum =
           shortMomentum < -0.01 && trendStrength < 0.05;
-        const profitPotentialExitMomentum = priceChange >= 0.05; // Exit if 5% profit reached
+        const profitPotentialExitMomentum = priceChange >= 0.08; // Exit if 8% profit reached (increased from 5%)
         return (
           sellProb > this.sellProbThreshold + 0.05 ||
           momentum < STRATEGY_CONFIG.NEGATIVE_MOMENTUM_THRESHOLD ||
@@ -684,7 +688,7 @@ export class TradingStrategy {
         // Enhanced sell conditions with momentum-based exits
         const momentumExitMeanRev =
           shortMomentum < -0.01 && trendStrength < 0.05;
-        const profitPotentialExitMeanRev = priceChange >= 0.03; // Exit if 3% profit reached
+        const profitPotentialExitMeanRev = priceChange >= 0.05; // Exit if 5% profit reached (increased from 3%)
         return (
           sellProb > this.sellProbThreshold ||
           momentum > STRATEGY_CONFIG.MOMENTUM_MAX ||

@@ -1,20 +1,20 @@
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { TradeModelTrainer } from "../cardano/TradeModelTrainer";
+import { TradeModelTrainer } from "../bitcoin/TradeModelTrainer";
 import { onRequest } from "firebase-functions/https";
 
 const runTraining = async () => {
-  console.log("Training started...");
+  console.log("Bitcoin model training started...");
   const trainer = new TradeModelTrainer();
   try {
     await trainer.train();
-    console.log("Training completed successfully.");
+    console.log("Bitcoin model training completed successfully.");
   } catch (error) {
-    console.error("Training failed:", error);
+    console.error("Bitcoin model training failed:", error);
     throw error;
   }
 };
 
-export const runModelTrainingADA = onSchedule(
+export const runModelTrainingBTC = onSchedule(
   {
     schedule: "0 0,12 * * *", // run once at midnight and once at noon
     memory: "4GiB",
@@ -36,11 +36,11 @@ export const triggerTrainingNow = onRequest(
       const endTime = performance.now();
       const executionTime = (endTime - startTime) / 1000;
       res.send(
-        `Training triggered successfully. Execution time: ${executionTime} milliseconds`
+        `Bitcoin model training triggered successfully. Execution time: ${executionTime} milliseconds`
       );
     } catch (error) {
       res.status(504);
-      console.log("Error training: ", JSON.stringify(error));
+      console.log("Error training Bitcoin model: ", JSON.stringify(error));
     }
   }
 );

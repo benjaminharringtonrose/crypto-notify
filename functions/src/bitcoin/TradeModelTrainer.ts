@@ -1,10 +1,11 @@
 import * as admin from "firebase-admin";
 import * as tf from "@tensorflow/tfjs-node";
 import dotenv from "dotenv";
-import { PredictionLoggerCallback } from "./callbacks/PredictionLoggerCallback";
+
 import { ExponentialDecayLRCallback } from "./callbacks/ExponentialDecayLRCallback";
 import { GradientClippingCallback } from "./callbacks/GradientClippingCallback";
 import { CurriculumLearningCallback } from "./callbacks/CurriculumLearningCallback";
+import { TrainingLoggerCallback } from "./callbacks/TrainingLoggerCallback";
 import { ModelConfig } from "../types";
 import TradeModelFactory from "./TradeModelFactory";
 import { FirebaseService } from "../api/FirebaseService";
@@ -131,11 +132,13 @@ export class TradeModelTrainer {
       );
       this.model = factory.createModel();
 
-      const predictionLoggerCallback = new PredictionLoggerCallback(
+      // Create centralized training logger
+      const trainingLoggerCallback = new TrainingLoggerCallback(
         X_val,
         y_val,
         this
       );
+
       const lrCallback = new ExponentialDecayLRCallback();
       const gradientClippingCallback = new GradientClippingCallback(
         this.lossFn,
@@ -163,10 +166,13 @@ export class TradeModelTrainer {
         ],
       });
 
-      predictionLoggerCallback.setModel(this.model);
+      trainingLoggerCallback.setModel(this.model);
       lrCallback.setModel(this.model);
       gradientClippingCallback.setModel(this.model);
       curriculumLearningCallback.setModel(this.model);
+
+      // Connect gradient clipping callback to training logger
+      gradientClippingCallback.setTrainingLogger(trainingLoggerCallback);
 
       console.log("Model summary:");
       this.model.summary();
@@ -179,23 +185,10 @@ export class TradeModelTrainer {
           {
             onEpochEnd: async (epoch: number, logs?: tf.Logs) => {
               if (logs) {
-                const trainAcc = logs["binaryAccuracy"] || 0;
-                const valAcc = logs["val_binaryAccuracy"] || 0;
-                const valLoss = logs["val_loss"] || Infinity;
-                const accSpread = trainAcc - valAcc;
-                console.log(
-                  `Epoch ${epoch + 1} - Binary Accuracy: ${trainAcc.toFixed(
-                    4
-                  )}, Val Binary Accuracy: ${valAcc.toFixed(
-                    4
-                  )}, Val Loss: ${valLoss.toFixed(
-                    4
-                  )}, Spread: ${accSpread.toFixed(4)}`
-                );
-
                 // Improved best weights tracking using validation loss and F1 score
                 const valF1Buy = logs["val_customF1Buy"] || 0;
                 const valF1Sell = logs["val_customF1Sell"] || 0;
+                const valLoss = logs["val_loss"] || Infinity;
                 const combinedScore = valF1Buy + valF1Sell - valLoss * 0.1; // Balance F1 scores and loss
 
                 if (
@@ -229,7 +222,8 @@ export class TradeModelTrainer {
                   }
                 }
 
-                await predictionLoggerCallback.onEpochEnd(epoch, logs);
+                // Use centralized training logger
+                await trainingLoggerCallback.onEpochEnd(epoch, logs);
                 await lrCallback.onEpochEnd(epoch, logs);
                 await gradientClippingCallback.onEpochEnd(epoch, logs);
                 await curriculumLearningCallback.onEpochEnd(epoch, logs);
@@ -245,6 +239,10 @@ export class TradeModelTrainer {
                 );
                 this.bestWeights.forEach((w) => w.dispose());
               }
+
+              // Print training summary and complete history
+              trainingLoggerCallback.printTrainingSummary();
+              trainingLoggerCallback.printAllEpochsTable();
             },
           },
         ],
@@ -274,6 +272,26 @@ export class TradeModelTrainer {
     X_std: tf.Tensor
   ): Promise<void> {
     if (!this.model) throw new Error("Model not initialized");
+    // Debug weight shapes before saving
+    const dense1_5Weights = await this.model
+      .getLayer("dense_1_5")
+      .getWeights()[0]
+      .data();
+    const outputWeights = await this.model
+      .getLayer("output")
+      .getWeights()[0]
+      .data();
+    console.log(
+      "Saving weights - dense_1_5 shape:",
+      this.model.getLayer("dense_1_5").getWeights()[0].shape
+    );
+    console.log("Saving weights - dense_1_5 length:", dense1_5Weights.length);
+    console.log(
+      "Saving weights - output shape:",
+      this.model.getLayer("output").getWeights()[0].shape
+    );
+    console.log("Saving weights - output length:", outputWeights.length);
+
     const weights = {
       conv1Weights: Array.from(
         await this.model.getLayer("conv1d_input").getWeights()[0].data()

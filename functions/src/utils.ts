@@ -11,7 +11,7 @@ export const isAboveThreshold = ({
   return prices.find((threshold) => currentPrice >= threshold);
 };
 
-export const checkCardanoPriceErrorMessage = (error: any) => {
+export const checkBitcoinPriceErrorMessage = (error: any) => {
   return `Error: ${JSON.stringify(error)}`;
 };
 
@@ -19,7 +19,7 @@ export const priceAlertTextMessage = (
   threshold: number,
   currentPrice: number
 ) => {
-  return `CARDANO ALERT: ADA has risen above $${threshold} and is now at $${currentPrice}`;
+  return `BITCOIN ALERT: BTC has risen above $${threshold} and is now at $${currentPrice}`;
 };
 
 export const formatAnalysisResults = ({
@@ -43,8 +43,8 @@ export const formatAnalysisResults = ({
   return `${symbol}: ${price}\n\nBuy Probability: ${buyProb}\nSell Probability: ${sellProb}\nHold Probability: ${holdProb}\n\nRecommendation: ${rec}\n\nThe probability is the model’s confidence in a near-term price change exceeding 5% over 7 days.\n\nReply with a cryptocurrency to run the analysis again`;
 };
 
-export const fetchCardanoPriceErrorMessage = (error: any) => {
-  return `Error fetching Cardano price: ${JSON.stringify(error)}`;
+export const fetchBitcoinPriceErrorMessage = (error: any) => {
+  return `Error fetching Bitcoin price: ${JSON.stringify(error)}`;
 };
 
 export const sendSmsErrorMessage = (error: any) => {

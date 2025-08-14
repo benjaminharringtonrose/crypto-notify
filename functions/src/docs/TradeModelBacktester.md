@@ -2,291 +2,230 @@
 
 ## Overview
 
-The `TradeModelBacktester` class is a sophisticated backtesting engine for the Cardano trading system that simulates historical trading performance using real market data. It provides comprehensive analysis of trading strategies, performance metrics, and risk assessment by replaying historical market conditions with realistic trading constraints and commission structures.
+The `TradeModelBacktester` class is a sophisticated backtesting engine for the Bitcoin trading system that simulates historical trading performance using real market data. It provides comprehensive analysis of trading strategies, performance metrics, and risk assessment by replaying historical market conditions with the trained machine learning model and rule-based trading strategies.
 
 ## Architecture
 
-The TradeModelBacktester implements a comprehensive backtesting framework:
+The TradeModelBacktester follows a simulation-based architecture:
 
 ```
-Historical Data → Strategy Simulation → Trade Execution → Performance Analysis → Results
-      ↓                ↓                    ↓                ↓              ↓
-ADA/BTC Prices    Trading Decisions    Buy/Sell Orders   Metrics Calc    Reports
-Volume Data       Risk Assessment      Position Mgmt      Risk Analysis   Performance
-Market Context    Confidence Scoring   Capital Tracking   Drawdown Calc   Strategy Eval
+BTC Prices    Trading Decisions    Buy/Sell Orders   Metrics Calc    Reports
+     ↓                ↓                    ↓                ↓
+Historical Data    ML Predictions    Trade Execution    Performance    Analysis
+BTC Volumes       Rule-Based Logic   Risk Management    Risk Metrics    Results
 ```
 
 ### Key Responsibilities
 
-- **Historical Simulation**: Replay trading decisions across historical market data
-- **Strategy Evaluation**: Test trading strategies with realistic market conditions
-- **Performance Analysis**: Calculate comprehensive performance metrics
-- **Risk Assessment**: Measure drawdown, volatility, and risk-adjusted returns
-- **Trade Tracking**: Monitor all trades, positions, and capital changes
-- **Strategy Distribution**: Analyze strategy performance across different market conditions
+- **Historical Simulation**: Replay market conditions with historical data
+- **Trade Execution**: Simulate buy/sell orders with realistic constraints
+- **Risk Management**: Implement stop-loss, take-profit, and position sizing
+- **Performance Analysis**: Calculate comprehensive trading metrics
+- **Strategy Evaluation**: Compare different trading approaches
 
 ## Class Structure
 
 ```typescript
 export class TradeModelBacktester {
+  private model: TradeModelPredictor;
+  private strategy: TradingStrategy;
   private initialCapital: number;
-  private tradingStrategy: TradingStrategy;
+  private commission: number;
+  private slippage: number;
 
-  constructor(initialCapital: number);
+  constructor(
+    model: TradeModelPredictor,
+    strategy: TradingStrategy,
+    initialCapital: number,
+    commission?: number,
+    slippage?: number
+  );
 
-  async backtest(
-    adaData: HistoricalData,
+  public async backtest(
     btcData: HistoricalData,
     startIndex: number,
     endIndex: number
   ): Promise<BacktestTrade[]>;
 
-  async evaluateBacktest(trades: BacktestTrade[]): Promise<void>;
+  public calculateMetrics(trades: BacktestTrade[]): BacktestMetrics;
 }
 ```
 
 ### Constructor Parameters
 
-- `initialCapital: number` - Starting capital in USD for the backtest simulation
+- `model: TradeModelPredictor` - Trained prediction model
+- `strategy: TradingStrategy` - Rule-based trading strategy
+- `initialCapital: number` - Starting capital for simulation
+- `commission: number` - Trading commission rate (default: 0.005)
+- `slippage: number` - Price slippage rate (default: 0.001)
 
-### Core Interfaces
-
-```typescript
-interface BacktestTrade extends Trade {
-  confidence: number; // Model confidence in the trade decision
-  buyProb: number; // Probability of buy recommendation
-  strategy: string; // Trading strategy used for the decision
-  atrAdjustedHold: number; // ATR-adjusted hold duration
-  holdToEndProfit?: number; // Profit if held until end of backtest
-}
-```
-
-## Core Methods
+## Methods
 
 ### Public Methods
 
-#### `backtest(adaData, btcData, startIndex, endIndex): Promise<BacktestTrade[]>`
+#### `backtest(btcData, startIndex, endIndex): Promise<BacktestTrade[]>`
 
-Executes a comprehensive backtest simulation over a specified historical period.
+Executes a complete backtest simulation over the specified date range.
 
 **Parameters:**
 
-- `adaData: HistoricalData` - Historical ADA price and volume data
 - `btcData: HistoricalData` - Historical BTC price and volume data
-- `startIndex: number` - Starting index in the historical data arrays
-- `endIndex: number` - Ending index in the historical data arrays
+- `startIndex: number` - Starting index for backtest
+- `endIndex: number` - Ending index for backtest
 
 **Returns:**
 
-- `Promise<BacktestTrade[]>` - Array of all executed trades with performance data
+- `Promise<BacktestTrade[]>` - Array of executed trades with details
 
 **Process:**
 
-1. **Data Validation**: Ensures all input arrays have equal lengths
-2. **Strategy Simulation**: Iterates through each day applying trading strategy
-3. **Trade Execution**: Simulates buy/sell decisions with realistic constraints
-4. **Position Management**: Tracks holdings, capital, and trade performance
-5. **Final Settlement**: Closes any remaining positions at end of backtest
+1. **Data Validation**: Ensures sufficient historical data
+2. **Model Predictions**: Generates trading signals using ML model
+3. **Strategy Execution**: Applies rule-based trading logic
+4. **Trade Simulation**: Executes trades with realistic constraints
+5. **Risk Management**: Implements stop-loss and take-profit logic
+6. **Performance Tracking**: Records all trade details and metrics
 
-**Key Features:**
+#### `calculateMetrics(trades): BacktestMetrics`
 
-- **Real-time Strategy Decisions**: Each day applies current market conditions
-- **Position Tracking**: Monitors open positions, entry prices, and peak prices
-- **Win Streak Analysis**: Tracks consecutive winning trades
-- **ATR-Adjusted Hold**: Dynamic hold duration based on market volatility
-- **Comprehensive Logging**: Detailed trade execution logs with strategy context
-
-#### `evaluateBacktest(trades: BacktestTrade[]): Promise<void>`
-
-Analyzes backtest results and generates comprehensive performance reports.
+Calculates comprehensive performance metrics from executed trades.
 
 **Parameters:**
 
-- `trades: BacktestTrade[]` - Array of completed trades from backtest
+- `trades: BacktestTrade[]` - Array of executed trades
 
 **Returns:**
 
-- `Promise<void>` - Outputs detailed performance analysis to console
+- `BacktestMetrics` - Comprehensive performance analysis
 
-**Analysis Components:**
+**Metrics Calculated:**
 
-1. **Return Metrics**: Total return, annualized return, mean return
-2. **Risk Metrics**: Maximum drawdown, standard deviation, Sharpe ratio
-3. **Trade Statistics**: Win rate, total trades, average holding period
-4. **Strategy Analysis**: Distribution of strategies used
-5. **Confidence Analysis**: Distribution of trade confidence levels
+- **Returns**: Total return, annualized return, Sharpe ratio
+- **Risk**: Maximum drawdown, volatility, VaR
+- **Trading**: Win rate, profit factor, average trade
+- **Timing**: Trade frequency, holding periods
 
-## Backtesting Process
+## Data Flow
 
-### Data Flow
+### 1. Historical Data Preparation
 
 ```typescript
-// 1. Initialize backtest parameters
-const backtester = new TradeModelBacktester(10000); // $10,000 starting capital
-
-// 2. Execute backtest over historical period
-const trades = await backtester.backtest(
-  adaHistoricalData,
-  btcHistoricalData,
-  0, // Start from beginning
-  1000 // Test over 1000 days
-);
-
-// 3. Analyze results
-await backtester.evaluateBacktest(trades);
+const btcData: HistoricalData = {
+  prices: [50000, 50100, 50200, ...],  // Historical BTC prices
+  volumes: [500, 550, 600, ...],       // Historical BTC volumes
+  timestamps: [1640995200, 1641081600, ...]  // Unix timestamps
+};
 ```
 
-### Trade Execution Logic
-
-#### Buy Decision Processing
+### 2. Model Prediction Generation
 
 ```typescript
-if (trade.type === Recommendation.Buy && capital > 0) {
-  // Update position and capital
-  holdings += trade.adaAmount;
-  capital -= trade.usdValue;
-  lastBuyPrice = trade.price;
-  peakPrice = trade.price;
-  buyTimestamp = trade.timestamp;
+// Generate predictions for each day
+for (let i = startIndex; i <= endIndex; i++) {
+  const prediction = await this.model.predict(
+    btcData.prices,
+    btcData.volumes,
+    i
+  );
 
-  // Log trade details
-  console.log(`Trade Opened: Price=${trade.price}, Strategy=${strategy}`);
+  // prediction contains: { buyProb, sellProb, holdProb, confidence }
 }
 ```
 
-#### Sell Decision Processing
+### 3. Strategy Decision Making
 
 ```typescript
-if (trade.type === Recommendation.Sell && holdings > 0) {
-  // Calculate profit/loss
-  const profit = ((trade.price - lastBuyPrice!) / lastBuyPrice!) * 100;
-  const holdToEndProfit = ((finalPrice - lastBuyPrice!) / lastBuyPrice!) * 100;
+// Apply rule-based trading strategy
+const decision = this.strategy.makeDecision({
+  prediction,
+  currentPrice: btcData.prices[i],
+  currentPosition: holdings,
+  marketConditions: {
+    rsi: indicators.rsi,
+    momentum: indicators.momentum,
+    volatility: indicators.atr,
+  },
+});
+```
 
-  // Update position and capital
-  capital += trade.usdValue;
-  holdings -= trade.adaAmount;
+### 4. Trade Execution Simulation
 
-  // Update win streak
-  winStreak = profit > 0 ? winStreak + 1 : 0;
+```typescript
+// Execute trade with realistic constraints
+if (decision.action === "BUY" && decision.confidence > threshold) {
+  const trade = {
+    type: "BUY",
+    price: btcData.prices[i] * (1 + this.slippage),
+    amount: this.calculatePositionSize(decision.confidence),
+    timestamp: btcData.timestamps[i],
+    confidence: decision.confidence,
+  };
+
+  // Apply commission
+  const commissionCost = trade.price * trade.amount * this.commission;
+  this.capital -= commissionCost;
 }
 ```
 
-### Position Management
+### 5. Risk Management
 
-- **Capital Tracking**: Monitors available USD for new positions
-- **Holdings Management**: Tracks ADA position size and entry price
-- **Peak Price Monitoring**: Records highest price since entry for drawdown analysis
-- **Win Streak Analysis**: Tracks consecutive profitable trades
-- **Final Settlement**: Closes any remaining positions at backtest end
+```typescript
+// Implement stop-loss and take-profit
+if (currentPosition && decision.action === "SELL") {
+  const profitLoss = (btcData.prices[i] - entryPrice) / entryPrice;
+
+  // Stop-loss check
+  if (profitLoss <= -this.strategy.stopLossMultiplier) {
+    // Force sell at stop-loss price
+  }
+
+  // Take-profit check
+  if (profitLoss >= this.strategy.profitTakeMultiplier) {
+    // Consider taking profits
+  }
+}
+```
 
 ## Performance Metrics
 
 ### Return Metrics
 
-#### Total Return
-
 ```typescript
-totalReturn = ((finalCapital - initialCapital) / initialCapital) * 100;
-```
-
-#### Annualized Return
-
-```typescript
-annualizedReturn = ((1 + totalReturn) ** (365 / avgHoldingDays) - 1) * 100;
+interface ReturnMetrics {
+  totalReturn: number; // Total percentage return
+  annualizedReturn: number; // Annualized return rate
+  sharpeRatio: number; // Risk-adjusted return
+  sortinoRatio: number; // Downside risk-adjusted return
+  calmarRatio: number; // Return to max drawdown ratio
+}
 ```
 
 ### Risk Metrics
 
-#### Maximum Drawdown
-
 ```typescript
-maxDrawdown = ((peakCapital - currentCapital) / peakCapital) * 100;
+interface RiskMetrics {
+  maxDrawdown: number; // Maximum portfolio decline
+  volatility: number; // Portfolio volatility
+  var95: number; // 95% Value at Risk
+  cvar95: number; // Conditional Value at Risk
+  downsideDeviation: number; // Downside deviation
+}
 ```
 
-#### Sharpe Ratio
+### Trading Metrics
 
 ```typescript
-sharpeRatio = (meanReturn / stdDev) * sqrt(365);
+interface TradingMetrics {
+  totalTrades: number; // Total number of trades
+  winRate: number; // Percentage of winning trades
+  profitFactor: number; // Gross profit / Gross loss
+  averageWin: number; // Average winning trade
+  averageLoss: number; // Average losing trade
+  largestWin: number; // Largest winning trade
+  largestLoss: number; // Largest losing trade
+  averageHoldingPeriod: number; // Average days held
+}
 ```
-
-### Trade Statistics
-
-#### Win Rate
-
-```typescript
-winRate = (winningTrades / totalTrades) * 100;
-```
-
-#### Average Holding Period
-
-```typescript
-avgHoldingDays = totalDaysHeld / totalTrades;
-```
-
-### Strategy Distribution Analysis
-
-```typescript
-const strategyDistribution = {
-  Momentum: 0, // Momentum-based trading
-  MeanReversion: 0, // Mean reversion strategies
-  Breakout: 0, // Breakout detection
-  TrendFollowing: 0, // Trend following approaches
-};
-```
-
-### Confidence Distribution Analysis
-
-```typescript
-const confidenceDistribution = {
-  "0.4-0.5": 0, // Low confidence trades
-  "0.5-0.6": 0, // Below average confidence
-  "0.6-0.7": 0, // Average confidence
-  "0.7-0.8": 0, // Above average confidence
-  "0.8+": 0, // High confidence trades
-};
-```
-
-## Advanced Features
-
-### ATR-Adjusted Hold Duration
-
-The backtester implements dynamic hold duration based on market volatility:
-
-```typescript
-atrAdjustedHold = sellProb * 10;
-```
-
-This adjusts holding periods based on:
-
-- **Market Volatility**: Higher ATR = shorter hold periods
-- **Sell Probability**: Higher sell probability = shorter hold periods
-- **Risk Management**: Dynamic position sizing based on market conditions
-
-### Hold-to-End Profit Analysis
-
-Tracks what profit would have been achieved by holding until the end of the backtest:
-
-```typescript
-holdToEndProfit = ((finalPrice - entryPrice) / entryPrice) * 100;
-```
-
-This helps evaluate:
-
-- **Strategy Effectiveness**: Compare actual vs. buy-and-hold performance
-- **Exit Timing**: Assess quality of sell decisions
-- **Opportunity Cost**: Measure missed profits from early exits
-
-### Win Streak Tracking
-
-Monitors consecutive profitable trades to identify:
-
-```typescript
-winStreak = profit > 0 ? winStreak + 1 : 0;
-```
-
-- **Strategy Consistency**: Long win streaks indicate robust strategies
-- **Market Regime Changes**: Streak breaks may signal market shifts
-- **Risk Management**: Streak length affects position sizing decisions
 
 ## Usage Examples
 
@@ -294,210 +233,202 @@ winStreak = profit > 0 ? winStreak + 1 : 0;
 
 ```typescript
 import { TradeModelBacktester } from "./TradeModelBacktester";
-import { HistoricalData } from "../types";
+import { TradeModelPredictor } from "./TradeModelPredictor";
+import { TradingStrategy } from "./TradingStrategy";
 
-// Initialize backtester with $10,000 starting capital
-const backtester = new TradeModelBacktester(10000);
+// Initialize components
+const model = new TradeModelPredictor();
+const strategy = new TradingStrategy();
+const backtester = new TradeModelBacktester(
+  model,
+  strategy,
+  10000, // $10,000 initial capital
+  0.005, // 0.5% commission
+  0.001 // 0.1% slippage
+);
 
-// Execute backtest over 2-year period
+// Load historical data
+const btcData = await loadHistoricalData();
+
+// Execute backtest
 const trades = await backtester.backtest(
-  adaData,
   btcData,
-  0, // Start index
-  730 // 2 years of daily data
+  100, // startIndex
+  500 // endIndex
 );
 
-// Analyze results
-await backtester.evaluateBacktest(trades);
-```
-
-### Custom Backtest Periods
-
-```typescript
-// Test specific market periods
-const bullMarketTrades = await backtester.backtest(
-  adaData,
-  btcData,
-  500, // Start from day 500
-  800 // End at day 800
-);
-
-const bearMarketTrades = await backtester.backtest(
-  adaData,
-  btcData,
-  200, // Start from day 200
-  500 // End at day 500
-);
-
-// Compare performance across different market conditions
-await backtester.evaluateBacktest(bullMarketTrades);
-await backtester.evaluateBacktest(bearMarketTrades);
+console.log(`Executed ${trades.length} trades`);
 ```
 
 ### Performance Analysis
 
 ```typescript
-// Analyze individual trade performance
-for (const trade of trades) {
-  if (trade.type === Recommendation.Sell) {
-    console.log(`Trade: ${trade.strategy}`);
-    console.log(`Profit: ${trade.holdToEndProfit?.toFixed(2)}%`);
-    console.log(`Confidence: ${trade.confidence.toFixed(2)}`);
-    console.log(`ATR Hold: ${trade.atrAdjustedHold.toFixed(2)}`);
-  }
+// Calculate comprehensive metrics
+const metrics = backtester.calculateMetrics(trades);
+
+console.log("Performance Summary:");
+console.log(`Total Return: ${(metrics.totalReturn * 100).toFixed(2)}%`);
+console.log(`Sharpe Ratio: ${metrics.sharpeRatio.toFixed(2)}`);
+console.log(`Max Drawdown: ${(metrics.maxDrawdown * 100).toFixed(2)}%`);
+console.log(`Win Rate: ${(metrics.winRate * 100).toFixed(2)}%`);
+console.log(`Profit Factor: ${metrics.profitFactor.toFixed(2)}`);
+```
+
+### Advanced Backtesting
+
+```typescript
+// Multiple strategy comparison
+const strategies = [
+  new TradingStrategy({ minConfidence: 0.1 }),
+  new TradingStrategy({ minConfidence: 0.2 }),
+  new TradingStrategy({ minConfidence: 0.3 }),
+];
+
+const results = [];
+
+for (const strategy of strategies) {
+  const backtester = new TradeModelBacktester(model, strategy, 10000);
+  const trades = await backtester.backtest(btcData, 100, 500);
+  const metrics = backtester.calculateMetrics(trades);
+
+  results.push({
+    strategy: strategy.config,
+    metrics: metrics,
+  });
 }
 
-// Calculate custom metrics
-const totalProfit = trades
-  .filter((t) => t.type === Recommendation.Sell)
-  .reduce((sum, t) => sum + (t.holdToEndProfit || 0), 0);
-
-console.log(`Total Profit: ${totalProfit.toFixed(2)}%`);
+// Compare results
+results.sort((a, b) => b.metrics.sharpeRatio - a.metrics.sharpeRatio);
+console.log("Best performing strategy:", results[0]);
 ```
+
+## Configuration
+
+### Risk Management Settings
+
+```typescript
+const riskConfig = {
+  stopLossMultiplier: 0.05, // 5% stop-loss
+  profitTakeMultiplier: 0.15, // 15% take-profit
+  maxPositionSize: 0.3, // 30% max position
+  trailingStop: 0.08, // 8% trailing stop
+  minHoldingPeriod: 2, // 2 days minimum hold
+};
+```
+
+### Trading Constraints
+
+```typescript
+const tradingConfig = {
+  commission: 0.005, // 0.5% trading commission
+  slippage: 0.001, // 0.1% price slippage
+  minTradeSize: 100, // $100 minimum trade
+  maxDailyTrades: 5, // Maximum 5 trades per day
+  marketHours: {
+    // Trading hours
+    start: "09:30",
+    end: "16:00",
+  },
+};
+```
+
+## Performance Considerations
+
+### Optimization Strategies
+
+- **Efficient Data Access**: Minimize array lookups and calculations
+- **Batch Processing**: Process multiple predictions efficiently
+- **Memory Management**: Reuse objects and arrays where possible
+- **Parallel Processing**: Consider parallel backtesting for multiple strategies
+
+### Computational Complexity
+
+- **Single Day**: O(features × model_complexity)
+- **Full Backtest**: O(days × features × model_complexity)
+- **Metrics Calculation**: O(trades × metrics_count)
+
+### Scalability
+
+- **Small Datasets**: < 1000 days - Real-time processing
+- **Medium Datasets**: 1000-10000 days - Batch processing
+- **Large Datasets**: > 10000 days - Consider chunking or sampling
 
 ## Error Handling
 
 ### Data Validation
 
-```typescript
-// Ensure data consistency
-if (
-  adaPrices.length !== btcPrices.length ||
-  adaPrices.length !== adaVolumes.length ||
-  adaPrices.length !== btcVolumes.length
-) {
-  throw new Error("Input data arrays must have equal lengths");
-}
+- **Length Checks**: Ensures sufficient historical data
+- **Price Validation**: Checks for valid price data
+- **Volume Validation**: Validates volume data integrity
+- **Index Bounds**: Prevents array out-of-bounds access
 
-// Validate index bounds
-if (endIndex >= adaPrices.length) {
-  throw new Error("endIndex exceeds data length");
-}
-```
+### Trade Execution Errors
 
-### Trade Execution Safety
+- **Insufficient Capital**: Handles insufficient funds gracefully
+- **Invalid Prices**: Manages missing or invalid price data
+- **Commission Errors**: Handles calculation errors
+- **Position Errors**: Manages position tracking issues
 
-- **Capital Validation**: Ensures sufficient capital before buy orders
-- **Position Validation**: Verifies holdings before sell orders
-- **Price Validation**: Handles missing or invalid price data
-- **Timestamp Validation**: Manages date conversion and time calculations
+### Fallback Mechanisms
 
-## Performance Considerations
-
-### Memory Management
-
-- **Efficient Iteration**: Single pass through historical data
-- **Array Slicing**: Minimal memory allocation for data subsets
-- **Object Reuse**: Efficient trade object construction and updates
-
-### Computational Efficiency
-
-- **Batch Processing**: Processes multiple days in single iteration
-- **Optimized Calculations**: Efficient profit/loss and metric calculations
-- **Reduced Logging**: Conditional logging to minimize I/O overhead
+- **Default Values**: Provides sensible defaults for missing data
+- **Error Recovery**: Continues processing with available data
+- **Logging**: Records errors for debugging and analysis
 
 ## Dependencies
 
 ### External Dependencies
 
-- **TradingStrategy**: Strategy decision engine for trade signals
-- **HistoricalData**: Market data structure for prices and volumes
-- **TIME_CONVERSIONS**: Time conversion constants for date calculations
+- **TradeModelPredictor**: ML model for predictions
+- **TradingStrategy**: Rule-based trading logic
+- **Historical Data**: Price and volume data structure
 
 ### Internal Dependencies
 
-- **Recommendation**: Trading decision types (Buy, Sell, Hold)
-- **Trade**: Base trade interface with execution details
-- **BacktestTrade**: Extended trade interface with backtest-specific data
-
-## Configuration
-
-### Backtest Parameters
-
-```typescript
-// Capital allocation
-const initialCapital = 10000; // Starting USD amount
-
-// Time period selection
-const startIndex = 0; // Beginning of dataset
-const endIndex = 1000; // End of dataset (1000 days)
-
-// Data granularity
-const dataFrequency = "daily"; // Daily price data
-```
-
-### Performance Thresholds
-
-- **Minimum Capital**: $100 for position entry
-- **Confidence Thresholds**: 0.4-0.8+ confidence ranges
-- **Win Rate Targets**: 50%+ for profitable strategies
-- **Drawdown Limits**: 20% maximum acceptable drawdown
+- **Array Methods**: Native JavaScript array operations
+- **Mathematical Functions**: Math library for calculations
+- **Date/Time**: Date manipulation for timestamps
 
 ## Testing
 
 ### Unit Testing Strategy
 
-- **Mock Data**: Test with synthetic historical data
-- **Edge Cases**: Test boundary conditions and data validation
-- **Strategy Simulation**: Mock trading strategy responses
-- **Performance Validation**: Verify metric calculations
-
-### Integration Testing
-
-- **Real Data**: Test with actual historical market data
-- **Strategy Integration**: Test complete strategy decision flow
-- **Performance Benchmarking**: Compare against known results
-- **Stress Testing**: Test with large datasets and extreme conditions
+- **Trade Execution**: Test individual trade logic
+- **Risk Management**: Validate stop-loss and take-profit
+- **Metrics Calculation**: Test performance metric computations
+- **Edge Cases**: Test boundary conditions and error scenarios
 
 ### Test Data Requirements
 
-- **Balanced Periods**: Include bull, bear, and sideways markets
-- **Sufficient Length**: Minimum 1 year of daily data
-- **Data Quality**: Clean, consistent price and volume data
-- **Market Events**: Include significant market movements and volatility
+- **Historical Data**: Real cryptocurrency price/volume data
+- **Known Patterns**: Data with predictable outcomes
+- **Edge Cases**: Minimal data, extreme values, missing data
 
-## Monitoring and Logging
+### Performance Testing
 
-### Trade Execution Logs
-
-```typescript
-// Buy trade logging
-console.log(
-  `Trade Opened: Price=${price}, Strategy=${strategy}, PositionSize=${amount}`
-);
-
-// Sell trade logging
-console.log(
-  `Trade Closed: Entry=${entry}, Exit=${exit}, Profit=${profit}%, Days Held=${days}`
-);
-```
-
-### Performance Monitoring
-
-- **Real-time Metrics**: Track performance during backtest execution
-- **Strategy Performance**: Monitor individual strategy effectiveness
-- **Risk Metrics**: Track drawdown and volatility in real-time
-- **Trade Quality**: Monitor confidence levels and success rates
+- **Memory Usage**: Monitor memory consumption during backtests
+- **Execution Time**: Measure backtest performance
+- **Scalability**: Test with large datasets
 
 ## Future Enhancements
 
 ### Potential Improvements
 
-- **Multi-Asset Support**: Extend beyond ADA/BTC to other cryptocurrencies
-- **Advanced Risk Models**: Implement VaR, CVaR, and other risk metrics
-- **Portfolio Optimization**: Multi-strategy portfolio backtesting
-- **Real-time Backtesting**: Live backtesting with streaming data
+- **Multi-Asset Support**: Extend beyond BTC to other cryptocurrencies
+- **Advanced Risk Models**: Implement more sophisticated risk management
+- **Real-time Integration**: Connect to live market data feeds
+- **Portfolio Optimization**: Multi-asset portfolio backtesting
 
 ### Advanced Features
 
-- **Monte Carlo Simulation**: Statistical analysis of strategy performance
-- **Regime Detection**: Automatic market condition identification
-- **Dynamic Parameter Tuning**: Adaptive strategy parameters
-- **Machine Learning Integration**: ML-based strategy optimization
+- **Monte Carlo Simulation**: Probabilistic backtesting
+- **Walk-Forward Analysis**: Out-of-sample testing
+- **Regime Detection**: Market condition-aware backtesting
+- **Custom Metrics**: User-defined performance measures
 
 ### Integration Enhancements
 
-- **Database Storage**: Persistent backtest results and analysis
-- **API Endpoints**: RESTful backtesting services
-- **Visualization**: Interactive charts and performance dashboards
-- **Report Generation**: Automated PDF/HTML performance reports
+- **Database Integration**: Store backtest results in database
+- **API Integration**: RESTful backtesting endpoints
+- **Visualization**: Interactive charts and dashboards
+- **Reporting**: Automated report generation

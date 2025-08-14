@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `TradeModelTrainer` class is the comprehensive training engine of the Cardano trading system that orchestrates the complete machine learning model training pipeline. It handles data preparation, model creation, training execution, performance monitoring, and weight persistence using advanced techniques like custom loss functions, gradient clipping, learning rate scheduling, and best weight tracking.
+The `TradeModelTrainer` class is the comprehensive training engine of the Bitcoin trading system that orchestrates the complete machine learning model training pipeline. It handles data preparation, model creation, training execution, performance monitoring, and weight persistence, providing a unified interface for training deep learning models for cryptocurrency price prediction.
 
 ## Architecture
 

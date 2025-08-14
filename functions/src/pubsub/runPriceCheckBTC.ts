@@ -3,28 +3,28 @@ import { firestore } from "firebase-admin";
 import { MERGE_PAYLOAD, PRICES, TIME_CONVERSIONS } from "../constants";
 import {
   sendSMS,
-  checkCardanoPriceErrorMessage,
+  checkBitcoinPriceErrorMessage,
   isAboveThreshold,
   priceAlertTextMessage,
 } from "../utils";
 import { CoinbaseProductIds, Collections, Docs } from "../types";
-import { TradeExecutor } from "../cardano/TradeExecutor";
+import { TradeExecutor } from "../bitcoin/TradeExecutor";
 
 const CONFIG: ScheduleOptions = {
   schedule: "*/10 * * * *",
   memory: "512MiB",
 };
 
-export const runPriceCheckADA = onSchedule(CONFIG, async () => {
+export const runPriceCheckBTC = onSchedule(CONFIG, async () => {
   try {
     const trader = new TradeExecutor({
       apiKey: process.env.COINBASE_API_KEY,
       apiSecret: process.env.COINBASE_API_SECRET,
     });
 
-    const currentPrice = await trader.getCurrentPrice(CoinbaseProductIds.ADA);
+    const currentPrice = await trader.getCurrentPrice(CoinbaseProductIds.BTC);
 
-    console.log(`Current Cardano price: $${currentPrice}`);
+    console.log(`Current Bitcoin price: $${currentPrice}`);
 
     const db = firestore();
     const configDocRef = db.collection(Collections.Config).doc(Docs.PriceAlert);
@@ -61,6 +61,6 @@ export const runPriceCheckADA = onSchedule(CONFIG, async () => {
       await configDocRef.set(lastNotifiedPayload, MERGE_PAYLOAD);
     }
   } catch (error) {
-    console.log(checkCardanoPriceErrorMessage(error));
+    console.log(checkBitcoinPriceErrorMessage(error));
   }
 });

@@ -55,24 +55,11 @@ export class CurriculumLearningCallback extends tf.Callback {
       this.dataProcessor.setDifficultyLevel(difficulty);
     }
 
-    console.log(
-      `Curriculum Learning: Epoch ${epoch + 1}, Difficulty: ${(
-        difficulty * 100
-      ).toFixed(1)}%`
-    );
+    // Curriculum learning logging moved to TrainingLoggerCallback
   }
 
   async onEpochEnd(epoch: number, logs?: tf.Logs): Promise<void> {
-    // Log curriculum progress
-    const difficulty =
-      this.difficultySchedule[
-        Math.min(epoch, this.difficultySchedule.length - 1)
-      ];
-    console.log(
-      `Curriculum Learning: Completed epoch ${epoch + 1}, Final difficulty: ${(
-        difficulty * 100
-      ).toFixed(1)}%`
-    );
+    // Curriculum learning logging moved to TrainingLoggerCallback
   }
 
   getDifficultyLevel(): number {

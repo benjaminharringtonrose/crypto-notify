@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `Metrics` class is a comprehensive evaluation and loss function library for the Cardano trading system's machine learning models. It provides specialized metrics for binary classification problems in cryptocurrency trading, including custom loss functions, precision/recall calculations, F1 scores, and comprehensive model evaluation capabilities.
+The `Metrics` class is a comprehensive evaluation and loss function library for the Bitcoin trading system's machine learning models. It provides specialized metrics for binary classification problems in cryptocurrency trading, including custom loss functions, precision/recall calculations, and performance evaluation tools optimized for imbalanced datasets.
 
 ## Architecture
 

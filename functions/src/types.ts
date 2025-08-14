@@ -1,7 +1,4 @@
 export interface CoinGeckoPriceResponse {
-  cardano: {
-    usd: number;
-  };
   bitcoin: {
     usd: number;
   };
@@ -46,10 +43,18 @@ export interface Indicators {
   momentum: number;
   priceChangePct: number;
   sma20: number;
+  sma50: number;
+  sma200: number;
   prices: number[];
   volAdjustedMomentum: number;
   trendRegime: number;
   adxProxy: number;
+  // Market Regime Features
+  volatilityRegimeScore: number;
+  trendRegimeScore: number;
+  momentumRegimeScore: number;
+  realizedVolatility: number;
+  regimeScore: number;
 }
 
 export interface StrategyResult {
@@ -127,7 +132,6 @@ export enum Granularity {
 
 export enum CryptoIds {
   Bitcoin = "bitcoin",
-  Cardano = "cardano",
 }
 
 export enum Currencies {
@@ -141,7 +145,7 @@ export enum Collections {
 
 export enum Docs {
   PriceAlert = "priceAlert",
-  Cardano = "cardano",
+  Bitcoin = "bitcoin",
 }
 
 export enum TradingStrategy {
@@ -169,7 +173,7 @@ export interface Trade {
   type: Recommendation;
   price: number;
   timestamp: string;
-  adaAmount: number;
+  btcAmount: number;
   usdValue: number;
   buyPrice?: number;
 }
@@ -192,12 +196,11 @@ export enum StrategyType {
 }
 
 export enum CoinbaseProductIds {
-  ADA = "ADA-USD",
   BTC = "BTC-USD",
 }
 
 export enum CoinbaseCurrency {
-  ADA = "ADA",
+  BTC = "BTC",
   USD = "USD",
 }
 

@@ -1,4 +1,4 @@
-import { TradeModelTrainer } from "../cardano/TradeModelTrainer";
+import { TradeModelTrainer } from "../bitcoin/TradeModelTrainer";
 
 const trainer = new TradeModelTrainer();
 

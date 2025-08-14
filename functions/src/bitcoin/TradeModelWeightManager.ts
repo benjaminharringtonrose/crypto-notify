@@ -90,6 +90,25 @@ export class ModelWeightManager {
           ),
           tf.tensor1d(this.weights.lstm1Bias),
         ]);
+      // Debug LSTM2 weights
+      console.log("LSTM2 weights length:", this.weights.lstm2Weights?.length);
+      console.log("Expected LSTM2 shape:", MODEL_CONFIG.LSTM2_WEIGHT_SHAPE);
+      console.log(
+        "Expected LSTM2 size:",
+        MODEL_CONFIG.LSTM2_WEIGHT_SHAPE[0] * MODEL_CONFIG.LSTM2_WEIGHT_SHAPE[1]
+      );
+
+      // Check LSTM2 weights match expected shape
+      const expectedLstm2Size =
+        MODEL_CONFIG.LSTM2_WEIGHT_SHAPE[0] * MODEL_CONFIG.LSTM2_WEIGHT_SHAPE[1];
+      if (this.weights.lstm2Weights?.length !== expectedLstm2Size) {
+        console.warn(
+          `LSTM2 weights size mismatch: expected ${expectedLstm2Size}, got ${this.weights.lstm2Weights?.length}`
+        );
+        console.warn("Using random initialization due to shape mismatch");
+        return;
+      }
+
       model
         .getLayer("lstm2")
         .setWeights([
@@ -103,6 +122,25 @@ export class ModelWeightManager {
           ),
           tf.tensor1d(this.weights.lstm2Bias),
         ]);
+      // Debug LSTM3 weights
+      console.log("LSTM3 weights length:", this.weights.lstm3Weights?.length);
+      console.log("Expected LSTM3 shape:", MODEL_CONFIG.LSTM3_WEIGHT_SHAPE);
+      console.log(
+        "Expected LSTM3 size:",
+        MODEL_CONFIG.LSTM3_WEIGHT_SHAPE[0] * MODEL_CONFIG.LSTM3_WEIGHT_SHAPE[1]
+      );
+
+      // Check LSTM3 weights match expected shape
+      const expectedLstm3Size =
+        MODEL_CONFIG.LSTM3_WEIGHT_SHAPE[0] * MODEL_CONFIG.LSTM3_WEIGHT_SHAPE[1];
+      if (this.weights.lstm3Weights?.length !== expectedLstm3Size) {
+        console.warn(
+          `LSTM3 weights size mismatch: expected ${expectedLstm3Size}, got ${this.weights.lstm3Weights?.length}`
+        );
+        console.warn("Using random initialization due to shape mismatch");
+        return;
+      }
+
       model
         .getLayer("lstm3")
         .setWeights([
@@ -181,15 +219,76 @@ export class ModelWeightManager {
           tf.tensor1d(this.weights.bnDense1MovingVariance),
         ]);
 
-      model
-        .getLayer("dense_1_5")
-        .setWeights([
-          tf.tensor2d(
-            this.weights.dense2Weights,
-            MODEL_CONFIG.DENSE_2_WEIGHT_SHAPE
-          ),
-          tf.tensor1d(this.weights.dense2Bias),
-        ]);
+      // Debug dense_1_5 layer weights
+      console.log(
+        "Dense_1_5 weights length:",
+        this.weights.dense2Weights?.length
+      );
+      console.log(
+        "Expected dense_1_5 shape:",
+        MODEL_CONFIG.DENSE_2_WEIGHT_SHAPE
+      );
+      console.log(
+        "Expected dense_1_5 size:",
+        MODEL_CONFIG.DENSE_2_WEIGHT_SHAPE[0] *
+          MODEL_CONFIG.DENSE_2_WEIGHT_SHAPE[1]
+      );
+
+      // Check dense_1_5 weights match expected shape
+      const expectedDense2Size =
+        MODEL_CONFIG.DENSE_2_WEIGHT_SHAPE[0] *
+        MODEL_CONFIG.DENSE_2_WEIGHT_SHAPE[1];
+
+      if (this.weights.dense2Weights?.length !== expectedDense2Size) {
+        console.warn(
+          `Dense_1_5 weights size mismatch: expected ${expectedDense2Size}, got ${this.weights.dense2Weights?.length}`
+        );
+
+        // Try to determine the correct shape from the saved weights
+        const actualDense2Size = this.weights.dense2Weights?.length || 0;
+        const dense2OutputUnits = MODEL_CONFIG.DENSE_2_WEIGHT_SHAPE[1]; // 2
+
+        // Calculate possible input size
+        const possibleDense2InputSize = actualDense2Size / dense2OutputUnits;
+        console.warn(
+          `Possible input size for dense_1_5 layer: ${possibleDense2InputSize}`
+        );
+
+        if (
+          Number.isInteger(possibleDense2InputSize) &&
+          possibleDense2InputSize > 0
+        ) {
+          console.warn(
+            `Attempting to use shape [${possibleDense2InputSize}, ${dense2OutputUnits}] for dense_1_5 layer`
+          );
+
+          // Set dense_1_5 layer weights with calculated shape
+          model
+            .getLayer("dense_1_5")
+            .setWeights([
+              tf.tensor2d(this.weights.dense2Weights, [
+                possibleDense2InputSize,
+                dense2OutputUnits,
+              ]),
+              tf.tensor1d(this.weights.dense2Bias),
+            ]);
+        } else {
+          console.warn(
+            "Using random initialization due to dense_1_5 shape mismatch"
+          );
+          return;
+        }
+      } else {
+        model
+          .getLayer("dense_1_5")
+          .setWeights([
+            tf.tensor2d(
+              this.weights.dense2Weights,
+              MODEL_CONFIG.DENSE_2_WEIGHT_SHAPE
+            ),
+            tf.tensor1d(this.weights.dense2Bias),
+          ]);
+      }
 
       model
         .getLayer("bn_dense1_5")
@@ -200,13 +299,70 @@ export class ModelWeightManager {
           tf.tensor1d(this.weights.bnDense2MovingMean),
         ]);
 
+      // Debug output layer weights
+      console.log("Output weights length:", this.weights.outputWeights?.length);
+      console.log("Expected output shape:", MODEL_CONFIG.OUTPUT_WEIGHT_SHAPE);
+      console.log(
+        "Expected output size:",
+        MODEL_CONFIG.OUTPUT_WEIGHT_SHAPE[0] *
+          MODEL_CONFIG.OUTPUT_WEIGHT_SHAPE[1]
+      );
+
+      // Check output weights match expected shape
+      const expectedOutputSize =
+        MODEL_CONFIG.OUTPUT_WEIGHT_SHAPE[0] *
+        MODEL_CONFIG.OUTPUT_WEIGHT_SHAPE[1];
+
+      // If there's a mismatch, try to determine the correct shape
+      if (this.weights.outputWeights?.length !== expectedOutputSize) {
+        console.warn(
+          `Output weights size mismatch: expected ${expectedOutputSize}, got ${this.weights.outputWeights?.length}`
+        );
+
+        // Try to determine the correct shape from the saved weights
+        const actualSize = this.weights.outputWeights?.length || 0;
+        const outputUnits = MODEL_CONFIG.OUTPUT_WEIGHT_SHAPE[1]; // 2
+
+        // Calculate possible input size
+        const possibleInputSize = actualSize / outputUnits;
+        console.warn(
+          `Possible input size for output layer: ${possibleInputSize}`
+        );
+
+        if (Number.isInteger(possibleInputSize) && possibleInputSize > 0) {
+          console.warn(
+            `Attempting to use shape [${possibleInputSize}, ${outputUnits}] for output layer`
+          );
+
+          // Set output layer weights with calculated shape
+          model
+            .getLayer("output")
+            .setWeights([
+              tf.tensor2d(this.weights.outputWeights, [
+                possibleInputSize,
+                outputUnits,
+              ]),
+              tf.tensor1d(this.weights.outputBias),
+            ]);
+          return;
+        }
+
+        console.warn(
+          "Architecture mismatch detected - saved weights were trained with different model architecture"
+        );
+        console.warn(
+          "Using random initialization for backtest - consider retraining model for production use"
+        );
+        return;
+      }
+
       // Set output layer weights
       model
         .getLayer("output")
         .setWeights([
           tf.tensor2d(
             this.weights.outputWeights,
-            MODEL_CONFIG.DENSE_2_WEIGHT_SHAPE
+            MODEL_CONFIG.OUTPUT_WEIGHT_SHAPE
           ),
           tf.tensor1d(this.weights.outputBias),
         ]);

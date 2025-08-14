@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `TradeModelWeightManager` class is a critical component of the Cardano trading system that handles the loading, validation, and application of pre-trained neural network weights to trading models. It serves as the bridge between persisted model knowledge (stored in Firebase Cloud Storage) and live trading models, ensuring that trained models can be deployed and used for real-time cryptocurrency trading predictions.
+The `TradeModelWeightManager` class is a critical component of the Bitcoin trading system that handles the loading, validation, and application of pre-trained neural network weights to trading models. It serves as the bridge between persisted model knowledge (stored in Firebase Cloud Storage) and live trading models, ensuring that trained models can be deployed and used for real-time cryptocurrency trading predictions.
 
 ## Architecture
 
@@ -84,7 +84,12 @@ public async loadWeights(): Promise<void> {
     "lstm1Weights": number[][],
     "lstm1RecurrentWeights": number[][],
     "lstm1Bias": number[],
-    // ... additional LSTM layers
+    "lstm2Weights": number[][],
+    "lstm2RecurrentWeights": number[][],
+    "lstm2Bias": number[],
+    "lstm3Weights": number[][],
+    "lstm3RecurrentWeights": number[][],
+    "lstm3Bias": number[],
 
     // Dense layers
     "dense1Weights": number[][],
@@ -92,11 +97,39 @@ public async loadWeights(): Promise<void> {
     "dense2Weights": number[][],
     "dense2Bias": number[],
 
-    // Batch normalization
-    "bnGamma": number[],
-    "bnBeta": number[],
-    "bnMovingMean": number[],
-    "bnMovingVariance": number[],
+    // Output layer
+    "outputWeights": number[][],
+    "outputBias": number[],
+
+    // Batch normalization layers
+    "bnConv1Gamma": number[],
+    "bnConv1Beta": number[],
+    "bnConv1MovingMean": number[],
+    "bnConv1MovingVariance": number[],
+    "bnConv2Gamma": number[],
+    "bnConv2Beta": number[],
+    "bnConv2MovingMean": number[],
+    "bnConv2MovingVariance": number[],
+    "bnLstm1Gamma": number[],
+    "bnLstm1Beta": number[],
+    "bnLstm1MovingMean": number[],
+    "bnLstm1MovingVariance": number[],
+    "bnLstm2Gamma": number[],
+    "bnLstm2Beta": number[],
+    "bnLstm2MovingMean": number[],
+    "bnLstm2MovingVariance": number[],
+    "bnLstm3Gamma": number[],
+    "bnLstm3Beta": number[],
+    "bnLstm3MovingMean": number[],
+    "bnLstm3MovingVariance": number[],
+    "bnDense1Gamma": number[],
+    "bnDense1Beta": number[],
+    "bnDense1MovingMean": number[],
+    "bnDense1MovingVariance": number[],
+    "bnDense2Gamma": number[],
+    "bnDense2Beta": number[],
+    "bnDense2MovingMean": number[],
+    "bnDense2MovingVariance": number[],
 
     // Feature statistics
     "featureMeans": number[],
@@ -143,7 +176,7 @@ private validateWeights(): void {
 ```typescript
 // Conv1D Layer 1
 model
-  .getLayer("conv1d")
+  .getLayer("conv1d_input")
   .setWeights([
     tf.tensor3d(this.weights.conv1Weights, MODEL_CONFIG.CONV1D_1_WEIGHT_SHAPE),
     tf.tensor1d(this.weights.conv1Bias),
@@ -210,32 +243,53 @@ model
 - **Recurrent Weights**: `[units, units * 4]` (recurrent connections)
 - **Bias**: `[units * 4]` (gate biases)
 
-##### Time-Distributed Layer
+##### Batch Normalization Layers
 
 ```typescript
-model
-  .getLayer("time_distributed")
-  .setWeights([
-    tf.tensor2d(
-      this.weights.timeDistributedWeights,
-      MODEL_CONFIG.TIME_DISTRIBUTED_WEIGHT_SHAPE
-    ),
-    tf.tensor1d(this.weights.timeDistributedBias),
-  ]);
-```
-
-**Purpose**: Applies dense transformation to each timestep
-**Weight Shapes**: Standard dense layer weights and biases
-
-##### Batch Normalization Layer
-
-```typescript
-model.getLayer("batchNormalization").setWeights([
-  tf.tensor1d(this.weights.bnGamma), // Scale parameter
-  tf.tensor1d(this.weights.bnBeta), // Shift parameter
-  tf.tensor1d(this.weights.bnMovingMean), // Running mean
-  tf.tensor1d(this.weights.bnMovingVariance), // Running variance
+// Conv1D Batch Normalization
+model.getLayer("bn_conv1").setWeights([
+  tf.tensor1d(this.weights.bnConv1Gamma), // Scale parameter
+  tf.tensor1d(this.weights.bnConv1Beta), // Shift parameter
+  tf.tensor1d(this.weights.bnConv1MovingMean), // Running mean
+  tf.tensor1d(this.weights.bnConv1MovingVariance), // Running variance
 ]);
+
+model
+  .getLayer("bn_conv2")
+  .setWeights([
+    tf.tensor1d(this.weights.bnConv2Gamma),
+    tf.tensor1d(this.weights.bnConv2Beta),
+    tf.tensor1d(this.weights.bnConv2MovingMean),
+    tf.tensor1d(this.weights.bnConv2MovingVariance),
+  ]);
+
+// LSTM Batch Normalization
+model
+  .getLayer("bn_lstm1")
+  .setWeights([
+    tf.tensor1d(this.weights.bnLstm1Gamma),
+    tf.tensor1d(this.weights.bnLstm1Beta),
+    tf.tensor1d(this.weights.bnLstm1MovingMean),
+    tf.tensor1d(this.weights.bnLstm1MovingVariance),
+  ]);
+
+model
+  .getLayer("bn_lstm2")
+  .setWeights([
+    tf.tensor1d(this.weights.bnLstm2Gamma),
+    tf.tensor1d(this.weights.bnLstm2Beta),
+    tf.tensor1d(this.weights.bnLstm2MovingMean),
+    tf.tensor1d(this.weights.bnLstm2MovingVariance),
+  ]);
+
+model
+  .getLayer("bn_lstm3")
+  .setWeights([
+    tf.tensor1d(this.weights.bnLstm3Gamma),
+    tf.tensor1d(this.weights.bnLstm3Beta),
+    tf.tensor1d(this.weights.bnLstm3MovingMean),
+    tf.tensor1d(this.weights.bnLstm3MovingVariance),
+  ]);
 ```
 
 **Batch Norm Parameters**:
@@ -250,18 +304,26 @@ model.getLayer("batchNormalization").setWeights([
 ```typescript
 // Dense Layer 1
 model
-  .getLayer("dense")
+  .getLayer("dense_1")
   .setWeights([
     tf.tensor2d(this.weights.dense1Weights, MODEL_CONFIG.DENSE_1_WEIGHT_SHAPE),
     tf.tensor1d(this.weights.dense1Bias),
   ]);
 
-// Dense Layer 2 (Output)
+// Dense Layer 2 (dense_1_5)
 model
-  .getLayer("dense_1")
+  .getLayer("dense_1_5")
   .setWeights([
     tf.tensor2d(this.weights.dense2Weights, MODEL_CONFIG.DENSE_2_WEIGHT_SHAPE),
     tf.tensor1d(this.weights.dense2Bias),
+  ]);
+
+// Output Layer
+model
+  .getLayer("output")
+  .setWeights([
+    tf.tensor2d(this.weights.outputWeights, MODEL_CONFIG.OUTPUT_WEIGHT_SHAPE),
+    tf.tensor1d(this.weights.outputBias),
   ]);
 ```
 
@@ -290,7 +352,7 @@ public getFeatureStds(): number[] {
 
 - **Means**: Zero-mean normalization (no shift)
 - **Stds**: Unit variance normalization (no scaling)
-- **Feature Count**: Uses `MODEL_CONFIG.FEATURE_COUNT` constant
+- **Feature Count**: Uses `MODEL_CONFIG.FEATURE_COUNT` constant (62 features)
 
 #### Normalization Application
 
@@ -311,18 +373,18 @@ const normalizedFeatures = features.sub(featureMeans).div(featureStds);
 import { MODEL_CONFIG } from "../constants";
 
 // Weight shapes for validation
-CONV1D_1_WEIGHT_SHAPE: number[];
-CONV1D_2_WEIGHT_SHAPE: number[];
-LSTM1_WEIGHT_SHAPE: number[];
-LSTM1_RECURRENT_SHAPE: number[];
-LSTM2_WEIGHT_SHAPE: number[];
-LSTM2_RECURRENT_SHAPE: number[];
-LSTM3_WEIGHT_SHAPE: number[];
-LSTM3_RECURRENT_SHAPE: number[];
-TIME_DISTRIBUTED_WEIGHT_SHAPE: number[];
-DENSE_1_WEIGHT_SHAPE: number[];
-DENSE_2_WEIGHT_SHAPE: number[];
-FEATURE_COUNT: number;
+CONV1D_1_WEIGHT_SHAPE: [5, 62, 12]; // [kernelSize, features, filters]
+CONV1D_2_WEIGHT_SHAPE: [3, 12, 24]; // [kernelSize, filters, filters]
+LSTM1_WEIGHT_SHAPE: [24, 192]; // [inputFeatures, units * 4]
+LSTM1_RECURRENT_SHAPE: [48, 192]; // [units, units * 4]
+LSTM2_WEIGHT_SHAPE: [48, 96]; // [inputFeatures, units * 4]
+LSTM2_RECURRENT_SHAPE: [24, 96]; // [units, units * 4]
+LSTM3_WEIGHT_SHAPE: [24, 48]; // [inputFeatures, units * 4]
+LSTM3_RECURRENT_SHAPE: [12, 48]; // [units, units * 4]
+DENSE_1_WEIGHT_SHAPE: [12, 24]; // [inputFeatures, outputFeatures]
+DENSE_2_WEIGHT_SHAPE: [24, 12]; // [inputFeatures, outputFeatures]
+OUTPUT_WEIGHT_SHAPE: [12, 2]; // [inputFeatures, outputFeatures]
+FEATURE_COUNT: 62; // Total features
 ```
 
 ### File Names Configuration
@@ -385,7 +447,7 @@ const featureStds = weightManager.getFeatureStds();
 // Apply normalization to input features
 const inputFeatures = tf.tensor2d([
   [
-    /* feature values */
+    /* 62 feature values */
   ],
 ]);
 const normalizedFeatures = inputFeatures.sub(featureMeans).div(featureStds);

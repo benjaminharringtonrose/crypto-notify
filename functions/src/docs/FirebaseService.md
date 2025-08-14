@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `FirebaseService` class is a singleton service component that provides centralized access to Firebase Cloud Storage functionality within the Cardano trading system. It implements the Singleton design pattern to ensure a single instance manages all Firebase storage operations, providing a unified interface for model weight storage, retrieval, and management across the application.
+The `FirebaseService` class is a comprehensive service that provides Firebase Cloud Storage functionality within the Bitcoin trading system. It implements the Singleton design pattern to ensure a single instance manages all Firebase storage operations, providing a unified interface for model weight storage, retrieval, and management.
 
 ## Architecture
 

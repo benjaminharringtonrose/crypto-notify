@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `FeatureSequenceGenerator` class is a specialized component in the Cardano trading system that creates time-series feature sequences for machine learning models. It transforms raw cryptocurrency price and volume data into structured, multi-dimensional feature sequences that can be used for training LSTM/RNN models or other time-series prediction algorithms.
+The `FeatureSequenceGenerator` class is a specialized component in the Bitcoin trading system that creates time-series feature sequences for machine learning models. It transforms raw cryptocurrency price and volume data into structured, multi-dimensional feature sequences that can be used for training LSTM/RNN models or other time-series prediction algorithms.
 
 ## Architecture
 
@@ -11,14 +11,14 @@ The FeatureSequenceGenerator follows a sequence-oriented architecture:
 ```
 Raw Data Input → Feature Computation → Sequence Assembly → Batch Generation → Output
      ↓                ↓                    ↓                ↓
-ADA/BTC Prices    FeatureCalculator    Timestep Arrays   Multiple Sequences
-ADA/BTC Volumes   Technical Indicators  Feature Vectors   Training Dataset
+BTC Prices         FeatureCalculator    Timestep Arrays   Multiple Sequences
+BTC Volumes        Technical Indicators  Feature Vectors   Training Dataset
 ```
 
 ### Key Responsibilities
 
 - **Sequence Generation**: Create fixed-length feature sequences from historical data
-- **Feature Integration**: Combine ADA and BTC features into unified feature vectors
+- **Feature Integration**: Process BTC features into unified feature vectors
 - **Batch Processing**: Generate multiple sequences for training datasets
 - **Data Validation**: Ensure sequence integrity and proper dimensions
 - **Memory Management**: Efficient handling of large datasets
@@ -32,8 +32,6 @@ export class FeatureSequenceGenerator {
   constructor(timesteps: number);
 
   public generateSequence(
-    adaPrices: number[],
-    adaVolumes: number[],
     btcPrices: number[],
     btcVolumes: number[],
     startIndex: number,
@@ -41,8 +39,6 @@ export class FeatureSequenceGenerator {
   ): number[][];
 
   public generateBatchSequences(
-    adaPrices: number[],
-    adaVolumes: number[],
     btcPrices: number[],
     btcVolumes: number[],
     startIndex: number,
@@ -60,14 +56,12 @@ export class FeatureSequenceGenerator {
 
 ### Public Methods
 
-#### `generateSequence(adaPrices, adaVolumes, btcPrices, btcVolumes, startIndex, endIndex): number[][]`
+#### `generateSequence(btcPrices, btcVolumes, startIndex, endIndex): number[][]`
 
 Generates a single feature sequence from the specified data range.
 
 **Parameters:**
 
-- `adaPrices: number[]` - Historical ADA price data
-- `adaVolumes: number[]` - Historical ADA volume data
 - `btcPrices: number[]` - Historical BTC price data
 - `btcVolumes: number[]` - Historical BTC volume data
 - `startIndex: number` - Starting index for sequence generation
@@ -81,7 +75,7 @@ Generates a single feature sequence from the specified data range.
 
 1. **Index Validation**: Ensures safe index boundaries
 2. **Feature Computation**: Uses FeatureCalculator for each time point
-3. **Feature Integration**: Combines ADA and BTC features
+3. **Feature Integration**: Processes BTC features
 4. **Sequence Padding**: Handles insufficient data scenarios
 5. **Length Enforcement**: Ensures exact timestep length
 
@@ -89,21 +83,19 @@ Generates a single feature sequence from the specified data range.
 
 ```typescript
 [
-  [adaFeatures_0 + btcFeatures_0], // Timestep 1
-  [adaFeatures_1 + btcFeatures_1], // Timestep 2
-  [adaFeatures_2 + btcFeatures_2], // Timestep 3
+  [btcFeatures_0], // Timestep 1
+  [btcFeatures_1], // Timestep 2
+  [btcFeatures_2], // Timestep 3
   // ... more timesteps
 ];
 ```
 
-#### `generateBatchSequences(adaPrices, adaVolumes, btcPrices, btcVolumes, startIndex, endIndex, stepDays): number[][][]`
+#### `generateBatchSequences(btcPrices, btcVolumes, startIndex, endIndex, stepDays): number[][][]`
 
 Generates multiple feature sequences for batch training.
 
 **Parameters:**
 
-- `adaPrices: number[]` - Historical ADA price data
-- `adaVolumes: number[]` - Historical ADA volume data
 - `btcPrices: number[]` - Historical BTC price data
 - `btcVolumes: number[]` - Historical BTC volume data
 - `startIndex: number` - Starting index for batch generation
@@ -127,8 +119,6 @@ Generates multiple feature sequences for batch training.
 ### 1. Input Data Preparation
 
 ```typescript
-const adaPrices = [100, 101, 102, ...];  // Historical ADA prices
-const adaVolumes = [1000, 1100, 1200, ...];  // Historical ADA volumes
 const btcPrices = [50000, 50100, 50200, ...];  // Historical BTC prices
 const btcVolumes = [500, 550, 600, ...];  // Historical BTC volumes
 ```
@@ -137,14 +127,6 @@ const btcVolumes = [500, 550, 600, ...];  // Historical BTC volumes
 
 ```typescript
 const featureCalculator = new FeatureCalculator();
-
-const adaFeatures = featureCalculator.compute({
-  prices: adaPrices,
-  volumes: adaVolumes,
-  dayIndex: i,
-  currentPrice: adaPrices[i],
-  isBTC: false,
-});
 
 const btcFeatures = featureCalculator.compute({
   prices: btcPrices,
@@ -158,15 +140,15 @@ const btcFeatures = featureCalculator.compute({
 ### 3. Feature Integration
 
 ```typescript
-const combinedFeatures = [...adaFeatures, ...btcFeatures];
-// ADA: 32 features + BTC: 29 features = 61 total features
+const features = btcFeatures;
+// BTC: 62 features total
 ```
 
 ### 4. Sequence Assembly
 
 ```typescript
-sequence.push(combinedFeatures);
-// Each timestep contains 61 features
+sequence.push(features);
+// Each timestep contains 62 features
 ```
 
 ### 5. Sequence Padding
@@ -181,69 +163,95 @@ while (sequence.length < this.timesteps) {
 
 ### Total Feature Count
 
-- **ADA Features**: 32 technical indicators and patterns
-- **BTC Features**: 29 technical indicators and patterns
-- **Combined Features**: 61 total features per timestep
+- **BTC Features**: 62 technical indicators and patterns
 
 ### Feature Categories
 
 ```typescript
 [
-  // ADA Features (32)
+  // BTC Features (62)
   rsi,
   prevRsi,
   sma7,
   sma21,
+  prevSma7,
+  prevSma21,
   macdLine,
   signalLine,
   currentPrice,
   upperBand,
+  lowerBand,
+  obvValues[obvValues.length - 1] / 1e6,
   obv,
   atr,
   atrBaseline,
   zScore,
   vwap,
   stochRsi,
+  stochRsiSignal,
   prevStochRsi,
   fib61_8,
+  prevPrice,
   volumeOscillator,
   prevVolumeOscillator,
-  isDoubleTop,
-  isHeadAndShoulders,
-  isTripleTop,
-  isTripleBottom,
+  isDoubleTop ? 1 : 0,
+  isHeadAndShoulders ? 1 : 0,
+  prevMacdLine,
+  isTripleTop ? 1 : 0,
+  isTripleBottom ? 1 : 0,
+  isVolumeSpike ? 1 : 0,
   momentum,
   priceChangePct,
+  sma20,
   volAdjustedMomentum,
-  adxProxy,
   trendRegime,
-  btcRatio,
-
-  // BTC Features (29)
-  rsi,
-  prevRsi,
-  sma7,
-  sma21,
-  macdLine,
-  signalLine,
-  currentPrice,
-  upperBand,
-  obv,
-  atr,
-  atrBaseline,
-  zScore,
-  vwap,
-  stochRsi,
-  prevStochRsi,
-  fib61_8,
-  volumeOscillator,
-  prevVolumeOscillator,
-  isDoubleTop,
-  isHeadAndShoulders,
-  isTripleTop,
-  momentum,
-  priceChangePct,
-  volAdjustedMomentum,
+  adxProxy,
+  // Market Regime Features
+  volatilityRegimeScore,
+  trendRegimeScore,
+  momentumRegimeScore,
+  realizedVolatility,
+  regimeScore,
+  // Additional technical indicators
+  sma50 || sma20,
+  sma200 || sma20,
+  // Price-based features
+  currentPrice / (sma20 || currentPrice),
+  currentPrice / (sma50 || currentPrice),
+  currentPrice / (sma200 || currentPrice),
+  // Volume-based features
+  volumes[dayIndex] /
+    (volumes
+      .slice(Math.max(0, dayIndex - 20), dayIndex + 1)
+      .reduce((a, b) => a + b, 0) /
+      Math.min(21, dayIndex + 1)),
+  volumes[dayIndex] /
+    (volumes
+      .slice(Math.max(0, dayIndex - 50), dayIndex + 1)
+      .reduce((a, b) => a + b, 0) /
+      Math.min(51, dayIndex + 1)),
+  // Momentum features
+  momentum / (atr || 1),
+  priceChangePct / (atr || 1),
+  // RSI-based features
+  rsi / 100,
+  prevRsi / 100,
+  // MACD-based features
+  macdLine / (currentPrice || 1),
+  signalLine / (currentPrice || 1),
+  // Bollinger Bands features
+  (currentPrice - upperBand) / (upperBand - lowerBand || 1),
+  (currentPrice - lowerBand) / (upperBand - lowerBand || 1),
+  // Stochastic features
+  stochRsi / 100,
+  stochRsiSignal / 100,
+  // Fibonacci features
+  fib61_8 / (currentPrice || 1),
+  // ATR-based features
+  atr / (currentPrice || 1),
+  atrBaseline / (currentPrice || 1),
+  // VWAP features
+  vwap / (currentPrice || 1),
 ];
 ```
 
@@ -257,8 +265,6 @@ import { FeatureSequenceGenerator } from "./FeatureSequenceGenerator";
 const generator = new FeatureSequenceGenerator(20); // 20 timesteps
 
 const sequence = generator.generateSequence(
-  adaPrices,
-  adaVolumes,
   btcPrices,
   btcVolumes,
   100, // startIndex
@@ -266,7 +272,7 @@ const sequence = generator.generateSequence(
 );
 
 console.log(`Sequence shape: ${sequence.length} × ${sequence[0].length}`);
-// Output: Sequence shape: 20 × 61
+// Output: Sequence shape: 20 × 62
 ```
 
 ### Batch Sequence Generation
@@ -274,8 +280,6 @@ console.log(`Sequence shape: ${sequence.length} × ${sequence[0].length}`);
 ```typescript
 // Generate sequences every 5 days
 const batchSequences = generator.generateBatchSequences(
-  adaPrices,
-  adaVolumes,
   btcPrices,
   btcVolumes,
   100, // startIndex
@@ -288,7 +292,7 @@ console.log(
   `Each sequence: ${batchSequences[0].length} × ${batchSequences[0][0].length}`
 );
 // Output: Generated 80 sequences
-// Output: Each sequence: 20 × 61
+// Output: Each sequence: 20 × 62
 ```
 
 ### Training Data Preparation
@@ -296,8 +300,6 @@ console.log(
 ```typescript
 // Prepare training dataset
 const trainingSequences = generator.generateBatchSequences(
-  adaPrices,
-  adaVolumes,
   btcPrices,
   btcVolumes,
   0, // startIndex
@@ -312,7 +314,7 @@ const y = generateLabels(trainingSequences); // Labels
 console.log(
   `Training data shape: ${X.length} × ${X[0].length} × ${X[0][0].length}`
 );
-// Output: Training data shape: 1000 × 20 × 61
+// Output: Training data shape: 1000 × 20 × 62
 ```
 
 ## Configuration
@@ -389,7 +391,7 @@ console.log(
 - **Sequence Generation**: Test individual sequence creation
 - **Batch Processing**: Validate batch generation logic
 - **Edge Cases**: Test with minimal data and boundary conditions
-- **Feature Integration**: Verify ADA/BTC feature combination
+- **Feature Integration**: Verify BTC feature processing
 
 ### Test Data Requirements
 

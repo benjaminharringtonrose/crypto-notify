@@ -1,7 +1,7 @@
 import { logger } from "firebase-functions";
 import { onSchedule, ScheduleOptions } from "firebase-functions/v2/scheduler";
-import { TradeExecutor } from "../cardano/TradeExecutor";
-import { TradingStrategy } from "../cardano/TradingStrategy";
+import { TradeExecutor } from "../bitcoin/TradeExecutor";
+import { TradingStrategy } from "../bitcoin/TradingStrategy";
 import { sendSMS } from "../utils";
 import { CoinbaseProductIds, Granularity } from "../types";
 import { TIME_CONVERSIONS } from "../constants";
@@ -24,13 +24,6 @@ export const runDailyTrade = onSchedule(CONFIG, async () => {
     const now = Math.floor(Date.now() / 1000);
     const start = now - TIME_CONVERSIONS.TIMESTEP_IN_SECONDS;
 
-    const adaData = await trader.getMarketData({
-      product_id: CoinbaseProductIds.ADA,
-      granularity: Granularity.OneDay,
-      start: start.toString(),
-      end: now.toString(),
-    });
-
     const btcData = await trader.getMarketData({
       product_id: CoinbaseProductIds.BTC,
       granularity: Granularity.OneDay,
@@ -41,12 +34,10 @@ export const runDailyTrade = onSchedule(CONFIG, async () => {
     // Fetch current portfolio state (simplified; adjust based on your needs)
     const balances = await trader.getAccountBalances();
     const capital = parseFloat(balances.usd?.available_balance.value || "0");
-    const holdings = parseFloat(balances.ada?.available_balance.value || "0");
+    const holdings = parseFloat(balances.btc?.available_balance.value || "0");
 
     // Decide trade using existing strategy
     const { trade, confidence } = await strategy.decideTrade({
-      adaPrices: adaData.prices,
-      adaVolumes: adaData.volumes,
       btcPrices: btcData.prices,
       btcVolumes: btcData.volumes,
       capital,

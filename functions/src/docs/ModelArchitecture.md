@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document provides a comprehensive explanation of the crypto trading model architecture used in the crypto-notify system. The model is designed to predict buy/sell signals for cryptocurrency trading based on historical price and volume data.
+This document provides a comprehensive explanation of the crypto trading model architecture used in the crypto-notify system. The model is designed to predict buy/sell signals for Bitcoin trading based on historical price and volume data.
 
 ## Model Architecture Summary
 
@@ -34,7 +34,7 @@ Output Layer (2 units, Softmax)
 
 - **Shape**: `[batch_size, 30, 62]`
 - **Timesteps**: 30 days of historical data
-- **Features**: 62 total features (33 ADA + 29 BTC features)
+- **Features**: 62 total features (BTC features only)
 
 ### 2. Convolutional Layers (Feature Extraction)
 
@@ -115,50 +115,59 @@ Output Layer (2 units, Softmax)
 
 ### Input Features (62 total)
 
-#### ADA Features (33 features)
+The model uses 62 technical indicators and features computed from Bitcoin price and volume data:
 
-1. **Price-based indicators**:
+1. **Momentum Indicators**:
 
-   - Current price
-   - Price change (1-day, 3-day, 7-day)
-   - Price momentum (10-day)
-   - Price volatility (ATR-based)
+   - RSI (14-period) and previous RSI
+   - Stochastic RSI and signal line
+   - Price momentum and volatility-adjusted momentum
 
-2. **Technical indicators**:
+2. **Trend Indicators**:
 
-   - RSI (14-period)
    - SMA (7, 20, 21, 50, 200-day)
-   - EMA (12, 26-day)
-   - MACD and signal line
-   - Bollinger Bands (upper, middle, lower)
-   - Stochastic RSI
-   - ADX (14-period)
+   - MACD line and signal line
+   - Previous MACD line
 
-3. **Volume indicators**:
+3. **Price Information**:
 
-   - Volume SMA (5, 14-day)
-   - Volume change
-   - VWAP (7-day)
+   - Current price and previous price
+   - VWAP (Volume Weighted Average Price)
 
-4. **Pattern recognition**:
+4. **Volatility Indicators**:
 
-   - Triple bottom detection
-   - Head and shoulders detection
+   - ATR (Average True Range) and baseline
+   - Bollinger Bands (upper, lower)
+   - Z-score
+
+5. **Volume Indicators**:
+
+   - OBV (On-Balance Volume)
+   - Volume oscillator and previous volume oscillator
+   - Volume spike detection
+
+6. **Pattern Recognition**:
+
    - Double top detection
+   - Head and shoulders detection
    - Triple top detection
+   - Triple bottom detection
 
-5. **Fibonacci levels**:
-   - Support and resistance levels
+7. **Market Regime Features**:
 
-#### BTC Features (29 features)
+   - Volatility regime score
+   - Trend regime score
+   - Momentum regime score
+   - Realized volatility
+   - Overall regime score
 
-Similar to ADA features but adapted for Bitcoin, including:
-
-- Price-based indicators
-- Technical indicators
-- Volume indicators
-- Pattern recognition
-- Market correlation features
+8. **Advanced Technical Features**:
+   - ADX proxy
+   - Trend regime
+   - Fibonacci levels
+   - Price-to-moving average ratios
+   - Volume ratios
+   - Normalized indicators
 
 ## Training Configuration
 
@@ -191,7 +200,7 @@ Similar to ADA features but adapted for Bitcoin, including:
 
 ### Data Preparation
 
-1. **Historical Data Fetching**: 1200 days of ADA and BTC data
+1. **Historical Data Fetching**: 1200 days of BTC data
 2. **Feature Calculation**: 62 technical indicators computed
 3. **Sequence Generation**: 30-day sliding windows
 4. **Data Normalization**: Z-score normalization per feature

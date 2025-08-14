@@ -7,6 +7,7 @@ export class GradientClippingCallback extends tf.CustomCallback {
   private lossFn: (yTrue: tf.Tensor, yPred: tf.Tensor) => tf.Tensor;
   private xVal: tf.Tensor;
   private yVal: tf.Tensor;
+  private trainingLogger?: any; // Reference to TrainingLoggerCallback
 
   constructor(
     lossFn: (yTrue: tf.Tensor, yPred: tf.Tensor) => tf.Tensor,
@@ -23,6 +24,10 @@ export class GradientClippingCallback extends tf.CustomCallback {
 
   setModel(model: tf.LayersModel) {
     this.model = model;
+  }
+
+  setTrainingLogger(logger: any) {
+    this.trainingLogger = logger;
   }
 
   async onEpochEnd(epoch: number, logs?: tf.Logs) {
@@ -48,9 +53,12 @@ export class GradientClippingCallback extends tf.CustomCallback {
           .map((g) => tf.sum(tf.square(g)))
           .reduce((acc, curr) => acc.add(curr), tf.scalar(0))
       );
-      console.log(
-        `Epoch ${epoch + 1} Gradient Norm: ${gradNorm.dataSync()[0].toFixed(4)}`
-      );
+      
+      // Send gradient norm to training logger instead of logging directly
+      if (this.trainingLogger) {
+        this.trainingLogger.setGradientNorm(gradNorm.dataSync()[0]);
+      }
+      
       const clippedGrads: { [key: string]: tf.Tensor } = {};
       trainableWeights.forEach((weight, i) => {
         const grad = grads[i];

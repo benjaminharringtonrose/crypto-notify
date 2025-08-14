@@ -36,8 +36,6 @@ export class TradeModelPredictor {
   }
 
   public async predict(
-    adaPrices: number[],
-    adaVolumes: number[],
     btcPrices: number[],
     btcVolumes: number[]
   ): Promise<{
@@ -60,17 +58,10 @@ export class TradeModelPredictor {
     }
 
     // const startTime = performance.now();
-    const startIndex = Math.max(0, adaPrices.length - this.timesteps - 1);
-    const endIndex = adaPrices.length - 1;
+    const startIndex = Math.max(0, btcPrices.length - this.timesteps - 1);
+    const endIndex = btcPrices.length - 1;
     const sequence = this.sequenceGenerator
-      .generateSequence(
-        adaPrices,
-        adaVolumes,
-        btcPrices,
-        btcVolumes,
-        startIndex,
-        endIndex
-      )
+      .generateSequence(btcPrices, btcVolumes, startIndex, endIndex)
       .slice(-this.timesteps);
 
     if (
@@ -107,14 +98,14 @@ export class TradeModelPredictor {
     const atr = sequence[sequence.length - 1][11];
     const momentumWindowSize =
       atr > 0.05 ? 5 : atr > 0.02 ? 10 : atr > 0.01 ? 14 : 20;
-    const momentumWindow = adaPrices.slice(-momentumWindowSize);
+    const momentumWindow = btcPrices.slice(-momentumWindowSize);
     const momentum =
       momentumWindow.length >= 2
         ? (momentumWindow[momentumWindow.length - 1] - momentumWindow[0]) /
           momentumWindow[0]
         : 0;
 
-    const shortMomentumWindow = adaPrices.slice(-3);
+    const shortMomentumWindow = btcPrices.slice(-3);
     const shortMomentum =
       shortMomentumWindow.length >= 2
         ? (shortMomentumWindow[shortMomentumWindow.length - 1] -
@@ -122,7 +113,7 @@ export class TradeModelPredictor {
           shortMomentumWindow[0]
         : 0;
 
-    const trendWindow = adaPrices.slice(-momentumWindowSize);
+    const trendWindow = btcPrices.slice(-momentumWindowSize);
     const trendSlope =
       trendWindow.length >= 2
         ? (trendWindow[trendWindow.length - 1] - trendWindow[0]) /

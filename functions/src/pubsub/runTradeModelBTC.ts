@@ -10,8 +10,8 @@ import {
 } from "../types";
 import { sendSMS, formatAnalysisResults } from "../utils";
 import { getFirestore } from "firebase-admin/firestore";
-import { TradingStrategy } from "../cardano/TradingStrategy";
-import { TradeExecutor } from "../cardano/TradeExecutor";
+import { TradingStrategy } from "../bitcoin/TradingStrategy";
+import { TradeExecutor } from "../bitcoin/TradeExecutor";
 import { TIME_CONVERSIONS } from "../constants";
 
 const CONFIG: ScheduleOptions = {
@@ -19,7 +19,7 @@ const CONFIG: ScheduleOptions = {
   memory: "512MiB",
 };
 
-export const runTradeModelADA = onSchedule(CONFIG, async () => {
+export const runTradeModelBTC = onSchedule(CONFIG, async () => {
   try {
     const strategy = new TradingStrategy();
 
@@ -33,14 +33,7 @@ export const runTradeModelADA = onSchedule(CONFIG, async () => {
     );
     const start = now - TIME_CONVERSIONS.TIMESTEP_IN_SECONDS;
 
-    const currentPrice = await trader.getCurrentPrice(CoinbaseProductIds.ADA);
-
-    const adaData = await trader.getMarketData({
-      product_id: CoinbaseProductIds.ADA,
-      granularity: Granularity.OneDay,
-      start: start.toString(),
-      end: now.toString(),
-    });
+    const currentPrice = await trader.getCurrentPrice(CoinbaseProductIds.BTC);
 
     const btcData = await trader.getMarketData({
       product_id: CoinbaseProductIds.BTC,
@@ -52,18 +45,13 @@ export const runTradeModelADA = onSchedule(CONFIG, async () => {
     // Fetch current portfolio state (simplified; adjust based on your needs)
     const balances = await trader.getAccountBalances();
     const capital = parseFloat(balances.usd?.available_balance.value || "0");
-    const holdings = parseFloat(balances.ada?.available_balance.value || "0");
+    const holdings = parseFloat(balances.btc?.available_balance.value || "0");
 
-    if (
-      adaData.prices.length < TIME_CONVERSIONS.ONE_MONTH_IN_DAYS ||
-      btcData.prices.length < TIME_CONVERSIONS.ONE_MONTH_IN_DAYS
-    ) {
+    if (btcData.prices.length < TIME_CONVERSIONS.ONE_MONTH_IN_DAYS) {
       throw new Error("Insufficient historical data for prediction");
     }
 
     const { trade, buyProb, sellProb } = await strategy.decideTrade({
-      adaPrices: adaData.prices,
-      adaVolumes: adaData.volumes,
       btcPrices: btcData.prices,
       btcVolumes: btcData.volumes,
       capital,
@@ -77,7 +65,7 @@ export const runTradeModelADA = onSchedule(CONFIG, async () => {
     const db = getFirestore();
     const recommendationRef = db
       .collection(Collections.TradeRecommendations)
-      .doc(Docs.Cardano);
+      .doc(Docs.Bitcoin);
 
     const previousDoc = await recommendationRef.get();
     const previous = (previousDoc.exists ? previousDoc.data() : undefined) as
@@ -85,7 +73,7 @@ export const runTradeModelADA = onSchedule(CONFIG, async () => {
       | undefined;
 
     const analysisResults = formatAnalysisResults({
-      cryptoSymbol: CryptoIds.Cardano,
+      cryptoSymbol: CryptoIds.Bitcoin,
       currentPrice,
       probabilities: {
         buy: buyProb,

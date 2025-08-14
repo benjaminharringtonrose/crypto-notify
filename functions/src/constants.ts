@@ -28,92 +28,48 @@ export const PERIODS = {
 } as const;
 
 export const STRATEGY_CONFIG = {
-  MIN_CONFIDENCE_DEFAULT: 0.15, // Reverted to original value
-  PROFIT_TAKE_MULTIPLIER_DEFAULT: 4,
-  BASE_POSITION_SIZE_DEFAULT: 0.015,
+  MIN_CONFIDENCE_DEFAULT: 0.16, // Back to successful setting
+  PROFIT_TAKE_MULTIPLIER_DEFAULT: 2.0, // Back to successful setting
+  BASE_POSITION_SIZE_DEFAULT: 0.085, // Back to successful setting
   SLIPPAGE: 0.001,
-  COMMISSION: 0.1,
-  STOP_LOSS_MULTIPLIER_DEFAULT: 10, // Increased from 8
-  TRAILING_STOP_DEFAULT: 0.25,
-  MIN_HOLD_DAYS_DEFAULT: 8,
-  BUY_PROB_THRESHOLD_DEFAULT: 0.17, // Fine-tuned reduction from 0.18
-  SELL_PROB_THRESHOLD_DEFAULT: 0.28, // Fine-tuned reduction from 0.3
+  COMMISSION: 0.005, // Fixed: Reduced from 0.1 (10%) to 0.005 (0.5%)
+  STOP_LOSS_MULTIPLIER_DEFAULT: 5.2, // Back to successful setting
+  TRAILING_STOP_DEFAULT: 0.12, // Back to successful setting
+  MIN_HOLD_DAYS_DEFAULT: 2.5, // Back to successful setting
+  BUY_PROB_THRESHOLD_DEFAULT: 0.105, // Back to successful setting
+  SELL_PROB_THRESHOLD_DEFAULT: 0.185, // Back to successful setting
   MOMENTUM_WINDOW_THRESHOLD: 0.01,
   MAX_ATR_THRESHOLD: 0.15,
-  MIN_PROFIT_THRESHOLD: 0.005,
-  MOMENTUM_THRESHOLD: 0.002, // Very aggressive lowering to enable momentum strategy
-  VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: 0.02, // Reverted to original value
-  TREND_STRENGTH_THRESHOLD: 0.0004, // Reverted to original value
-  DEVIATION_THRESHOLD: 0.015, // Reverted to original value
-  VOLUME_MULTIPLIER: 1.5,
-  TREND_SLOPE_THRESHOLD: 0.005, // Very aggressive lowering to enable trend following
-  SHORT_MOMENTUM_THRESHOLD: 0.005, // Very aggressive lowering to enable more strategies
-  DAYS_SINCE_TRADE_THRESHOLD: 15,
-  DYNAMIC_BREAKOUT_THRESHOLD: 0.25,
-  HIGH_CONFIDENCE_THRESHOLD: 0.65,
+  MIN_PROFIT_THRESHOLD: 0.0012, // Back to successful setting
+  MOMENTUM_THRESHOLD: 0.0016, // Back to successful setting
+  VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: 0.016, // Back to successful setting
+  TREND_STRENGTH_THRESHOLD: 0.0035, // Back to successful setting
+  TREND_SLOPE_THRESHOLD: 0.0035, // Back to successful setting
+  SHORT_MOMENTUM_THRESHOLD: 0.0035, // Back to successful setting
+  DAYS_SINCE_TRADE_THRESHOLD: 5, // Back to successful setting
+  DYNAMIC_BREAKOUT_THRESHOLD: 0.2, // Back to successful setting
+  HIGH_CONFIDENCE_THRESHOLD: 0.46, // Back to successful setting
   MOMENTUM_MULTIPLIER: 0.05,
-  MAX_PROFIT_TAKE: 4.0,
-  NEGATIVE_MOMENTUM_THRESHOLD: -0.04,
-  NEGATIVE_SHORT_MOMENTUM_THRESHOLD: -0.015,
-  MEAN_REVERSION_THRESHOLD: 0.015, // Increased from 0.008
-  NEGATIVE_SHORT_MOMENTUM_MIN: -0.01,
-  MOMENTUM_MAX: 0.025,
-  POSITION_SIZE_MAX: 0.05, // Reduced from 0.03
-  POSITION_SIZE_MAX_HIGH_ATR: 0.1, // Reduced from 0.15
-  POSITION_SIZE_MAX_HIGH_CONFIDENCE: 0.08, // Reduced from 0.12
-  CONFIDENCE_BOOST_MULTIPLIER: 1.2,
-  TREND_SLOPE_BOOST_THRESHOLD: 0.02,
-  TREND_SLOPE_POSITION_BOOST: 1.2,
+  MAX_PROFIT_TAKE: 2.0, // Back to successful setting
+  NEGATIVE_MOMENTUM_THRESHOLD: -0.032,
+  NEGATIVE_SHORT_MOMENTUM_THRESHOLD: -0.011,
+  MEAN_REVERSION_THRESHOLD: 0.012, // Back to successful setting
+  NEGATIVE_SHORT_MOMENTUM_MIN: -0.0085,
+  MOMENTUM_MAX: 0.021,
+  POSITION_SIZE_MAX: 0.3, // Back to successful setting
+  POSITION_SIZE_MAX_HIGH_ATR: 0.35, // Back to successful setting
+  POSITION_SIZE_MAX_HIGH_CONFIDENCE: 0.4, // Back to successful setting
+  CONFIDENCE_BOOST_MULTIPLIER: 1.75, // Back to successful setting
+  TREND_SLOPE_BOOST_THRESHOLD: 0.016,
+  TREND_SLOPE_POSITION_BOOST: 1.28,
+  VOLUME_BOOST_THRESHOLD: 1.2,
+  NEGATIVE_DEVIATION_THRESHOLD: -0.015,
+  VOLUME_MULTIPLIER: 1.5,
+  TREND_STRENGTH_REVERSAL_THRESHOLD: -0.01,
   ATR_POSITION_THRESHOLD: 0.05,
   BUY_PROB_MAX_MULTIPLIER: 2.0,
-  VOLUME_BOOST_THRESHOLD: 1.2,
-  NEGATIVE_DEVIATION_THRESHOLD: -0.015, // Adjusted from -0.008
-  TREND_STRENGTH_REVERSAL_THRESHOLD: -0.01,
   CONSECUTIVE_BUYS_MAX: 4,
   CONSECUTIVE_BUY_CONFIDENCE_LEVELS: [0.25, 0.3, 0.35, 0.4],
-  STRATEGY_PERSISTENCE_TRADES: 3,
-  STRATEGY_PERSISTENCE_DAYS: 5,
-  STRATEGY_OVERRIDE_CONFIDENCE: 0.8,
-  MOMENTUM: {
-    MIN_CONFIDENCE_DEFAULT: 0.25, // Moderate increase from 0.14 for higher quality trades
-    BUY_PROB_THRESHOLD_DEFAULT: 0.17, // Fine-tuned reduction from 0.18
-    MIN_HOLD_DAYS_DEFAULT: 8,
-    TRAILING_STOP_DEFAULT: 0.2, // Reduced from 0.25 for tighter trailing
-    STOP_LOSS_MULTIPLIER_DEFAULT: 10, // Increased
-    PROFIT_TAKE_MULTIPLIER_DEFAULT: 3.5, // Increased from 2.5 for better returns
-    VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: 0.012, // Lowered from 0.015 to enable more momentum
-    TREND_STRENGTH_THRESHOLD: 0.0002, // Lowered from 0.0004 to enable more momentum
-  },
-  MEAN_REVERSION: {
-    MIN_CONFIDENCE_DEFAULT: 0.22, // Moderate increase from 0.14 for higher quality trades
-    BUY_PROB_THRESHOLD_DEFAULT: 0.17, // Fine-tuned reduction from 0.18
-    MIN_HOLD_DAYS_DEFAULT: 3,
-    PROFIT_TAKE_MULTIPLIER_DEFAULT: 3.0, // Increased from 2.5 for better returns
-    STOP_LOSS_MULTIPLIER_DEFAULT: 10, // Increased from 6
-    TRAILING_STOP_DEFAULT: 0.2,
-    VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: 0.015, // Lowered from 0.02 to enable more mean reversion
-    TREND_STRENGTH_THRESHOLD: 0.0001, // Lowered from 0.0002 to enable more mean reversion
-  },
-  BREAKOUT: {
-    MIN_CONFIDENCE_DEFAULT: 0.25, // Moderate increase from 0.14 for higher quality trades
-    BUY_PROB_THRESHOLD_DEFAULT: 0.17, // Fine-tuned reduction from 0.18
-    MIN_HOLD_DAYS_DEFAULT: 7,
-    STOP_LOSS_MULTIPLIER_DEFAULT: 10, // Increased from 7
-    TRAILING_STOP_DEFAULT: 0.2,
-    PROFIT_TAKE_MULTIPLIER_DEFAULT: 4.0, // Increased from 2.5 for better returns
-    VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: 0.025, // Lowered from 0.03 to enable more breakout
-    TREND_STRENGTH_THRESHOLD: 0.0002, // Lowered from 0.0003 to enable more breakout
-  },
-  TREND_FOLLOWING: {
-    MIN_CONFIDENCE_DEFAULT: 0.24, // Moderate increase from 0.14 for higher quality trades
-    BUY_PROB_THRESHOLD_DEFAULT: 0.17, // Fine-tuned reduction from 0.18
-    MIN_HOLD_DAYS_DEFAULT: 10,
-    TRAILING_STOP_DEFAULT: 0.15,
-    STOP_LOSS_MULTIPLIER_DEFAULT: 10, // Increased from 8
-    PROFIT_TAKE_MULTIPLIER_DEFAULT: 3.5, // Increased from 2.5 for better returns
-    VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: 0.025, // Lowered from 0.03 to enable more trend following
-    TREND_STRENGTH_THRESHOLD: 0.0002, // Lowered from 0.0004 to enable more trend following
-  },
 };
 
 const MODEL_CONFIG_BASE = {
@@ -134,9 +90,8 @@ const MODEL_CONFIG_BASE = {
   RESIDUAL_FILTERS: 8, // New: filters for residual connections
   TIMESTEPS_AFTER_CONV: 24,
   TIMESTEPS: 30,
-  ADA_FEATURE_COUNT: 33,
-  BTC_FEATURE_COUNT: 29,
-  FEATURE_COUNT: 62,
+  BTC_FEATURE_COUNT: 62, // Bitcoin features only
+  FEATURE_COUNT: 62, // Total features
 };
 
 export const MODEL_CONFIG = {
@@ -169,7 +124,7 @@ export const MODEL_CONFIG = {
     MODEL_CONFIG_BASE.LSTM_UNITS_2 * 4,
   ] as [number, number],
   LSTM3_WEIGHT_SHAPE: [
-    MODEL_CONFIG_BASE.TIMESTEPS_AFTER_CONV * MODEL_CONFIG_BASE.LSTM_UNITS_2,
+    MODEL_CONFIG_BASE.LSTM_UNITS_2,
     MODEL_CONFIG_BASE.LSTM_UNITS_3 * 4,
   ] as [number, number],
   LSTM3_RECURRENT_SHAPE: [
@@ -185,6 +140,10 @@ export const MODEL_CONFIG = {
     MODEL_CONFIG_BASE.DENSE_UNITS_1,
   ] as [number, number],
   DENSE_2_WEIGHT_SHAPE: [
+    MODEL_CONFIG_BASE.DENSE_UNITS_1,
+    Math.floor(MODEL_CONFIG_BASE.DENSE_UNITS_1 / 2),
+  ] as [number, number],
+  OUTPUT_WEIGHT_SHAPE: [
     Math.floor(MODEL_CONFIG_BASE.DENSE_UNITS_1 / 2),
     MODEL_CONFIG_BASE.OUTPUT_UNITS,
   ] as [number, number],

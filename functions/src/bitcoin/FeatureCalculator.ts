@@ -7,7 +7,6 @@ interface ComputeParams {
   dayIndex: number;
   currentPrice: number;
   isBTC: boolean;
-  btcPrice?: number;
 }
 
 interface CalculateIndicatorsParams {
@@ -106,13 +105,290 @@ export default class FeatureCalculator {
   }
 
   public calculateEMA(prices: number[], period: number): number {
-    if (prices.length < 1) return 0;
-    const k = 2 / (period + 1);
+    if (prices.length === 0) return 0;
+    const alpha = 2 / (period + 1);
     let ema = prices[0];
     for (let i = 1; i < prices.length; i++) {
-      ema = prices[i] * k + ema * (1 - k);
+      ema = alpha * prices[i] + (1 - alpha) * ema;
     }
     return ema;
+  }
+
+  // Market Regime Detection Methods (using existing features)
+  public calculateRealizedVolatility(
+    prices: number[],
+    period: number = 20
+  ): number {
+    if (prices.length < period + 1) return 0;
+
+    const returns = [];
+    for (let i = 1; i < prices.length; i++) {
+      returns.push(Math.log(prices[i] / prices[i - 1]));
+    }
+
+    const recentReturns = returns.slice(-period);
+    const meanReturn =
+      recentReturns.reduce((sum, ret) => sum + ret, 0) / period;
+    const variance =
+      recentReturns.reduce(
+        (sum, ret) => sum + Math.pow(ret - meanReturn, 2),
+        0
+      ) / period;
+
+    return Math.sqrt(variance * 252); // Annualized volatility
+  }
+
+  // Regime Score Conversion Methods
+  private volatilityRegimeToScore(regime: string): number {
+    switch (regime) {
+      case "EXTREME_HIGH":
+        return 5;
+      case "HIGH":
+        return 4;
+      case "MEDIUM":
+        return 3;
+      case "LOW":
+        return 2;
+      case "VERY_LOW":
+        return 1;
+      default:
+        return 3;
+    }
+  }
+
+  private trendRegimeToScore(regime: string): number {
+    switch (regime) {
+      case "STRONG_UPTREND":
+        return 7;
+      case "UPTREND":
+        return 6;
+      case "WEAK_UPTREND":
+        return 5;
+      case "SIDEWAYS":
+        return 4;
+      case "WEAK_DOWNTREND":
+        return 3;
+      case "DOWNTREND":
+        return 2;
+      case "STRONG_DOWNTREND":
+        return 1;
+      default:
+        return 4;
+    }
+  }
+
+  private momentumRegimeToScore(regime: string): number {
+    switch (regime) {
+      case "STRONG_MOMENTUM":
+        return 5;
+      case "MOMENTUM":
+        return 4;
+      case "NEUTRAL":
+        return 3;
+      case "REVERSAL":
+        return 2;
+      case "STRONG_REVERSAL":
+        return 1;
+      default:
+        return 3;
+    }
+  }
+
+  // Market Regime Detection Methods
+  public classifyVolatilityRegime(realizedVolatility: number): string {
+    // More nuanced volatility classification with better thresholds
+    if (realizedVolatility > 1.0) return "EXTREME_HIGH";
+    if (realizedVolatility > 0.6) return "HIGH";
+    if (realizedVolatility > 0.35) return "MEDIUM";
+    if (realizedVolatility > 0.2) return "LOW";
+    return "VERY_LOW";
+  }
+
+  public classifyTrendRegime(
+    price: number,
+    sma20: number,
+    sma50: number,
+    sma200: number
+  ): string {
+    // Enhanced trend classification with percentage-based thresholds
+    const shortTrend = (price - sma20) / sma20;
+    const mediumTrend = (sma20 - sma50) / sma50;
+    const longTrend = (sma50 - sma200) / sma200;
+
+    // Strong trends require significant deviation
+    if (shortTrend > 0.05 && mediumTrend > 0.03 && longTrend > 0.02) {
+      return "STRONG_UPTREND";
+    }
+    if (shortTrend < -0.05 && mediumTrend < -0.03 && longTrend < -0.02) {
+      return "STRONG_DOWNTREND";
+    }
+
+    // Moderate trends
+    if (shortTrend > 0.02 && mediumTrend > 0.01) return "UPTREND";
+    if (shortTrend < -0.02 && mediumTrend < -0.01) return "DOWNTREND";
+
+    // Weak trends
+    if (shortTrend > 0.005) return "WEAK_UPTREND";
+    if (shortTrend < -0.005) return "WEAK_DOWNTREND";
+
+    return "SIDEWAYS";
+  }
+
+  public classifyMomentumRegime(
+    rsi: number,
+    momentum: number,
+    macdLine: number,
+    signalLine: number
+  ): string {
+    // Enhanced momentum classification with more nuanced logic
+    const rsiMomentum =
+      rsi > 75 ? "OVERBOUGHT" : rsi < 25 ? "OVERSOLD" : "NEUTRAL";
+    const priceMomentum =
+      momentum > 0.01
+        ? "STRONG_POSITIVE"
+        : momentum > 0
+        ? "POSITIVE"
+        : momentum < -0.01
+        ? "STRONG_NEGATIVE"
+        : "NEGATIVE";
+    const macdMomentum =
+      macdLine > signalLine * 1.1
+        ? "STRONG_POSITIVE"
+        : macdLine > signalLine
+        ? "POSITIVE"
+        : macdLine < signalLine * 0.9
+        ? "STRONG_NEGATIVE"
+        : "NEGATIVE";
+
+    // Strong momentum combinations
+    if (
+      rsiMomentum === "NEUTRAL" &&
+      priceMomentum === "STRONG_POSITIVE" &&
+      macdMomentum === "STRONG_POSITIVE"
+    ) {
+      return "STRONG_MOMENTUM";
+    }
+    if (
+      rsiMomentum === "NEUTRAL" &&
+      priceMomentum === "STRONG_NEGATIVE" &&
+      macdMomentum === "STRONG_NEGATIVE"
+    ) {
+      return "STRONG_REVERSAL";
+    }
+
+    // Moderate momentum
+    if (priceMomentum === "POSITIVE" && macdMomentum === "POSITIVE") {
+      return "MOMENTUM";
+    }
+    if (priceMomentum === "NEGATIVE" && macdMomentum === "NEGATIVE") {
+      return "REVERSAL";
+    }
+
+    // RSI-based momentum
+    if (rsiMomentum === "OVERBOUGHT" && priceMomentum === "NEGATIVE") {
+      return "REVERSAL";
+    }
+    if (rsiMomentum === "OVERSOLD" && priceMomentum === "POSITIVE") {
+      return "MOMENTUM";
+    }
+
+    return "NEUTRAL";
+  }
+
+  public calculateMarketRegimeFeatures(
+    prices: number[],
+    volumes: number[],
+    dayIndex: number,
+    currentPrice: number
+  ): {
+    volatilityRegime: string;
+    trendRegime: string;
+    momentumRegime: string;
+    realizedVolatility: number;
+    regimeScore: number;
+  } {
+    const realizedVolatility = this.calculateRealizedVolatility(
+      prices.slice(0, dayIndex + 1),
+      20
+    );
+
+    const volatilityRegime = this.classifyVolatilityRegime(realizedVolatility);
+
+    const sma20 = this.calculateSMA(
+      prices.slice(Math.max(0, dayIndex - 19), dayIndex + 1)
+    );
+    const sma50 = this.calculateSMA(
+      prices.slice(Math.max(0, dayIndex - 49), dayIndex + 1)
+    );
+    const sma200 = this.calculateSMA(
+      prices.slice(Math.max(0, dayIndex - 199), dayIndex + 1)
+    );
+
+    const trendRegime = this.classifyTrendRegime(
+      currentPrice,
+      sma20,
+      sma50,
+      sma200
+    );
+
+    const rsi = this.calculateRSI(prices.slice(0, dayIndex + 1));
+    const momentum = dayIndex >= 10 ? currentPrice - prices[dayIndex - 10] : 0;
+    const ema12 = this.calculateEMA(
+      prices.slice(Math.max(0, dayIndex - 11), dayIndex + 1),
+      12
+    );
+    const ema26 = this.calculateEMA(
+      prices.slice(Math.max(0, dayIndex - 25), dayIndex + 1),
+      26
+    );
+    const macdLine = ema12 - ema26;
+    const signalLine = this.calculateEMA(
+      prices.slice(Math.max(0, dayIndex - 8), dayIndex + 1).map((_, i) => {
+        const slice = prices.slice(
+          Math.max(0, dayIndex - 25 - i),
+          dayIndex + 1 - i
+        );
+        return (
+          this.calculateEMA(slice.slice(-12), 12) - this.calculateEMA(slice, 26)
+        );
+      }),
+      9
+    );
+
+    const momentumRegime = this.classifyMomentumRegime(
+      rsi,
+      momentum,
+      macdLine,
+      signalLine
+    );
+
+    // Calculate regime score (0-100) for strategy weighting
+    let regimeScore = 50; // Neutral base
+
+    // Volatility adjustment
+    if (volatilityRegime === "EXTREME_HIGH") regimeScore += 20;
+    else if (volatilityRegime === "HIGH") regimeScore += 10;
+    else if (volatilityRegime === "VERY_LOW") regimeScore -= 10;
+
+    // Trend adjustment
+    if (trendRegime === "STRONG_UPTREND") regimeScore += 15;
+    else if (trendRegime === "UPTREND") regimeScore += 8;
+    else if (trendRegime === "STRONG_DOWNTREND") regimeScore -= 15;
+    else if (trendRegime === "DOWNTREND") regimeScore -= 8;
+
+    // Momentum adjustment
+    if (momentumRegime === "STRONG_MOMENTUM") regimeScore += 15;
+    else if (momentumRegime === "MOMENTUM") regimeScore += 8;
+    else if (momentumRegime === "STRONG_REVERSAL") regimeScore -= 15;
+    else if (momentumRegime === "REVERSAL") regimeScore -= 8;
+
+    return {
+      volatilityRegime,
+      trendRegime,
+      momentumRegime,
+      realizedVolatility,
+      regimeScore: Math.max(0, Math.min(100, regimeScore)),
+    };
   }
 
   public calculateSMA(prices: number[]): number {
@@ -560,6 +836,14 @@ export default class FeatureCalculator {
       prices.slice(0, dayIndex + 1)
     );
 
+    // Market Regime Features (using existing features)
+    const marketRegimeFeatures = this.calculateMarketRegimeFeatures(
+      prices,
+      volumes,
+      dayIndex,
+      currentPrice
+    );
+
     return {
       rsi,
       prevRsi,
@@ -593,10 +877,24 @@ export default class FeatureCalculator {
       momentum,
       priceChangePct,
       sma20,
+      sma50,
+      sma200,
       prices,
       volAdjustedMomentum,
       trendRegime,
       adxProxy,
+      // Market Regime Features (converted to numeric)
+      volatilityRegimeScore: this.volatilityRegimeToScore(
+        marketRegimeFeatures.volatilityRegime
+      ),
+      trendRegimeScore: this.trendRegimeToScore(
+        marketRegimeFeatures.trendRegime
+      ),
+      momentumRegimeScore: this.momentumRegimeToScore(
+        marketRegimeFeatures.momentumRegime
+      ),
+      realizedVolatility: marketRegimeFeatures.realizedVolatility,
+      regimeScore: marketRegimeFeatures.regimeScore,
     };
   }
 
@@ -606,12 +904,9 @@ export default class FeatureCalculator {
     dayIndex,
     currentPrice,
     isBTC,
-    btcPrice,
   }: ComputeParams): number[] {
     if (!prices || !volumes || dayIndex < 0 || dayIndex >= prices.length) {
-      return Array(
-        isBTC ? MODEL_CONFIG.BTC_FEATURE_COUNT : MODEL_CONFIG.ADA_FEATURE_COUNT
-      ).fill(0);
+      return Array(MODEL_CONFIG.BTC_FEATURE_COUNT).fill(0);
     }
 
     const indicators = this.calculateIndicators({
@@ -631,12 +926,15 @@ export default class FeatureCalculator {
       indicators.signalLine,
       indicators.currentPrice,
       indicators.upperBand,
+      indicators.lowerBand,
       indicators.obvValues[indicators.obvValues.length - 1] / 1e6,
+      indicators.obv,
       indicators.atr,
       indicators.atrBaseline,
       indicators.zScore,
       indicators.vwap,
       indicators.stochRsi,
+      indicators.stochRsiSignal,
       indicators.prevStochRsi,
       indicators.fib61_8,
       dayIndex > 0 ? prices[dayIndex - 1] : prices[0],
@@ -646,20 +944,64 @@ export default class FeatureCalculator {
       indicators.isHeadAndShoulders ? 1 : 0,
       indicators.prevMacdLine,
       indicators.isTripleTop ? 1 : 0,
+      indicators.isTripleBottom ? 1 : 0,
       indicators.isVolumeSpike ? 1 : 0,
       indicators.momentum,
       indicators.priceChangePct,
+      indicators.sma20,
       indicators.volAdjustedMomentum,
+      indicators.trendRegime,
+      indicators.adxProxy,
+      // Market Regime Features
+      indicators.volatilityRegimeScore,
+      indicators.trendRegimeScore,
+      indicators.momentumRegimeScore,
+      indicators.realizedVolatility,
+      indicators.regimeScore,
+      // Additional technical indicators
+      indicators.sma50 || indicators.sma20,
+      indicators.sma200 || indicators.sma20,
+      // Price-based features
+      currentPrice / (indicators.sma20 || currentPrice),
+      currentPrice / (indicators.sma50 || currentPrice),
+      currentPrice / (indicators.sma200 || currentPrice),
+      // Volume-based features
+      volumes[dayIndex] /
+        (volumes
+          .slice(Math.max(0, dayIndex - 20), dayIndex + 1)
+          .reduce((a, b) => a + b, 0) /
+          Math.min(21, dayIndex + 1)),
+      volumes[dayIndex] /
+        (volumes
+          .slice(Math.max(0, dayIndex - 50), dayIndex + 1)
+          .reduce((a, b) => a + b, 0) /
+          Math.min(51, dayIndex + 1)),
+      // Momentum features
+      indicators.momentum / (indicators.atr || 1),
+      indicators.priceChangePct / (indicators.atr || 1),
+      // RSI-based features
+      indicators.rsi / 100,
+      indicators.prevRsi / 100,
+      // MACD-based features
+      indicators.macdLine / (indicators.currentPrice || 1),
+      indicators.signalLine / (indicators.currentPrice || 1),
+      // Bollinger Bands features
+      (indicators.currentPrice - indicators.upperBand) /
+        (indicators.upperBand - indicators.lowerBand || 1),
+      (indicators.currentPrice - indicators.lowerBand) /
+        (indicators.upperBand - indicators.lowerBand || 1),
+      // Stochastic features
+      indicators.stochRsi / 100,
+      indicators.stochRsiSignal / 100,
+      // Fibonacci features
+      indicators.fib61_8 / (indicators.currentPrice || 1),
+      // ATR-based features
+      indicators.atr / (indicators.currentPrice || 1),
+      indicators.atrBaseline / (indicators.currentPrice || 1),
+      // VWAP features
+      indicators.vwap / (indicators.currentPrice || 1),
     ];
 
-    return isBTC
-      ? baseFeatures
-      : [
-          ...baseFeatures,
-          indicators.isTripleBottom ? 1 : 0,
-          indicators.adxProxy,
-          indicators.trendRegime,
-          btcPrice ? currentPrice / btcPrice : 0,
-        ];
+    return baseFeatures;
   }
 }

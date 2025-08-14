@@ -10,7 +10,7 @@ import {
   formatPredictionExplanation,
   sendSMS,
 } from "../utils";
-import { TradeModelPredictor } from "../cardano/TradeModelPredictor";
+import { TradeModelPredictor } from "../bitcoin/TradeModelPredictor";
 import { TIME_CONVERSIONS } from "../constants";
 import { CoinbaseService } from "../api/CoinbaseService";
 
@@ -18,7 +18,7 @@ const CONFIG: https.HttpsOptions = {
   memory: "512MiB",
 };
 
-export const receiveTextADA = https.onRequest(CONFIG, async (_, response) => {
+export const receiveTextBTC = https.onRequest(CONFIG, async (_, response) => {
   try {
     const coinbase = new CoinbaseService({
       apiKey: process.env.COINBASE_API_KEY,
@@ -30,14 +30,7 @@ export const receiveTextADA = https.onRequest(CONFIG, async (_, response) => {
     const now = Math.floor(Date.now() / 1000);
     const start = now - TIME_CONVERSIONS.TIMESTEP_IN_SECONDS;
 
-    const currentPrice = await coinbase.getCurrentPrice(CoinbaseProductIds.ADA);
-
-    const adaData = await coinbase.getPricesAndVolumes({
-      product_id: CoinbaseProductIds.ADA,
-      granularity: Granularity.OneDay,
-      start: start.toString(),
-      end: now.toString(),
-    });
+    const currentPrice = await coinbase.getCurrentPrice(CoinbaseProductIds.BTC);
 
     const btcData = await coinbase.getPricesAndVolumes({
       product_id: CoinbaseProductIds.BTC,
@@ -46,20 +39,12 @@ export const receiveTextADA = https.onRequest(CONFIG, async (_, response) => {
       end: now.toString(),
     });
 
-    if (
-      adaData.prices.length < TIME_CONVERSIONS.ONE_MONTH_IN_DAYS ||
-      btcData.prices.length < TIME_CONVERSIONS.ONE_MONTH_IN_DAYS
-    ) {
+    if (btcData.prices.length < TIME_CONVERSIONS.ONE_MONTH_IN_DAYS) {
       console.log("Insufficient historical data for prediction");
       throw new Error("Insufficient historical data for prediction");
     }
 
-    const prediction = await predictor.predict(
-      adaData.prices,
-      adaData.volumes,
-      btcData.prices,
-      btcData.volumes
-    );
+    const prediction = await predictor.predict(btcData.prices, btcData.volumes);
 
     const { buyProb, sellProb, confidence, momentum, trendSlope, atr } =
       prediction;
@@ -76,7 +61,7 @@ export const receiveTextADA = https.onRequest(CONFIG, async (_, response) => {
     }
 
     const analysisMessage = formatAnalysisResults({
-      cryptoSymbol: CryptoIds.Cardano,
+      cryptoSymbol: CryptoIds.Bitcoin,
       currentPrice,
       probabilities: {
         buy: buyProb,

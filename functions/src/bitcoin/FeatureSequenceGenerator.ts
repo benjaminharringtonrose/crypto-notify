@@ -9,27 +9,17 @@ export class FeatureSequenceGenerator {
   }
 
   public generateSequence(
-    adaPrices: number[],
-    adaVolumes: number[],
     btcPrices: number[],
     btcVolumes: number[],
     startIndex: number,
     endIndex: number
   ): number[][] {
     const sequence: number[][] = [];
-    const safeEndIndex = Math.min(endIndex, adaPrices.length - 1);
+    const safeEndIndex = Math.min(endIndex, btcPrices.length - 1);
     const safeStartIndex = Math.max(0, safeEndIndex - this.timesteps + 1);
 
     for (let i = safeStartIndex; i <= safeEndIndex; i++) {
       const featureCalculator = new FeatureCalculator();
-
-      const adaFeatures = featureCalculator.compute({
-        prices: adaPrices,
-        volumes: adaVolumes,
-        dayIndex: i,
-        currentPrice: adaPrices[i],
-        isBTC: false,
-      });
 
       const btcFeatures = featureCalculator.compute({
         prices: btcPrices,
@@ -39,7 +29,7 @@ export class FeatureSequenceGenerator {
         isBTC: true,
       });
 
-      sequence.push([...adaFeatures, ...btcFeatures]);
+      sequence.push(btcFeatures);
     }
 
     while (sequence.length < this.timesteps) {
@@ -51,8 +41,6 @@ export class FeatureSequenceGenerator {
   }
 
   public generateBatchSequences(
-    adaPrices: number[],
-    adaVolumes: number[],
     btcPrices: number[],
     btcVolumes: number[],
     startIndex: number,
@@ -61,9 +49,7 @@ export class FeatureSequenceGenerator {
   ): number[][][] {
     const sequences: number[][][] = [];
     if (
-      adaPrices.length < this.timesteps ||
       btcPrices.length < this.timesteps ||
-      adaVolumes.length < this.timesteps ||
       btcVolumes.length < this.timesteps
     ) {
       console.error("Insufficient data length for sequence generation");
@@ -72,8 +58,6 @@ export class FeatureSequenceGenerator {
 
     for (let i = startIndex; i < endIndex; i += stepDays) {
       const sequence = this.generateSequence(
-        adaPrices,
-        adaVolumes,
         btcPrices,
         btcVolumes,
         Math.max(0, i - this.timesteps + 1),

@@ -93,66 +93,43 @@ export class DataProcessor {
   }
 
   private async fetchHistoricalData(): Promise<{
-    adaData: HistoricalData;
     btcData: HistoricalData;
   }> {
     console.log("Fetching historical data...");
-    const [adaData, btcData] = await Promise.all([
-      cryptoCompare.getHistoricalData("ADA", this.startDaysAgo),
-      cryptoCompare.getHistoricalData("BTC", this.startDaysAgo),
-    ]);
-    console.log(
-      `ADA data length: ${adaData.prices.length}, BTC data length: ${btcData.prices.length}`
+    const btcData = await cryptoCompare.getHistoricalData(
+      "BTC",
+      this.startDaysAgo
     );
-    return { adaData, btcData };
+    console.log(`BTC data length: ${btcData.prices.length}`);
+    return { btcData };
   }
 
   private buildSequence(
-    adaData: HistoricalData,
     btcData: HistoricalData,
     index: number
   ): number[][] | null {
     const sequence: number[][] = [];
     for (let j = index - this.config.timesteps + 1; j <= index; j++) {
-      const [adaFeatures, btcFeatures] = this.computeFeaturePair(
-        adaData,
-        btcData,
-        j
-      );
-      if (!this.validateFeatures(adaFeatures, btcFeatures)) {
+      const btcFeatures = this.computeFeatures(btcData, j);
+      if (!this.validateFeatures(btcFeatures)) {
         console.log(
-          `Invalid features at index ${j}: adaFeatures length=${adaFeatures.length}, btcFeatures length=${btcFeatures.length}`
+          `Invalid features at index ${j}: btcFeatures length=${btcFeatures.length}`
         );
         return null;
       }
       const atr = new FeatureCalculator().calculateATR(
-        adaData.prices.slice(0, j + 1),
+        btcData.prices.slice(0, j + 1),
         PERIODS.ATR
       );
       const scale = 1 + atr * (0.9 + Math.random() * 0.2); // Volatility-based noise
-      const noisyFeatures = [
-        ...this.addNoise(adaFeatures, scale),
-        ...this.addNoise(btcFeatures, scale),
-      ];
+      const noisyFeatures = this.addNoise(btcFeatures, scale);
       sequence.push(noisyFeatures);
     }
     return this.adjustSequenceLength(sequence);
   }
 
-  private computeFeaturePair(
-    adaData: HistoricalData,
-    btcData: HistoricalData,
-    index: number
-  ): [number[], number[]] {
+  private computeFeatures(btcData: HistoricalData, index: number): number[] {
     const featureCalculator = new FeatureCalculator();
-    const adaFeatures = featureCalculator.compute({
-      prices: adaData.prices,
-      volumes: adaData.volumes,
-      dayIndex: index,
-      currentPrice: adaData.prices[index],
-      isBTC: false,
-      btcPrice: btcData.prices[index],
-    });
     const btcFeatures = featureCalculator.compute({
       prices: btcData.prices,
       volumes: btcData.volumes,
@@ -160,16 +137,11 @@ export class DataProcessor {
       currentPrice: btcData.prices[index],
       isBTC: true,
     });
-    return [adaFeatures, btcFeatures];
+    return btcFeatures;
   }
 
-  private validateFeatures(
-    adaFeatures: number[],
-    btcFeatures: number[]
-  ): boolean {
+  private validateFeatures(btcFeatures: number[]): boolean {
     return (
-      Array.isArray(adaFeatures) &&
-      adaFeatures.length === MODEL_CONFIG.ADA_FEATURE_COUNT &&
       Array.isArray(btcFeatures) &&
       btcFeatures.length === MODEL_CONFIG.BTC_FEATURE_COUNT
     );
@@ -325,18 +297,18 @@ export class DataProcessor {
   }
 
   public async prepareData(): Promise<{ X: number[][][]; y: number[] }> {
-    const { adaData, btcData } = await this.fetchHistoricalData();
+    const { btcData } = await this.fetchHistoricalData();
     const X: number[][][] = [];
     const y: number[] = [];
 
     for (
       let i = 34 + this.config.timesteps - 1;
-      i < adaData.prices.length;
+      i < btcData.prices.length;
       i++
     ) {
-      const sequence = this.buildSequence(adaData, btcData, i);
+      const sequence = this.buildSequence(btcData, i);
       if (!sequence) continue;
-      const label = this.labelData({ prices: adaData.prices, dayIndex: i });
+      const label = this.labelData({ prices: btcData.prices, dayIndex: i });
       X.push(sequence);
       y.push(label);
     }

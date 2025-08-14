@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `TradingStrategy` class is the intelligent decision-making engine of the Cardano trading system that dynamically selects and executes trading strategies based on market conditions, technical indicators, and machine learning predictions. It implements a sophisticated multi-strategy framework that adapts to changing market dynamics, combining quantitative analysis with risk management to optimize trading performance across different market regimes.
+The `TradingStrategy` class is the intelligent decision-making engine of the Bitcoin trading system that dynamically selects and executes trading strategies based on market conditions, technical indicators, and machine learning predictions. It implements a sophisticated multi-strategy framework that adapts to changing market dynamics, combining quantitative analysis with risk management to optimize trading performance across different market regimes.
 
 ## Architecture
 

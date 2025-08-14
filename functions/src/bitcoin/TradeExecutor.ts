@@ -35,11 +35,11 @@ export class TradeExecutor {
       return;
     }
     const orderParams = {
-      product_id: CoinbaseProductIds.ADA,
+      product_id: CoinbaseProductIds.BTC,
       side: trade.type,
       order_configuration: {
         market_market_ioc: {
-          base_size: trade.adaAmount.toString(),
+          base_size: trade.btcAmount.toString(),
         },
       },
       client_order_id: crypto.randomUUID(),
@@ -48,7 +48,7 @@ export class TradeExecutor {
     try {
       const response = await this.client.submitOrder(orderParams);
       console.log(
-        `Trade executed: ${trade.type} ${trade.adaAmount} ADA at $${trade.price}`
+        `Trade executed: ${trade.type} ${trade.btcAmount} BTC at $${trade.price}`
       );
       return response;
     } catch (error: any) {
@@ -75,7 +75,7 @@ export class TradeExecutor {
       const currentPrice = response.prices[response.prices.length - 1];
 
       console.log(
-        `Current ADA-USD Price (as of ${new Date().toISOString()}): $${currentPrice.toFixed(
+        `Current BTC-USD Price (as of ${new Date().toISOString()}): $${currentPrice.toFixed(
           2
         )}`
       );
@@ -109,13 +109,13 @@ export class TradeExecutor {
 
   public async getAccountBalances(): Promise<{
     usd?: AdvTradeAccount;
-    ada?: AdvTradeAccount;
+    btc?: AdvTradeAccount;
   }> {
     try {
       const response: AdvTradeAccountsList = await this.client.getAccounts();
       return {
         usd: response.accounts.find((i) => i.currency === CoinbaseCurrency.USD),
-        ada: response.accounts.find((i) => i.currency === CoinbaseCurrency.ADA),
+        btc: response.accounts.find((i) => i.currency === CoinbaseCurrency.BTC),
       };
     } catch (error: any) {
       console.error("Failed to fetch balance:", error.message || error);

@@ -20,25 +20,18 @@ export class TradeModelBacktester {
   }
 
   async backtest(
-    adaData: HistoricalData,
     btcData: HistoricalData,
     startIndex: number,
     endIndex: number
   ): Promise<BacktestTrade[]> {
-    const adaPrices = adaData.prices;
-    const adaVolumes = adaData.volumes;
     const btcPrices = btcData.prices;
     const btcVolumes = btcData.volumes;
 
-    if (
-      adaPrices.length !== btcPrices.length ||
-      adaPrices.length !== adaVolumes.length ||
-      adaPrices.length !== btcVolumes.length
-    ) {
+    if (btcPrices.length !== btcVolumes.length) {
       throw new Error("Input data arrays must have equal lengths");
     }
 
-    if (endIndex >= adaPrices.length) {
+    if (endIndex >= btcPrices.length) {
       throw new Error("endIndex exceeds data length");
     }
 
@@ -53,13 +46,11 @@ export class TradeModelBacktester {
     for (let i = startIndex; i <= endIndex; i++) {
       const currentTimestamp = new Date(
         Date.now() -
-          (adaPrices.length - i - 1) * TIME_CONVERSIONS.ONE_DAY_IN_MILLISECONDS
+          (btcPrices.length - i - 1) * TIME_CONVERSIONS.ONE_DAY_IN_MILLISECONDS
       ).toISOString();
 
       const { trade, confidence, buyProb, sellProb } =
         await this.tradingStrategy.decideTrade({
-          adaPrices: adaPrices.slice(0, i + 1),
-          adaVolumes: adaVolumes.slice(0, i + 1),
           btcPrices: btcPrices.slice(0, i + 1),
           btcVolumes: btcVolumes.slice(0, i + 1),
           capital,
@@ -74,7 +65,7 @@ export class TradeModelBacktester {
       if (!trade) continue;
 
       if (trade.type === Recommendation.Buy && capital > 0) {
-        holdings += trade.adaAmount;
+        holdings += trade.btcAmount;
         capital -= trade.usdValue;
         lastBuyPrice = trade.price;
         peakPrice = trade.price;
@@ -84,7 +75,7 @@ export class TradeModelBacktester {
             4
           )}, BuyProb=${buyProb.toFixed(4)}, Confidence=${confidence.toFixed(
             4
-          )}, Strategy=${this.tradingStrategy.getCurrentStrategy()}, PositionSize=${trade.adaAmount.toFixed(
+          )}, Strategy=${this.tradingStrategy.getCurrentStrategy()}, PositionSize=${trade.btcAmount.toFixed(
             4
           )}, ATRAdjustedHold=${(sellProb * 10).toFixed(2)}`
         );
@@ -98,10 +89,10 @@ export class TradeModelBacktester {
       } else if (trade.type === Recommendation.Sell && holdings > 0) {
         const profit = ((trade.price - lastBuyPrice!) / lastBuyPrice!) * 100;
         const holdToEndProfit =
-          ((adaPrices[adaPrices.length - 1] - lastBuyPrice!) / lastBuyPrice!) *
+          ((btcPrices[btcPrices.length - 1] - lastBuyPrice!) / lastBuyPrice!) *
           100; // Added
         capital += trade.usdValue;
-        holdings -= trade.adaAmount;
+        holdings -= trade.btcAmount;
         peakPrice = undefined;
         buyTimestamp = undefined;
         winStreak = profit > 0 ? winStreak + 1 : 0;
@@ -118,7 +109,7 @@ export class TradeModelBacktester {
                     TIME_CONVERSIONS.ONE_DAY_IN_MILLISECONDS
                 )
               : 0
-          }, Reason=Sell, Strategy=${this.tradingStrategy.getCurrentStrategy()}, PositionSize=${trade.adaAmount.toFixed(
+          }, Reason=Sell, Strategy=${this.tradingStrategy.getCurrentStrategy()}, PositionSize=${trade.btcAmount.toFixed(
             4
           )}, ATRAdjustedHold=${(sellProb * 10).toFixed(2)}`
         );
@@ -135,7 +126,7 @@ export class TradeModelBacktester {
     }
 
     if (holdings > 0 && lastBuyPrice && buyTimestamp) {
-      const finalPrice = adaPrices[adaPrices.length - 1];
+      const finalPrice = btcPrices[btcPrices.length - 1];
       const profit = ((finalPrice - lastBuyPrice) / lastBuyPrice) * 100;
       const holdToEndProfit = profit; // Same as profit at end
       const usdReceived =
@@ -158,7 +149,7 @@ export class TradeModelBacktester {
         type: Recommendation.Sell,
         price: finalPrice,
         timestamp: new Date().toISOString(),
-        adaAmount: holdings,
+        btcAmount: holdings,
         usdValue: usdReceived,
         buyPrice: lastBuyPrice,
         confidence: 0,
@@ -174,7 +165,19 @@ export class TradeModelBacktester {
     return trades;
   }
 
-  async evaluateBacktest(trades: BacktestTrade[]): Promise<void> {
+  async evaluateBacktest(trades: BacktestTrade[]): Promise<{
+    totalReturn: number;
+    annualizedReturn: number;
+    winRate: number;
+    maxDrawdown: number;
+    sharpeRatio: number;
+    totalTrades: number;
+    winningTrades: number;
+    losingTrades: number;
+    averageHoldingDays: number;
+    strategyDistribution: { [key: string]: number };
+    confidenceDistribution: { [key: string]: number };
+  }> {
     let capital = this.initialCapital;
     let peakCapital = capital;
     let maxDrawdown = 0;
@@ -235,15 +238,16 @@ export class TradeModelBacktester {
                   TIME_CONVERSIONS.ONE_DAY_IN_MILLISECONDS
               )
             : 0;
+
+        // Only count completed trades (sell trades) for distribution
+        if (trade.confidence >= 0.8) confidenceDistribution["0.8+"]++;
+        else if (trade.confidence >= 0.7) confidenceDistribution["0.7-0.8"]++;
+        else if (trade.confidence >= 0.6) confidenceDistribution["0.6-0.7"]++;
+        else if (trade.confidence >= 0.5) confidenceDistribution["0.5-0.6"]++;
+        else confidenceDistribution["0.4-0.5"]++;
+
+        strategyDistribution[trade.strategy]++;
       }
-
-      if (trade.confidence >= 0.8) confidenceDistribution["0.8+"]++;
-      else if (trade.confidence >= 0.7) confidenceDistribution["0.7-0.8"]++;
-      else if (trade.confidence >= 0.6) confidenceDistribution["0.6-0.7"]++;
-      else if (trade.confidence >= 0.5) confidenceDistribution["0.5-0.6"]++;
-      else confidenceDistribution["0.4-0.5"]++;
-
-      strategyDistribution[trade.strategy]++;
     }
 
     const totalTrades = winningTrades + losingTrades;
@@ -283,5 +287,19 @@ export class TradeModelBacktester {
     for (const [strategy, count] of Object.entries(strategyDistribution)) {
       console.log(`${strategy}: ${count} trades`);
     }
+
+    return {
+      totalReturn,
+      annualizedReturn,
+      winRate,
+      maxDrawdown,
+      sharpeRatio,
+      totalTrades,
+      winningTrades,
+      losingTrades,
+      averageHoldingDays: avgHoldingDays,
+      strategyDistribution,
+      confidenceDistribution,
+    };
   }
 }

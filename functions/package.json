@@ -12,6 +12,7 @@
     "test": "npx ts-node src/test.ts",
     "train": "npx ts-node src/scripts/train.ts",
     "backtest": "TF_CPP_MIN_LOG_LEVEL=1 npx ts-node src/scripts/backtest.ts",
+    "clear:weights": "npx ts-node src/scripts/clearWeights.ts",
     "train:full": "npm run train && npm run backtest"
   },
   "engines": {

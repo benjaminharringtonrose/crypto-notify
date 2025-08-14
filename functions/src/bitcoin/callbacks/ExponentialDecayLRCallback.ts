@@ -45,6 +45,6 @@ export class ExponentialDecayLRCallback extends tf.CustomCallback {
       loss: this.model.loss,
       metrics: this.model.metrics as string[],
     });
-    console.log(`Epoch ${epoch + 1} Learning Rate: ${lr.toFixed(6)}`);
+    // Learning rate logging moved to TrainingLoggerCallback
   }
 }

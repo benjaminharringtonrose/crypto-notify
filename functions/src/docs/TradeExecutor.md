@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `TradeExecutor` class is a core component of the Cardano trading system that handles the execution of trading decisions and market interactions through the Coinbase Advanced Trade API. It provides a secure, reliable interface for executing trades, fetching market data, and managing account balances in real-time cryptocurrency trading operations.
+The `TradeExecutor` class is a core component of the Bitcoin trading system that handles the execution of trading decisions and market interactions through the Coinbase Advanced Trade API. It provides a secure, reliable interface for executing trades, fetching market data, and managing account balances in real-time cryptocurrency trading operations.
 
 ## Architecture
 
@@ -39,7 +39,7 @@ export class TradeExecutor {
   ): Promise<{ prices: number[]; volumes: number[] }>;
   public async getAccountBalances(): Promise<{
     usd?: AdvTradeAccount;
-    ada?: AdvTradeAccount;
+    btc?: AdvTradeAccount;
   }>;
 }
 ```
@@ -80,12 +80,12 @@ Executes a trading order based on the provided trade recommendation.
 
 ```typescript
 const orderParams = {
-  product_id: CoinbaseProductIds.ADA, // ADA-USD trading pair
+  product_id: CoinbaseProductIds.BTC, // BTC-USD trading pair
   side: trade.type, // Buy or Sell
   order_configuration: {
     market_market_ioc: {
       // Immediate-or-Cancel market order
-      base_size: trade.adaAmount.toString(), // Amount of ADA to trade
+      base_size: trade.btcAmount.toString(), // Amount of BTC to trade
     },
   },
   client_order_id: crypto.randomUUID(), // Unique order identifier
@@ -94,8 +94,8 @@ const orderParams = {
 
 **Trade Types Supported:**
 
-- `Recommendation.Buy` - Purchase ADA with USD
-- `Recommendation.Sell` - Sell ADA for USD
+- `Recommendation.Buy` - Purchase BTC with USD
+- `Recommendation.Sell` - Sell BTC for USD
 - `Recommendation.Hold` - No action taken
 
 #### `getCurrentPrice(product_id: CoinbaseProductIds): Promise<number>`
@@ -104,7 +104,7 @@ Retrieves the current market price for a specified trading pair.
 
 **Parameters:**
 
-- `product_id: CoinbaseProductIds` - Trading pair identifier (e.g., ADA-USD)
+- `product_id: CoinbaseProductIds` - Trading pair identifier (e.g., BTC-USD)
 
 **Returns:**
 
@@ -152,18 +152,18 @@ interface MarketDataResponse {
 }
 ```
 
-#### `getAccountBalances(): Promise<{ usd?: AdvTradeAccount; ada?: AdvTradeAccount }>`
+#### `getAccountBalances(): Promise<{ usd?: AdvTradeAccount; btc?: AdvTradeAccount }>`
 
-Retrieves current account balances for USD and ADA holdings.
+Retrieves current account balances for USD and BTC holdings.
 
 **Returns:**
 
-- `Promise<{ usd?: AdvTradeAccount; ada?: AdvTradeAccount }>` - Account balance information
+- `Promise<{ usd?: AdvTradeAccount; btc?: AdvTradeAccount }>` - Account balance information
 
 **Process:**
 
 1. **Account Fetch**: Retrieves all accounts from Coinbase
-2. **Currency Filtering**: Separates USD and ADA accounts
+2. **Currency Filtering**: Separates USD and BTC accounts
 3. **Balance Assembly**: Returns structured balance object
 4. **Error Handling**: Throws error on API failure
 
@@ -172,7 +172,7 @@ Retrieves current account balances for USD and ADA holdings.
 ```typescript
 interface AccountBalances {
   usd?: AdvTradeAccount; // USD account information
-  ada?: AdvTradeAccount; // ADA account information
+  btc?: AdvTradeAccount; // BTC account information
 }
 ```
 
@@ -184,8 +184,10 @@ interface AccountBalances {
 // 1. Receive trade recommendation
 const trade: Trade = {
   type: Recommendation.Buy,
-  adaAmount: 100,
-  price: 0.5,
+  btcAmount: 0.001,
+  price: 45000,
+  timestamp: new Date().toISOString(),
+  usdValue: 45,
 };
 
 // 2. Execute trade
@@ -200,15 +202,15 @@ try {
 ### Market Data Retrieval
 
 ```typescript
-// Get current ADA price
+// Get current BTC price
 const currentPrice = await tradeExecutor.getCurrentPrice(
-  CoinbaseProductIds.ADA
+  CoinbaseProductIds.BTC
 );
-console.log(`Current ADA price: $${currentPrice}`);
+console.log(`Current BTC price: $${currentPrice}`);
 
 // Get historical market data
 const marketData = await tradeExecutor.getMarketData({
-  product_id: CoinbaseProductIds.ADA,
+  product_id: CoinbaseProductIds.BTC,
   granularity: Granularity.OneHour,
   start: "1640995200", // Unix timestamp
   end: "1640998800", // Unix timestamp
@@ -228,8 +230,8 @@ if (balances.usd) {
   console.log(`USD Balance: $${balances.usd.available_balance.value}`);
 }
 
-if (balances.ada) {
-  console.log(`ADA Balance: ${balances.ada.available_balance.value} ADA`);
+if (balances.btc) {
+  console.log(`BTC Balance: ${balances.btc.available_balance.value} BTC`);
 }
 ```
 
@@ -325,7 +327,7 @@ COINBASE_TIMEOUT=30000         # API timeout in milliseconds
 ### Trading Parameters
 
 - **Order Type**: Market orders with immediate-or-cancel (IOC)
-- **Product ID**: ADA-USD trading pair
+- **Product ID**: BTC-USD trading pair
 - **Granularity**: One-hour candlesticks for market data
 - **Time Range**: Configurable historical data periods
 

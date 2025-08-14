@@ -25,7 +25,6 @@ export class TradeModelTrainer {
   };
   private bucket = admin.storage().bucket();
   private model: tf.LayersModel | null = null;
-  private lossFn = Metrics.focalLoss.bind(Metrics);
   private dataProcessor: DataProcessor;
   private bestThreshold: number = 0.5;
   private bestWeights: tf.Tensor[] = []; // Store best weights
@@ -141,7 +140,6 @@ export class TradeModelTrainer {
 
       const lrCallback = new ExponentialDecayLRCallback();
       const gradientClippingCallback = new GradientClippingCallback(
-        this.lossFn,
         X_val,
         y_val
       );
@@ -154,7 +152,7 @@ export class TradeModelTrainer {
 
       this.model.compile({
         optimizer: tf.train.adam(this.config.initialLearningRate),
-        loss: this.lossFn,
+        loss: "categoricalCrossentropy", // Use standard cross-entropy
         metrics: [
           "binaryAccuracy",
           Metrics.precisionBuy,
@@ -273,8 +271,8 @@ export class TradeModelTrainer {
   ): Promise<void> {
     if (!this.model) throw new Error("Model not initialized");
     // Debug weight shapes before saving
-    const dense1_5Weights = await this.model
-      .getLayer("dense_1_5")
+    const dense2Weights = await this.model
+      .getLayer("dense2")
       .getWeights()[0]
       .data();
     const outputWeights = await this.model
@@ -282,10 +280,10 @@ export class TradeModelTrainer {
       .getWeights()[0]
       .data();
     console.log(
-      "Saving weights - dense_1_5 shape:",
-      this.model.getLayer("dense_1_5").getWeights()[0].shape
+      "Saving weights - dense2 shape:",
+      this.model.getLayer("dense2").getWeights()[0].shape
     );
-    console.log("Saving weights - dense_1_5 length:", dense1_5Weights.length);
+    console.log("Saving weights - dense2 length:", dense2Weights.length);
     console.log(
       "Saving weights - output shape:",
       this.model.getLayer("output").getWeights()[0].shape
@@ -393,16 +391,16 @@ export class TradeModelTrainer {
         await this.model.getLayer("bn_lstm3").getWeights()[3].data()
       ),
       dense1Weights: Array.from(
-        await this.model.getLayer("dense_1").getWeights()[0].data()
+        await this.model.getLayer("dense1").getWeights()[0].data()
       ),
       dense1Bias: Array.from(
-        await this.model.getLayer("dense_1").getWeights()[1].data()
+        await this.model.getLayer("dense1").getWeights()[1].data()
       ),
       dense2Weights: Array.from(
-        await this.model.getLayer("dense_1_5").getWeights()[0].data()
+        await this.model.getLayer("dense2").getWeights()[0].data()
       ),
       dense2Bias: Array.from(
-        await this.model.getLayer("dense_1_5").getWeights()[1].data()
+        await this.model.getLayer("dense2").getWeights()[1].data()
       ),
       outputWeights: Array.from(
         await this.model.getLayer("output").getWeights()[0].data()
@@ -423,16 +421,16 @@ export class TradeModelTrainer {
         await this.model.getLayer("bn_dense1").getWeights()[3].data()
       ),
       bnDense2Gamma: Array.from(
-        await this.model.getLayer("bn_dense1_5").getWeights()[0].data()
+        await this.model.getLayer("bn_dense2").getWeights()[0].data()
       ),
       bnDense2Beta: Array.from(
-        await this.model.getLayer("bn_dense1_5").getWeights()[1].data()
+        await this.model.getLayer("bn_dense2").getWeights()[1].data()
       ),
       bnDense2MovingMean: Array.from(
-        await this.model.getLayer("bn_dense1_5").getWeights()[2].data()
+        await this.model.getLayer("bn_dense2").getWeights()[2].data()
       ),
       bnDense2MovingVariance: Array.from(
-        await this.model.getLayer("bn_dense1_5").getWeights()[3].data()
+        await this.model.getLayer("bn_dense2").getWeights()[3].data()
       ),
       featureMeans: Array.from(await X_mean.data()),
       featureStds: Array.from(await X_std.data()),

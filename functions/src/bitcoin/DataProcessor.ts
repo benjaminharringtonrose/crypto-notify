@@ -168,7 +168,7 @@ export class DataProcessor {
       `Before balancing - Buy samples: ${buySamples.length}, Sell samples: ${sellSamples.length}`
     );
 
-    // Use SMOTE-like oversampling for minority class
+    // Simple 1:1 balancing - no aggressive augmentation
     const minorityClass =
       buySamples.length < sellSamples.length ? buySamples : sellSamples;
     const majorityClass =
@@ -178,23 +178,19 @@ export class DataProcessor {
     const balancedX: number[][][] = [];
     const balancedY: number[] = [];
 
-    // Add all majority class samples
-    majorityClass.forEach((sample, i) => {
-      balancedX.push(sample);
-      balancedY.push(buySamples.length < sellSamples.length ? 0 : 1);
-    });
-
-    // Add minority class samples with augmentation
+    // Add all minority class samples
     minorityClass.forEach((sample, i) => {
       balancedX.push(sample);
       balancedY.push(minorityLabel);
+    });
 
-      // Add augmented samples for minority class
-      const augmentedSamples = this.augmentSample(sample, 2); // Create 2 augmented samples (back to original)
-      augmentedSamples.forEach((augSample) => {
-        balancedX.push(augSample);
-        balancedY.push(minorityLabel);
-      });
+    // Add equal number of majority class samples (simple undersampling)
+    const numMajoritySamples = minorityClass.length;
+    const selectedMajoritySamples = majorityClass.slice(0, numMajoritySamples);
+    
+    selectedMajoritySamples.forEach((sample, i) => {
+      balancedX.push(sample);
+      balancedY.push(buySamples.length < sellSamples.length ? 0 : 1);
     });
 
     // Shuffle the balanced dataset
@@ -215,31 +211,10 @@ export class DataProcessor {
     return { X: shuffledX, y: shuffledY };
   }
 
-  private augmentSample(
-    sample: number[][],
-    numAugmentations: number
-  ): number[][][] {
-    const augmented: number[][][] = [];
-
-    for (let i = 0; i < numAugmentations; i++) {
-      const augmentedSample = sample.map((timestep) =>
-        timestep.map((feature) => {
-          // Add small random noise and scaling
-          const noise = (Math.random() - 0.5) * 0.02; // Reduced noise
-          const scale = 1 + (Math.random() - 0.5) * 0.1; // Small scaling variation
-          return feature * scale + noise;
-        })
-      );
-      augmented.push(augmentedSample);
-    }
-
-    return augmented;
-  }
-
   private labelData({
     prices,
     dayIndex,
-    threshold = 0.06, // Moderate reduction from 0.07 (more conservative)
+    threshold = 0.05, // Increased from 0.04 to create more balanced Buy/Sell distribution
     horizon = 7,
   }: {
     prices: number[];

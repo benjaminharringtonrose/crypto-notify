@@ -28,38 +28,38 @@ export const PERIODS = {
 } as const;
 
 export const STRATEGY_CONFIG = {
-  MIN_CONFIDENCE_DEFAULT: 0.16, // Back to successful setting
-  PROFIT_TAKE_MULTIPLIER_DEFAULT: 2.0, // Back to successful setting
-  BASE_POSITION_SIZE_DEFAULT: 0.085, // Back to successful setting
+  MIN_CONFIDENCE_DEFAULT: 0.15, // Reasonable threshold for quality trades
+  PROFIT_TAKE_MULTIPLIER_DEFAULT: 2.0,
+  BASE_POSITION_SIZE_DEFAULT: 0.085,
   SLIPPAGE: 0.001,
-  COMMISSION: 0.005, // Fixed: Reduced from 0.1 (10%) to 0.005 (0.5%)
-  STOP_LOSS_MULTIPLIER_DEFAULT: 5.2, // Back to successful setting
-  TRAILING_STOP_DEFAULT: 0.12, // Back to successful setting
-  MIN_HOLD_DAYS_DEFAULT: 2.5, // Back to successful setting
-  BUY_PROB_THRESHOLD_DEFAULT: 0.105, // Back to successful setting
-  SELL_PROB_THRESHOLD_DEFAULT: 0.185, // Back to successful setting
+  COMMISSION: 0.005,
+  STOP_LOSS_MULTIPLIER_DEFAULT: 5.2,
+  TRAILING_STOP_DEFAULT: 0.12,
+  MIN_HOLD_DAYS_DEFAULT: 2.5,
+  BUY_PROB_THRESHOLD_DEFAULT: 0.105,
+  SELL_PROB_THRESHOLD_DEFAULT: 0.185,
   MOMENTUM_WINDOW_THRESHOLD: 0.01,
-  MAX_ATR_THRESHOLD: 0.15,
-  MIN_PROFIT_THRESHOLD: 0.0012, // Back to successful setting
-  MOMENTUM_THRESHOLD: 0.0016, // Back to successful setting
-  VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: 0.016, // Back to successful setting
-  TREND_STRENGTH_THRESHOLD: 0.0035, // Back to successful setting
-  TREND_SLOPE_THRESHOLD: 0.0035, // Back to successful setting
-  SHORT_MOMENTUM_THRESHOLD: 0.0035, // Back to successful setting
-  DAYS_SINCE_TRADE_THRESHOLD: 5, // Back to successful setting
-  DYNAMIC_BREAKOUT_THRESHOLD: 0.2, // Back to successful setting
-  HIGH_CONFIDENCE_THRESHOLD: 0.46, // Back to successful setting
+  MAX_ATR_THRESHOLD: 2.0, // Increased from 0.15 to allow more trades
+  MIN_PROFIT_THRESHOLD: 0.0012,
+  MOMENTUM_THRESHOLD: 0.0016,
+  VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: 0.016,
+  TREND_STRENGTH_THRESHOLD: 0.0035,
+  TREND_SLOPE_THRESHOLD: 0.0035,
+  SHORT_MOMENTUM_THRESHOLD: 0.0035,
+  DAYS_SINCE_TRADE_THRESHOLD: 5,
+  DYNAMIC_BREAKOUT_THRESHOLD: 0.2,
+  HIGH_CONFIDENCE_THRESHOLD: 0.46,
   MOMENTUM_MULTIPLIER: 0.05,
-  MAX_PROFIT_TAKE: 2.0, // Back to successful setting
+  MAX_PROFIT_TAKE: 2.0,
   NEGATIVE_MOMENTUM_THRESHOLD: -0.032,
   NEGATIVE_SHORT_MOMENTUM_THRESHOLD: -0.011,
-  MEAN_REVERSION_THRESHOLD: 0.012, // Back to successful setting
+  MEAN_REVERSION_THRESHOLD: 0.012,
   NEGATIVE_SHORT_MOMENTUM_MIN: -0.0085,
   MOMENTUM_MAX: 0.021,
-  POSITION_SIZE_MAX: 0.3, // Back to successful setting
-  POSITION_SIZE_MAX_HIGH_ATR: 0.35, // Back to successful setting
-  POSITION_SIZE_MAX_HIGH_CONFIDENCE: 0.4, // Back to successful setting
-  CONFIDENCE_BOOST_MULTIPLIER: 1.75, // Back to successful setting
+  POSITION_SIZE_MAX: 0.3,
+  POSITION_SIZE_MAX_HIGH_ATR: 0.35,
+  POSITION_SIZE_MAX_HIGH_CONFIDENCE: 0.4,
+  CONFIDENCE_BOOST_MULTIPLIER: 1.75,
   TREND_SLOPE_BOOST_THRESHOLD: 0.016,
   TREND_SLOPE_POSITION_BOOST: 1.28,
   VOLUME_BOOST_THRESHOLD: 1.2,
@@ -150,28 +150,28 @@ export const MODEL_CONFIG = {
 };
 
 export const TRAINING_CONFIG = {
-  EPOCHS: 120, // Increased from 100 for better convergence
-  BATCH_SIZE: 32, // Reduced from 64 for better generalization with complex model
+  EPOCHS: 120,
+  BATCH_SIZE: 32,
   SHUFFLE_CHUNK_SIZE: 10,
-  INITIAL_LEARNING_RATE: 0.0008, // Reduced from 0.001 for more stable training
-  MIN_LEARNING_RATE: 0.000005, // Reduced from 0.00001 for better fine-tuning
-  CYCLIC_LR_STEP_SIZE: 12, // Increased from 8 for longer cycles
+  INITIAL_LEARNING_RATE: 0.001, // Standard learning rate
+  MIN_LEARNING_RATE: 0.00001,
+  CYCLIC_LR_STEP_SIZE: 12,
   OUTPUT_CLASSES: 2,
-  START_DAYS_AGO: 1200, // Increased from 1000 for more training data
-  TRAIN_SPLIT: 0.85, // Increased from 0.8 for more training data
-  PREFETCH_BUFFER: 4, // Increased from 2 for better data loading
-  PATIENCE: 20, // Increased from 15 for more stable training
+  START_DAYS_AGO: 1200,
+  TRAIN_SPLIT: 0.8, // Standard split
+  PREFETCH_BUFFER: 4,
+  PATIENCE: 20, // Standard patience
   BYTES_TO_MB: 1024 * 1024,
   MS_TO_SECONDS: 1000,
-  GAMMA: 1.5, // Reduced from 2.0 for less aggressive focal loss
-  ALPHA: [0.35, 0.65] as [number, number], // Moderate buy emphasis (more conservative)
-  GRADIENT_CLIP_NORM: 1.0, // Reduced from 1.5 for more stable gradients
-  LR_DECAY_RATE: 0.92, // Reduced from 0.95 for slower decay
-  WARMUP_EPOCHS: 8, // Increased from 5 for better initialization
-  WARMUP_INITIAL_LR: 0.00005, // Reduced from 0.0001 for gentler warmup
-  ATTENTION_DROPOUT: 0.1, // New: dropout for attention mechanisms
-  RESIDUAL_DROPOUT: 0.15, // New: dropout for residual connections
-  LAYER_NORM_EPSILON: 1e-6, // New: epsilon for layer normalization
+  GAMMA: 0, // Disable focal loss - use standard cross-entropy
+  ALPHA: [0.5, 0.5] as [number, number], // Balanced weights
+  GRADIENT_CLIP_NORM: 1.0,
+  LR_DECAY_RATE: 0.95, // Standard decay
+  WARMUP_EPOCHS: 5,
+  WARMUP_INITIAL_LR: 0.0001,
+  ATTENTION_DROPOUT: 0.1,
+  RESIDUAL_DROPOUT: 0.15,
+  LAYER_NORM_EPSILON: 1e-6,
 };
 
 export const TIME_CONVERSIONS = {

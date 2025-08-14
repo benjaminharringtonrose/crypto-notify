@@ -86,9 +86,12 @@ export class TradeModelPredictor {
     const logits = this.model.predict(featuresNormalized) as tf.Tensor2D;
     const logitsArray = await logits.data();
     const [sellLogit, buyLogit] = [logitsArray[0], logitsArray[1]];
+    
+    // Use natural softmax probabilities without any calibration
     const probs = tf.tensor2d([[sellLogit, buyLogit]]).softmax();
     const probArray = await probs.data();
     const [sellProb, buyProb] = [probArray[0], probArray[1]];
+    
     const confidence = Math.max(buyProb, sellProb);
 
     // Manual variance calculation
@@ -131,38 +134,28 @@ export class TradeModelPredictor {
         : atr;
     const atrBreakout = atr / atrSma;
 
-    // const endTime = performance.now();
-    // console.log(
-    //   `Prediction executed in ${(endTime - startTime).toFixed(2)} ms`
-    // );
-    // console.log(
-    //   `ATR: ${atr.toFixed(
-    //     4
-    //   )}, Momentum Window: ${momentumWindowSize}, Variance: ${variance.toFixed(
-    //     4
-    //   )}`
-    // );
-    // console.log(
-    //   `Logits: [Sell: ${sellLogit.toFixed(4)}, Buy: ${buyLogit.toFixed(4)}]`
-    // );
-    // console.log(
-    //   `Probs: [Sell: ${sellProb.toFixed(4)}, Buy: ${buyProb.toFixed(4)}]`
-    // );
-    // console.log(
-    //   `Confidence: ${confidence.toFixed(4)}, Momentum: ${momentum.toFixed(
-    //     4
-    //   )}, Short Momentum: ${shortMomentum.toFixed(
-    //     4
-    //   )}, Trend Slope: ${trendSlope.toFixed(
-    //     4
-    //   )}, Momentum Divergence: ${momentumDivergence.toFixed(
-    //     4
-    //   )}, Vol-Adj Momentum: ${volatilityAdjustedMomentum.toFixed(
-    //     4
-    //   )}, Trend Strength: ${trendStrength.toFixed(
-    //     4
-    //   )}, ATR Breakout: ${atrBreakout.toFixed(4)}`
-    // );
+    // Debug logging for confidence analysis
+    console.log(
+      `Raw Logits: [Sell: ${sellLogit.toFixed(4)}, Buy: ${buyLogit.toFixed(4)}]`
+    );
+    console.log(
+      `Raw Probs: [Sell: ${sellProb.toFixed(4)}, Buy: ${buyProb.toFixed(4)}]`
+    );
+    console.log(
+      `Confidence: ${confidence.toFixed(4)}, Momentum: ${momentum.toFixed(
+        4
+      )}, Short Momentum: ${shortMomentum.toFixed(
+        4
+      )}, Trend Slope: ${trendSlope.toFixed(
+        4
+      )}, Momentum Divergence: ${momentumDivergence.toFixed(
+        4
+      )}, Vol-Adj Momentum: ${volatilityAdjustedMomentum.toFixed(
+        4
+      )}, Trend Strength: ${trendStrength.toFixed(
+        4
+      )}, ATR Breakout: ${atrBreakout.toFixed(4)}`
+    );
 
     features.dispose();
     featuresNormalized.dispose();

@@ -106,7 +106,7 @@ export default class TradeModelFactory {
     model.add(tf.layers.batchNormalization({ name: "bn_lstm3" }));
     model.add(tf.layers.dropout({ rate: MODEL_CONFIG.DROPOUT_RATE }));
 
-    // Dense layers for feature learning
+    // Final dense layers for classification
     model.add(
       tf.layers.dense({
         units: MODEL_CONFIG.DENSE_UNITS_1,
@@ -115,7 +115,7 @@ export default class TradeModelFactory {
         kernelRegularizer: tf.regularizers.l2({
           l2: MODEL_CONFIG.L2_REGULARIZATION,
         }),
-        name: "dense_1",
+        name: "dense1",
       })
     );
     model.add(tf.layers.batchNormalization({ name: "bn_dense1" }));
@@ -128,20 +128,23 @@ export default class TradeModelFactory {
         activation: "relu",
         kernelInitializer: "heNormal",
         kernelRegularizer: tf.regularizers.l2({
-          l2: MODEL_CONFIG.L2_REGULARIZATION * 0.5,
+          l2: MODEL_CONFIG.L2_REGULARIZATION,
         }),
-        name: "dense_1_5",
+        name: "dense2",
       })
     );
-    model.add(tf.layers.batchNormalization({ name: "bn_dense1_5" }));
+    model.add(tf.layers.batchNormalization({ name: "bn_dense2" }));
     model.add(tf.layers.dropout({ rate: MODEL_CONFIG.DROPOUT_RATE * 0.5 }));
 
-    // Output layer with softmax activation
+    // Output layer with linear activation for logits (temperature scaling applied in predictor)
     model.add(
       tf.layers.dense({
         units: MODEL_CONFIG.OUTPUT_UNITS,
-        activation: "softmax",
-        kernelInitializer: "heNormal",
+        activation: "linear", // Use linear activation for logits
+        kernelInitializer: "glorotNormal",
+        kernelRegularizer: tf.regularizers.l2({
+          l2: MODEL_CONFIG.L2_REGULARIZATION * 0.5, // Reduced regularization for output
+        }),
         name: "output",
       })
     );

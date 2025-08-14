@@ -42,9 +42,8 @@ export class TradingStrategy {
   private sellProbThreshold: number;
   private smaPeriod: number;
   private breakoutThreshold: number;
-  private strategyStartTimestamp: string | null;
   private strategyTradeCount: number;
-  private recentIndicators: { [key: string]: number[] };
+  private featureCalculator: FeatureCalculator;
 
   constructor(params?: TradingStrategyParams);
 
@@ -58,9 +57,8 @@ export class TradingStrategy {
   private getSellConditions(...): boolean;
   private calculateSMA(prices: number[], period: number): number;
   private calculateEMA(prices: number[], period: number): number;
-  private updateRecentIndicators(...): void;
-  private getThreeDayAverage(key: string): number;
-  private shouldPersistStrategy(currentTimestamp: string, confidence: number): boolean;
+  private detectMarketRegime(...): MarketRegime;
+  private calculateStrategyWeights(...): StrategyWeights;
 }
 ```
 
@@ -71,6 +69,7 @@ export class TradingStrategy {
 - **PERIODS**: Technical analysis period constants
 - **STRATEGY_CONFIG**: Strategy-specific configuration parameters
 - **TIME_CONVERSIONS**: Time utility constants
+- **FeatureCalculator**: Market regime detection and feature calculation
 
 ## Strategy Types
 
@@ -80,12 +79,12 @@ export class TradingStrategy {
 **Core Logic**: Buy when price deviates significantly below moving average
 **Key Parameters**:
 
-- **Min Hold Days**: `STRATEGY_CONFIG.MEAN_REVERSION.MIN_HOLD_DAYS_DEFAULT`
-- **Stop Loss**: `STRATEGY_CONFIG.MEAN_REVERSION.STOP_LOSS_MULTIPLIER_DEFAULT`
-- **Trailing Stop**: `STRATEGY_CONFIG.MEAN_REVERSION.TRAILING_STOP_DEFAULT`
-- **Profit Take**: `STRATEGY_CONFIG.MEAN_REVERSION.PROFIT_TAKE_MULTIPLIER_DEFAULT`
-- **Min Confidence**: `STRATEGY_CONFIG.MEAN_REVERSION.MIN_CONFIDENCE_DEFAULT`
-- **Buy Probability Threshold**: `STRATEGY_CONFIG.MEAN_REVERSION.BUY_PROB_THRESHOLD_DEFAULT`
+- **Min Hold Days**: `STRATEGY_CONFIG.MIN_HOLD_DAYS_DEFAULT`
+- **Stop Loss**: `STRATEGY_CONFIG.STOP_LOSS_MULTIPLIER_DEFAULT`
+- **Trailing Stop**: `STRATEGY_CONFIG.TRAILING_STOP_DEFAULT`
+- **Profit Take**: `STRATEGY_CONFIG.PROFIT_TAKE_MULTIPLIER_DEFAULT`
+- **Min Confidence**: `STRATEGY_CONFIG.MIN_CONFIDENCE_DEFAULT`
+- **Buy Probability Threshold**: `STRATEGY_CONFIG.BUY_PROB_THRESHOLD_DEFAULT`
 
 **Buy Conditions**:
 
@@ -121,12 +120,12 @@ case StrategyType.MeanReversion:
 **Core Logic**: Follow strong upward trends with momentum confirmation
 **Key Parameters**:
 
-- **Min Hold Days**: `STRATEGY_CONFIG.MOMENTUM.MIN_HOLD_DAYS_DEFAULT`
-- **Stop Loss**: `STRATEGY_CONFIG.MOMENTUM.STOP_LOSS_MULTIPLIER_DEFAULT`
-- **Trailing Stop**: `STRATEGY_CONFIG.MOMENTUM.TRAILING_STOP_DEFAULT`
-- **Profit Take**: `STRATEGY_CONFIG.MOMENTUM.PROFIT_TAKE_MULTIPLIER_DEFAULT`
-- **Min Confidence**: `STRATEGY_CONFIG.MOMENTUM.MIN_CONFIDENCE_DEFAULT`
-- **Buy Probability Threshold**: `STRATEGY_CONFIG.MOMENTUM.BUY_PROB_THRESHOLD_DEFAULT`
+- **Min Hold Days**: `STRATEGY_CONFIG.MIN_HOLD_DAYS_DEFAULT`
+- **Stop Loss**: `STRATEGY_CONFIG.STOP_LOSS_MULTIPLIER_DEFAULT`
+- **Trailing Stop**: `STRATEGY_CONFIG.TRAILING_STOP_DEFAULT`
+- **Profit Take**: `STRATEGY_CONFIG.PROFIT_TAKE_MULTIPLIER_DEFAULT`
+- **Min Confidence**: `STRATEGY_CONFIG.MIN_CONFIDENCE_DEFAULT`
+- **Buy Probability Threshold**: `STRATEGY_CONFIG.BUY_PROB_THRESHOLD_DEFAULT`
 
 **Buy Conditions**:
 
@@ -142,8 +141,8 @@ case StrategyType.Momentum:
     buyProb > this.buyProbThreshold &&
     confidence >= this.minConfidence &&
     shortMomentum > STRATEGY_CONFIG.SHORT_MOMENTUM_THRESHOLD &&
-    volatilityAdjustedMomentum > STRATEGY_CONFIG.MOMENTUM.VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD &&
-    trendStrength > STRATEGY_CONFIG.MOMENTUM.TREND_STRENGTH_THRESHOLD &&
+    volatilityAdjustedMomentum > STRATEGY_CONFIG.VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD &&
+    trendStrength > STRATEGY_CONFIG.TREND_STRENGTH_THRESHOLD &&
     (atrBreakout > dynamicBreakoutThreshold || trendReversal) &&
     currentVolume > avgVolume * STRATEGY_CONFIG.VOLUME_BOOST_THRESHOLD
   );
@@ -170,12 +169,12 @@ case StrategyType.Momentum:
 **Core Logic**: Enter positions on significant price breakouts with volume confirmation
 **Key Parameters**:
 
-- **Min Hold Days**: `STRATEGY_CONFIG.BREAKOUT.MIN_HOLD_DAYS_DEFAULT`
-- **Stop Loss**: `STRATEGY_CONFIG.BREAKOUT.STOP_LOSS_MULTIPLIER_DEFAULT`
-- **Trailing Stop**: `STRATEGY_CONFIG.BREAKOUT.TRAILING_STOP_DEFAULT`
-- **Profit Take**: `STRATEGY_CONFIG.BREAKOUT.PROFIT_TAKE_MULTIPLIER_DEFAULT`
-- **Min Confidence**: `STRATEGY_CONFIG.BREAKOUT.MIN_CONFIDENCE_DEFAULT`
-- **Buy Probability Threshold**: `STRATEGY_CONFIG.BREAKOUT.BUY_PROB_THRESHOLD_DEFAULT`
+- **Min Hold Days**: `STRATEGY_CONFIG.MIN_HOLD_DAYS_DEFAULT`
+- **Stop Loss**: `STRATEGY_CONFIG.STOP_LOSS_MULTIPLIER_DEFAULT`
+- **Trailing Stop**: `STRATEGY_CONFIG.TRAILING_STOP_DEFAULT`
+- **Profit Take**: `STRATEGY_CONFIG.PROFIT_TAKE_MULTIPLIER_DEFAULT`
+- **Min Confidence**: `STRATEGY_CONFIG.MIN_CONFIDENCE_DEFAULT`
+- **Buy Probability Threshold**: `STRATEGY_CONFIG.BUY_PROB_THRESHOLD_DEFAULT`
 
 **Buy Conditions**:
 
@@ -210,12 +209,12 @@ case StrategyType.Breakout:
 **Core Logic**: Follow established trends with trend strength confirmation
 **Key Parameters**:
 
-- **Min Hold Days**: `STRATEGY_CONFIG.TREND_FOLLOWING.MIN_HOLD_DAYS_DEFAULT`
-- **Stop Loss**: `STRATEGY_CONFIG.TREND_FOLLOWING.STOP_LOSS_MULTIPLIER_DEFAULT`
-- **Trailing Stop**: `STRATEGY_CONFIG.TREND_FOLLOWING.TRAILING_STOP_DEFAULT`
-- **Profit Take**: `STRATEGY_CONFIG.TREND_FOLLOWING.PROFIT_TAKE_MULTIPLIER_DEFAULT`
-- **Min Confidence**: `STRATEGY_CONFIG.TREND_FOLLOWING.MIN_CONFIDENCE_DEFAULT`
-- **Buy Probability Threshold**: `STRATEGY_CONFIG.TREND_FOLLOWING.BUY_PROB_THRESHOLD_DEFAULT`
+- **Min Hold Days**: `STRATEGY_CONFIG.MIN_HOLD_DAYS_DEFAULT`
+- **Stop Loss**: `STRATEGY_CONFIG.STOP_LOSS_MULTIPLIER_DEFAULT`
+- **Trailing Stop**: `STRATEGY_CONFIG.TRAILING_STOP_DEFAULT`
+- **Profit Take**: `STRATEGY_CONFIG.PROFIT_TAKE_MULTIPLIER_DEFAULT`
+- **Min Confidence**: `STRATEGY_CONFIG.MIN_CONFIDENCE_DEFAULT`
+- **Buy Probability Threshold**: `STRATEGY_CONFIG.BUY_PROB_THRESHOLD_DEFAULT`
 
 **Buy Conditions**:
 
@@ -247,105 +246,84 @@ case StrategyType.TrendFollowing:
   );
 ```
 
-## Strategy Selection Logic
+## Market Regime Detection
 
-### Dynamic Strategy Selection
+### Dynamic Strategy Adaptation
+
+The TradingStrategy implements sophisticated market regime detection to dynamically adapt strategy weights:
 
 ```typescript
-private selectStrategy(
-  shortMomentum: number,
-  momentum: number,
-  trendSlope: number,
-  momentumDivergence: number,
-  volatilityAdjustedMomentum: number,
-  trendStrength: number,
-  atrBreakout: number,
+private detectMarketRegime(
   prices: number[],
   volumes: number[],
-  currentTimestamp: string,
-  confidence: number
-): StrategyType {
-  // Update recent indicators for averaging
-  this.updateRecentIndicators(
-    shortMomentum, momentum, trendSlope, momentumDivergence,
-    volatilityAdjustedMomentum, trendStrength, atrBreakout
+  dayIndex: number,
+  currentPrice: number
+): MarketRegime {
+  return this.featureCalculator.calculateMarketRegimeFeatures(
+    prices,
+    volumes,
+    dayIndex,
+    currentPrice
   );
-
-  // Calculate 3-day averages for stability
-  const avgShortMomentum = this.getThreeDayAverage("shortMomentum");
-  const avgMomentum = this.getThreeDayAverage("momentum");
-  const avgTrendSlope = this.getThreeDayAverage("trendSlope");
-  const avgMomentumDivergence = this.getThreeDayAverage("momentumDivergence");
-  const avgVolatilityAdjustedMomentum = this.getThreeDayAverage("volatilityAdjustedMomentum");
-  const avgTrendStrength = this.getThreeDayAverage("trendStrength");
-  const avgAtrBreakout = this.getThreeDayAverage("atrBreakout");
-
-  // Check strategy persistence
-  if (this.shouldPersistStrategy(currentTimestamp, confidence)) {
-    return this.currentStrategy;
-  }
-
-  let newStrategy: StrategyType;
-
-  // Strategy selection priority:
-  // 1. Trend Following for bullish markets
-  if (Math.abs(avgTrendSlope) > STRATEGY_CONFIG.TREND_SLOPE_THRESHOLD &&
-      emaShort > emaLong &&
-      avgTrendStrength > STRATEGY_CONFIG.TREND_STRENGTH_THRESHOLD) {
-    newStrategy = StrategyType.TrendFollowing;
-  }
-  // 2. Momentum for volatile markets
-  else if (avgShortMomentum > STRATEGY_CONFIG.MOMENTUM_THRESHOLD &&
-           avgVolatilityAdjustedMomentum > STRATEGY_CONFIG.MOMENTUM.VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD &&
-           avgTrendStrength > STRATEGY_CONFIG.MOMENTUM.TREND_STRENGTH_THRESHOLD &&
-           emaShort > emaLong) {
-    newStrategy = StrategyType.Momentum;
-  }
-  // 3. Breakout for high volume and volatility
-  else if (avgAtrBreakout > this.breakoutThreshold &&
-           currentVolume > avgVolume * STRATEGY_CONFIG.VOLUME_MULTIPLIER &&
-           avgShortMomentum > STRATEGY_CONFIG.SHORT_MOMENTUM_THRESHOLD) {
-    newStrategy = StrategyType.Breakout;
-  }
-  // 4. Mean Reversion as default
-  else if (Math.abs(deviation) > STRATEGY_CONFIG.DEVIATION_THRESHOLD &&
-           Math.abs(avgMomentum) < STRATEGY_CONFIG.MOMENTUM_THRESHOLD &&
-           avgMomentumDivergence !== 0) {
-    newStrategy = StrategyType.MeanReversion;
-  } else {
-    newStrategy = StrategyType.MeanReversion; // Default for stability
-  }
-
-  // Update strategy if changed
-  if (newStrategy !== this.currentStrategy) {
-    this.currentStrategy = newStrategy;
-    this.strategyStartTimestamp = currentTimestamp;
-    this.strategyTradeCount = 0;
-    this.updateStrategyParameters();
-  }
-
-  return this.currentStrategy;
 }
 ```
 
-### Strategy Persistence Logic
+### Strategy Weight Calculation
 
 ```typescript
-private shouldPersistStrategy(
-  currentTimestamp: string,
-  confidence: number
-): boolean {
-  if (!this.strategyStartTimestamp) return false;
+private calculateStrategyWeights(
+  marketRegime: MarketRegime
+): StrategyWeights {
+  const { volatilityRegime, trendRegime, momentumRegime } = marketRegime;
 
-  const daysSinceStart = (new Date(currentTimestamp).getTime() -
-    new Date(this.strategyStartTimestamp).getTime()) /
-    TIME_CONVERSIONS.ONE_DAY_IN_MILLISECONDS;
+  // Enhanced base weights with more balanced distribution
+  let weights: StrategyWeights = {
+    momentum: 0.25,
+    mean_reversion: 0.25,
+    breakout: 0.25,
+    trend_following: 0.25,
+  };
 
-  return (
-    (this.strategyTradeCount < STRATEGY_CONFIG.STRATEGY_PERSISTENCE_TRADES ||
-     daysSinceStart < STRATEGY_CONFIG.STRATEGY_PERSISTENCE_DAYS) &&
-    confidence < STRATEGY_CONFIG.STRATEGY_OVERRIDE_CONFIDENCE
-  );
+  // Volatility-based adjustments
+  switch (volatilityRegime) {
+    case "EXTREME_HIGH":
+      weights.breakout = 0.45;
+      weights.momentum = 0.25;
+      weights.mean_reversion = 0.15;
+      weights.trend_following = 0.15;
+      break;
+    case "HIGH":
+      weights.breakout = 0.35;
+      weights.momentum = 0.3;
+      weights.mean_reversion = 0.2;
+      weights.trend_following = 0.15;
+      break;
+    // ... additional volatility regimes
+  }
+
+  // Trend-based adjustments
+  switch (trendRegime) {
+    case "STRONG_UPTREND":
+      weights.trend_following = Math.max(weights.trend_following, 0.4);
+      weights.momentum = Math.max(weights.momentum, 0.3);
+      weights.mean_reversion = Math.min(weights.mean_reversion, 0.2);
+      weights.breakout = Math.min(weights.breakout, 0.1);
+      break;
+    // ... additional trend regimes
+  }
+
+  // Momentum-based adjustments
+  switch (momentumRegime) {
+    case "STRONG_MOMENTUM":
+      weights.momentum = Math.max(weights.momentum, 0.4);
+      weights.trend_following = Math.max(weights.trend_following, 0.3);
+      weights.breakout = Math.min(weights.breakout, 0.2);
+      weights.mean_reversion = Math.min(weights.mean_reversion, 0.1);
+      break;
+    // ... additional momentum regimes
+  }
+
+  return weights;
 }
 ```
 
@@ -355,8 +333,6 @@ private shouldPersistStrategy(
 
 ```typescript
 public async decideTrade({
-  adaPrices,
-  adaVolumes,
   btcPrices,
   btcVolumes,
   capital,
@@ -366,11 +342,24 @@ public async decideTrade({
   buyTimestamp,
   currentTimestamp,
   winStreak = 0,
-}: TradeDecisionParams): Promise<TradeDecisionResult> {
+}: {
+  btcPrices: number[];
+  btcVolumes: number[];
+  capital: number;
+  holdings: number;
+  lastBuyPrice: number | undefined;
+  peakPrice: number | undefined;
+  buyTimestamp: string | undefined;
+  currentTimestamp: string;
+  winStreak?: number;
+}): Promise<{
+  trade: Trade | null;
+  confidence: number;
+  buyProb: number;
+  sellProb: number;
+}> {
   // 1. Get ML predictions
-  const prediction = await this.predictor.predict(
-    adaPrices, adaVolumes, btcPrices, btcVolumes
-  );
+  const prediction = await this.predictor.predict(btcPrices, btcVolumes);
 
   // 2. Validate confidence and ATR thresholds
   if (confidence < this.minConfidence || atr > STRATEGY_CONFIG.MAX_ATR_THRESHOLD) {
@@ -381,7 +370,7 @@ public async decideTrade({
   this.currentStrategy = this.selectStrategy(
     shortMomentum, momentum, trendSlope, momentumDivergence,
     volatilityAdjustedMomentum, trendStrength, atrBreakout,
-    adaPrices, adaVolumes, currentTimestamp, confidence
+    btcPrices, btcVolumes, currentTimestamp, confidence
   );
 
   // 4. Calculate dynamic parameters
@@ -405,41 +394,36 @@ public async decideTrade({
 #### Position Sizing
 
 ```typescript
-// Volatility-adjusted position sizing
-const volatilityAdjustedSize = Math.min(
-  this.basePositionSize / (atr > 0 ? atr : 0.01),
-  atr > STRATEGY_CONFIG.ATR_POSITION_THRESHOLD
-    ? STRATEGY_CONFIG.POSITION_SIZE_MAX_HIGH_ATR
-    : STRATEGY_CONFIG.POSITION_SIZE_MAX
-);
+// Balanced position sizing for optimal returns
+const basePositionSize = this.basePositionSize;
 
-// Trend-adjusted position sizing
-const trendAdjustedSize =
-  trendSlope > STRATEGY_CONFIG.TREND_SLOPE_BOOST_THRESHOLD
-    ? volatilityAdjustedSize * STRATEGY_CONFIG.TREND_SLOPE_POSITION_BOOST
-    : volatilityAdjustedSize;
+// Balanced confidence boost
+const confidenceBoost = confidence > 0.52 ? 1.3 : 1.0;
 
-// Confidence and win streak boosts
-const confidenceBoost =
-  confidence > STRATEGY_CONFIG.HIGH_CONFIDENCE_THRESHOLD
-    ? STRATEGY_CONFIG.CONFIDENCE_BOOST_MULTIPLIER
-    : 1.0;
+// Balanced volatility adjustment
+const volatilityAdjustment = atr > 0.05 ? 0.9 : 1.1;
 
-const winStreakBoost =
-  this.currentStrategy === StrategyType.Momentum && winStreak > 1
-    ? 1 + winStreak * 0.2
-    : 1.0;
+// Balanced trend-based adjustment
+const trendAdjustment = trendStrength > 0.1 ? 1.2 : 1.0;
 
-// Final position size calculation
-const positionSize = Math.min(
-  trendAdjustedSize *
-    confidenceBoost *
-    winStreakBoost *
-    Math.min(
-      buyProb / this.buyProbThreshold,
-      STRATEGY_CONFIG.BUY_PROB_MAX_MULTIPLIER
-    ),
-  STRATEGY_CONFIG.POSITION_SIZE_MAX
+// Balanced momentum-based adjustment
+const momentumAdjustment = momentum > 0.02 ? 1.15 : 1.0;
+
+// Balanced buy probability boost
+const buyProbBoost = buyProb > 0.52 ? 1.1 : 1.0;
+
+// Calculate position size with balanced safety checks
+const positionSize = Math.max(
+  0.008, // Minimum position size
+  Math.min(
+    basePositionSize *
+      confidenceBoost *
+      volatilityAdjustment *
+      trendAdjustment *
+      momentumAdjustment *
+      buyProbBoost,
+    STRATEGY_CONFIG.POSITION_SIZE_MAX
+  )
 );
 ```
 
@@ -500,51 +484,6 @@ private calculateEMA(prices: number[], period: number): number {
 }
 ```
 
-### Indicator Tracking
-
-#### Recent Indicators Management
-
-```typescript
-private recentIndicators: { [key: string]: number[] } = {
-  shortMomentum: [],
-  momentum: [],
-  trendSlope: [],
-  momentumDivergence: [],
-  volatilityAdjustedMomentum: [],
-  trendStrength: [],
-  atrBreakout: [],
-};
-
-private updateRecentIndicators(
-  shortMomentum: number,
-  momentum: number,
-  trendSlope: number,
-  momentumDivergence: number,
-  volatilityAdjustedMomentum: number,
-  trendStrength: number,
-  atrBreakout: number
-) {
-  const keys = ["shortMomentum", "momentum", "trendSlope", "momentumDivergence",
-                "volatilityAdjustedMomentum", "trendStrength", "atrBreakout"];
-  const values = [shortMomentum, momentum, trendSlope, momentumDivergence,
-                  volatilityAdjustedMomentum, trendStrength, atrBreakout];
-
-  keys.forEach((key, index) => {
-    this.recentIndicators[key].push(values[index]);
-    if (this.recentIndicators[key].length > 3) {
-      this.recentIndicators[key].shift();
-    }
-  });
-}
-
-private getThreeDayAverage(key: string): number {
-  const values = this.recentIndicators[key];
-  return values.length >= 3
-    ? values.reduce((sum, val) => sum + val, 0) / 3
-    : values[values.length - 1] || 0;
-}
-```
-
 ## Configuration Constants
 
 ### Strategy Configuration Integration
@@ -565,28 +504,6 @@ BUY_PROB_THRESHOLD_DEFAULT: number;
 SELL_PROB_THRESHOLD_DEFAULT: number;
 DYNAMIC_BREAKOUT_THRESHOLD: number;
 
-// Strategy-specific configurations
-MOMENTUM: {
-  MIN_HOLD_DAYS_DEFAULT: number;
-  STOP_LOSS_MULTIPLIER_DEFAULT: number;
-  TRAILING_STOP_DEFAULT: number;
-  PROFIT_TAKE_MULTIPLIER_DEFAULT: number;
-  MIN_CONFIDENCE_DEFAULT: number;
-  BUY_PROB_THRESHOLD_DEFAULT: number;
-  VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: number;
-  TREND_STRENGTH_THRESHOLD: number;
-}
-
-MEAN_REVERSION: {
-  /* similar structure */
-}
-BREAKOUT: {
-  /* similar structure */
-}
-TREND_FOLLOWING: {
-  /* similar structure */
-}
-
 // Thresholds and limits
 TREND_SLOPE_THRESHOLD: number;
 TREND_STRENGTH_THRESHOLD: number;
@@ -596,9 +513,7 @@ VOLUME_MULTIPLIER: number;
 DEVIATION_THRESHOLD: number;
 MAX_ATR_THRESHOLD: number;
 HIGH_CONFIDENCE_THRESHOLD: number;
-STRATEGY_PERSISTENCE_TRADES: number;
-STRATEGY_PERSISTENCE_DAYS: number;
-STRATEGY_OVERRIDE_CONFIDENCE: number;
+POSITION_SIZE_MAX: number;
 ```
 
 ## Usage Examples
@@ -633,8 +548,6 @@ const customStrategy = new TradingStrategy({
 ```typescript
 // Execute trade decision
 const decision = await strategy.decideTrade({
-  adaPrices: [0.45, 0.46, 0.47, 0.48, 0.49],
-  adaVolumes: [1000000, 1200000, 1100000, 1300000, 1400000],
   btcPrices: [45000, 45500, 46000, 46500, 47000],
   btcVolumes: [500, 600, 550, 650, 700],
   capital: 10000,
@@ -691,14 +604,12 @@ async function executeTradingCycle() {
 
     // 3. Execute trade decision
     const decision = await strategy.decideTrade({
-      adaPrices: marketData.adaPrices,
-      adaVolumes: marketData.adaVolumes,
       btcPrices: marketData.btcPrices,
       btcVolumes: marketData.btcVolumes,
       capital: accountBalance.capital,
       holdings: accountBalance.holdings,
       lastBuyPrice: lastTrade?.price,
-      peakPrice: calculatePeakPrice(marketData.adaPrices),
+      peakPrice: calculatePeakPrice(marketData.btcPrices),
       buyTimestamp: lastTrade?.timestamp,
       currentTimestamp: new Date().toISOString(),
       winStreak: calculateWinStreak(tradeHistory),
@@ -785,16 +696,16 @@ constructor(params?: TradingStrategyParams) {
 
 ### Computational Efficiency
 
-- **Indicator Caching**: Recent indicators stored in memory for quick access
+- **Market Regime Detection**: Efficient market condition analysis
 - **Moving Average Optimization**: Efficient window-based calculations
 - **Strategy Persistence**: Reduces unnecessary strategy recalculations
 - **Parameter Caching**: Strategy parameters cached until strategy changes
 
 ### Memory Management
 
-- **Limited History**: Only 3-day indicator history maintained
 - **Efficient Data Structures**: Array-based storage for indicators
-- **Garbage Collection**: Automatic cleanup of old indicator values
+- **Garbage Collection**: Automatic cleanup of temporary variables
+- **Feature Calculation**: Optimized market regime feature computation
 
 ## Security Considerations
 

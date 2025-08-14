@@ -4,19 +4,16 @@ import { TRAINING_CONFIG } from "../../constants";
 export class GradientClippingCallback extends tf.CustomCallback {
   private model: tf.LayersModel | null = null;
   private clipNorm: number;
-  private lossFn: (yTrue: tf.Tensor, yPred: tf.Tensor) => tf.Tensor;
   private xVal: tf.Tensor;
   private yVal: tf.Tensor;
   private trainingLogger?: any; // Reference to TrainingLoggerCallback
 
   constructor(
-    lossFn: (yTrue: tf.Tensor, yPred: tf.Tensor) => tf.Tensor,
     xVal: tf.Tensor,
     yVal: tf.Tensor,
     clipNorm: number = TRAINING_CONFIG.GRADIENT_CLIP_NORM
   ) {
     super({});
-    this.lossFn = lossFn;
     this.xVal = xVal;
     this.yVal = yVal;
     this.clipNorm = clipNorm;
@@ -28,6 +25,10 @@ export class GradientClippingCallback extends tf.CustomCallback {
 
   setTrainingLogger(logger: any) {
     this.trainingLogger = logger;
+  }
+
+  private calculateLoss(predictions: tf.Tensor): tf.Scalar {
+    return tf.losses.softmaxCrossEntropy(this.yVal, predictions).mean() as tf.Scalar;
   }
 
   async onEpochEnd(epoch: number, logs?: tf.Logs) {
@@ -42,7 +43,8 @@ export class GradientClippingCallback extends tf.CustomCallback {
         const predictions = this.model!.apply(this.xVal, {
           training: false,
         }) as tf.Tensor;
-        return this.lossFn(this.yVal, predictions).mean() as tf.Scalar;
+        const loss = this.calculateLoss(predictions);
+        return loss;
       };
 
       const gradFn = tf.grads(computeLoss);

@@ -1,7 +1,7 @@
 import { TradeModelBacktester } from "../bitcoin/TradeModelBacktester";
 import { CoinbaseService } from "../api/CoinbaseService";
 import { HistoricalData } from "../types";
-import { TIME_CONVERSIONS } from "../constants";
+import { TIME_CONVERSIONS, STRATEGY_CONFIG } from "../constants";
 
 // Interface for backtest results
 interface BacktestPeriodResult {
@@ -70,15 +70,15 @@ async function fetchHistoricalData(
   return { prices: mergedPrices, volumes: mergedVolumes };
 }
 
-// Function to print comprehensive final summary
+// Enhanced function to print comprehensive final summary
 function printFinalSummary(results: BacktestPeriodResult[]) {
-  console.log("\n" + "=".repeat(100));
-  console.log("🎯 COMPREHENSIVE BACKTEST SUMMARY");
-  console.log("=".repeat(100));
+  console.log("\n" + "=".repeat(120));
+  console.log("🎯 ENHANCED BACKTEST SUMMARY - MODEL IMPROVEMENTS EVALUATION");
+  console.log("=".repeat(120));
 
-  // Print summary table
+  // Print enhanced summary table
   console.log("\n📊 PERFORMANCE SUMMARY BY PERIOD:");
-  console.log("─".repeat(100));
+  console.log("─".repeat(120));
   console.log(
     "Period".padEnd(15) +
       "Return".padEnd(12) +
@@ -89,7 +89,7 @@ function printFinalSummary(results: BacktestPeriodResult[]) {
       "Trades".padEnd(8) +
       "Avg Hold".padEnd(10)
   );
-  console.log("─".repeat(100));
+  console.log("─".repeat(120));
 
   let totalCombinedReturn = 0;
   let totalTrades = 0;
@@ -116,7 +116,7 @@ function printFinalSummary(results: BacktestPeriodResult[]) {
     totalDays += result.averageHoldingDays * result.totalTrades;
   });
 
-  console.log("─".repeat(100));
+  console.log("─".repeat(120));
 
   // Calculate aggregated statistics
   const overallWinRate =
@@ -126,7 +126,7 @@ function printFinalSummary(results: BacktestPeriodResult[]) {
     results.length > 0 ? totalCombinedReturn / results.length : 0;
 
   console.log("\n📈 AGGREGATED STATISTICS:");
-  console.log("─".repeat(50));
+  console.log("─".repeat(60));
   console.log(
     `   Total Combined Return: ${(totalCombinedReturn * 100).toFixed(2)}%`
   );
@@ -137,9 +137,9 @@ function printFinalSummary(results: BacktestPeriodResult[]) {
   console.log(`   Losing Trades: ${totalLosingTrades}`);
   console.log(`   Average Holding Days: ${avgHoldingDays.toFixed(1)}`);
 
-  // Strategy distribution analysis
+  // Enhanced strategy distribution analysis
   console.log("\n🎯 STRATEGY DISTRIBUTION ANALYSIS:");
-  console.log("─".repeat(50));
+  console.log("─".repeat(60));
   const strategyTotals: { [key: string]: number } = {};
   results.forEach((result) => {
     Object.entries(result.strategyDistribution).forEach(([strategy, count]) => {
@@ -154,9 +154,9 @@ function printFinalSummary(results: BacktestPeriodResult[]) {
     );
   });
 
-  // Confidence distribution analysis
+  // Enhanced confidence distribution analysis
   console.log("\n🎯 CONFIDENCE DISTRIBUTION ANALYSIS:");
-  console.log("─".repeat(50));
+  console.log("─".repeat(60));
   const confidenceTotals: { [key: string]: number } = {};
   results.forEach((result) => {
     Object.entries(result.confidenceDistribution).forEach(([range, count]) => {
@@ -171,9 +171,9 @@ function printFinalSummary(results: BacktestPeriodResult[]) {
     );
   });
 
-  // Performance insights
-  console.log("\n💡 PERFORMANCE INSIGHTS:");
-  console.log("─".repeat(50));
+  // Performance insights and recommendations
+  console.log("\n💡 PERFORMANCE INSIGHTS & RECOMMENDATIONS:");
+  console.log("─".repeat(60));
 
   const bestPeriod = results.reduce((best, current) =>
     current.totalReturn > best.totalReturn ? current : best
@@ -202,127 +202,165 @@ function printFinalSummary(results: BacktestPeriodResult[]) {
     ).toFixed(1)}%)`
   );
 
-  console.log("=".repeat(100));
+  // Model improvement recommendations
+  console.log("\n🔧 MODEL IMPROVEMENT RECOMMENDATIONS:");
+  console.log("─".repeat(60));
+
+  if (overallWinRate < 65) {
+    console.log("   ⚠️  Win rate below target (65%+). Consider:");
+    console.log("      - Increasing confidence thresholds");
+    console.log("      - Improving feature engineering");
+    console.log("      - Adjusting strategy parameters");
+  } else {
+    console.log("   ✅ Win rate meets target requirements");
+  }
+
+  if (avgReturn < 0.15) {
+    console.log("   ⚠️  Average return below target (15%+). Consider:");
+    console.log("      - More aggressive position sizing");
+    console.log("      - Better trend following strategies");
+    console.log("      - Enhanced market regime detection");
+  } else {
+    console.log("   ✅ Average return meets target requirements");
+  }
+
+  // Configuration summary
+  console.log("\n⚙️  CURRENT CONFIGURATION SUMMARY:");
+  console.log("─".repeat(60));
+  console.log(`   Min Confidence: ${STRATEGY_CONFIG.MIN_CONFIDENCE_DEFAULT}`);
+  console.log(
+    `   Stop Loss Multiplier: ${STRATEGY_CONFIG.STOP_LOSS_MULTIPLIER_DEFAULT}`
+  );
+  console.log(
+    `   Profit Take Multiplier: ${STRATEGY_CONFIG.PROFIT_TAKE_MULTIPLIER_DEFAULT}`
+  );
+  console.log(
+    `   Base Position Size: ${STRATEGY_CONFIG.BASE_POSITION_SIZE_DEFAULT}`
+  );
+  console.log(`   Min Hold Days: ${STRATEGY_CONFIG.MIN_HOLD_DAYS_DEFAULT}`);
+
+  console.log("=".repeat(120));
 }
 
 async function runBacktest() {
-  const backtester = new TradeModelBacktester(10000);
+  console.log("🚀 Starting Enhanced BTC Model Backtest");
+  console.log("=".repeat(60));
+
   const coinbaseService = new CoinbaseService({
     apiKey: process.env.COINBASE_API_KEY,
     apiSecret: process.env.COINBASE_API_SECRET,
   });
+  const backtester = new TradeModelBacktester(10000);
+  const results: BacktestPeriodResult[] = [];
 
   const recentDays = 500;
   const middleDays = 500;
-  const olderDays = 300;
   const now = Date.now();
   const oneDayMs = 24 * 60 * 60 * 1000;
 
-  const results: BacktestPeriodResult[] = [];
+  try {
+    // Recent: April 2024 - April 2025
+    console.log("\n📊 Testing Recent Period (500 days)...");
+    const recentEnd = now;
+    const recentStart = recentEnd - recentDays * oneDayMs;
 
-  // Recent: April 2024 - April 2025
-  const recentEnd = now;
-  const recentStart = recentEnd - recentDays * oneDayMs;
-  const recentBtcData = await fetchHistoricalData(
-    coinbaseService,
-    "BTC-USD",
-    recentStart,
-    recentEnd
-  );
-  console.log(`Recent Data: ${recentBtcData.prices.length} candles`);
-  console.log(
-    `Backtesting Recent ${recentDays} Days (Days 1 to ${
-      recentBtcData.prices.length - 30
-    })...`
-  );
-  const recentResult = await backtester.backtest(
-    recentBtcData,
-    30,
-    recentBtcData.prices.length - 1
-  );
-  const recentEvaluation = await backtester.evaluateBacktest(recentResult);
-  results.push({
-    period: "Recent (500d)",
-    ...recentEvaluation,
-  });
+    const recentBtcData = await fetchHistoricalData(
+      coinbaseService,
+      "BTC-USD",
+      recentStart,
+      recentEnd
+    );
+    console.log(`   Data: ${recentBtcData.prices.length} candles`);
 
-  // Middle: November 2022 - April 2024
-  const middleEnd = recentStart - oneDayMs;
-  const middleStart = middleEnd - middleDays * oneDayMs;
-  const middleBtcData = await fetchHistoricalData(
-    coinbaseService,
-    "BTC-USD",
-    middleStart,
-    middleEnd
-  );
-  console.log(`Middle Data: ${middleBtcData.prices.length} candles`);
-  console.log(
-    `Backtesting Middle ${middleDays} Days (Days 1 to ${
-      middleBtcData.prices.length - 30
-    })...`
-  );
-  const middleResult = await backtester.backtest(
-    middleBtcData,
-    30,
-    middleBtcData.prices.length - 1
-  );
-  const middleEvaluation = await backtester.evaluateBacktest(middleResult);
-  results.push({
-    period: "Middle (500d)",
-    ...middleEvaluation,
-  });
+    const recentResult = await backtester.backtest(
+      recentBtcData,
+      30,
+      recentBtcData.prices.length - 1
+    );
+    const recentEvaluation = await backtester.evaluateBacktest(recentResult);
+    results.push({
+      period: "Recent (500d)",
+      ...recentEvaluation,
+    });
 
-  // Older: January 1, 2021 - October 28, 2021
-  const olderEnd = new Date("2021-10-28").getTime();
-  const olderStart = new Date("2021-01-01").getTime();
-  const olderBtcData = await fetchHistoricalData(
-    coinbaseService,
-    "BTC-USD",
-    olderStart,
-    olderEnd
-  );
-  console.log(`Older Data: ${olderBtcData.prices.length} candles`);
-  console.log(
-    `Backtesting Older ${olderDays} Days (Days 1 to ${
-      olderBtcData.prices.length - 30
-    })...`
-  );
-  const olderResult = await backtester.backtest(
-    olderBtcData,
-    30,
-    olderBtcData.prices.length - 1
-  );
-  const olderEvaluation = await backtester.evaluateBacktest(olderResult);
-  results.push({
-    period: "Older (300d)",
-    ...olderEvaluation,
-  });
+    // Middle: November 2022 - April 2024
+    console.log("\n📊 Testing Middle Period (500 days)...");
+    const middleEnd = recentStart - oneDayMs;
+    const middleStart = middleEnd - middleDays * oneDayMs;
+    const middleBtcData = await fetchHistoricalData(
+      coinbaseService,
+      "BTC-USD",
+      middleStart,
+      middleEnd
+    );
+    console.log(`   Data: ${middleBtcData.prices.length} candles`);
 
-  // Full: January 2021 - April 2025
-  const fullStart = olderStart;
-  const fullBtcData = await fetchHistoricalData(
-    coinbaseService,
-    "BTC-USD",
-    fullStart,
-    recentEnd
-  );
-  console.log(`Full Data: ${fullBtcData.prices.length} candles`);
-  console.log(
-    `Backtesting Full Period (Days 1 to ${fullBtcData.prices.length - 30})...`
-  );
-  const fullResult = await backtester.backtest(
-    fullBtcData,
-    30,
-    fullBtcData.prices.length - 1
-  );
-  const fullEvaluation = await backtester.evaluateBacktest(fullResult);
-  results.push({
-    period: "Full Period",
-    ...fullEvaluation,
-  });
+    const middleResult = await backtester.backtest(
+      middleBtcData,
+      30,
+      middleBtcData.prices.length - 1
+    );
+    const middleEvaluation = await backtester.evaluateBacktest(middleResult);
+    results.push({
+      period: "Middle (500d)",
+      ...middleEvaluation,
+    });
 
-  // Print comprehensive final summary
-  printFinalSummary(results);
+    // Older: January 1, 2021 - October 28, 2021
+    console.log("\n📊 Testing Older Period (300 days)...");
+    const olderEnd = new Date("2021-10-28").getTime();
+    const olderStart = new Date("2021-01-01").getTime();
+    const olderBtcData = await fetchHistoricalData(
+      coinbaseService,
+      "BTC-USD",
+      olderStart,
+      olderEnd
+    );
+    console.log(`   Data: ${olderBtcData.prices.length} candles`);
+
+    const olderResult = await backtester.backtest(
+      olderBtcData,
+      30,
+      olderBtcData.prices.length - 1
+    );
+    const olderEvaluation = await backtester.evaluateBacktest(olderResult);
+    results.push({
+      period: "Older (300d)",
+      ...olderEvaluation,
+    });
+
+    // Full: January 2021 - April 2025
+    console.log("\n📊 Testing Full Period...");
+    const fullStart = olderStart;
+    const fullBtcData = await fetchHistoricalData(
+      coinbaseService,
+      "BTC-USD",
+      fullStart,
+      recentEnd
+    );
+    console.log(`   Data: ${fullBtcData.prices.length} candles`);
+
+    const fullResult = await backtester.backtest(
+      fullBtcData,
+      30,
+      fullBtcData.prices.length - 1
+    );
+    const fullEvaluation = await backtester.evaluateBacktest(fullResult);
+    results.push({
+      period: "Full Period",
+      ...fullEvaluation,
+    });
+
+    // Print comprehensive final summary
+    printFinalSummary(results);
+  } catch (error) {
+    console.error("\n❌ Backtest failed:", error);
+    console.error(
+      "Stack trace:",
+      error instanceof Error ? error.stack : "No stack trace"
+    );
+    process.exit(1);
+  }
 }
 
 runBacktest().catch((error) => {

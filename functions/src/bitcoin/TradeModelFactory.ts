@@ -1,5 +1,5 @@
 import * as tf from "@tensorflow/tfjs-node";
-import { MODEL_CONFIG } from "../constants";
+import { MODEL_CONFIG, TRAINING_CONFIG } from "../constants";
 
 export default class TradeModelFactory {
   private timesteps: number;
@@ -46,6 +46,23 @@ export default class TradeModelFactory {
     model.add(tf.layers.batchNormalization({ name: "bn_conv2" }));
     model.add(tf.layers.dropout({ rate: 0.2 }));
 
+    // Enhanced feature extraction layer (replaces attention mechanism)
+    if (TRAINING_CONFIG.USE_ATTENTION) {
+      model.add(
+        tf.layers.dense({
+          units: MODEL_CONFIG.ATTENTION_UNITS_1,
+          activation: "tanh",
+          kernelInitializer: "heNormal",
+          kernelRegularizer: tf.regularizers.l2({
+            l2: MODEL_CONFIG.L2_REGULARIZATION,
+          }),
+          name: "enhanced_features1",
+        })
+      );
+      model.add(tf.layers.batchNormalization({ name: "bn_enhanced1" }));
+      model.add(tf.layers.dropout({ rate: TRAINING_CONFIG.ATTENTION_DROPOUT }));
+    }
+
     // First LSTM layer with return sequences for temporal modeling
     model.add(
       tf.layers.lstm({
@@ -86,6 +103,23 @@ export default class TradeModelFactory {
     model.add(tf.layers.batchNormalization({ name: "bn_lstm2" }));
     model.add(tf.layers.dropout({ rate: MODEL_CONFIG.DROPOUT_RATE }));
 
+    // Second enhanced feature layer (replaces attention mechanism)
+    if (TRAINING_CONFIG.USE_ATTENTION) {
+      model.add(
+        tf.layers.dense({
+          units: MODEL_CONFIG.ATTENTION_UNITS_2,
+          activation: "tanh",
+          kernelInitializer: "heNormal",
+          kernelRegularizer: tf.regularizers.l2({
+            l2: MODEL_CONFIG.L2_REGULARIZATION,
+          }),
+          name: "enhanced_features2",
+        })
+      );
+      model.add(tf.layers.batchNormalization({ name: "bn_enhanced2" }));
+      model.add(tf.layers.dropout({ rate: TRAINING_CONFIG.ATTENTION_DROPOUT }));
+    }
+
     // Third LSTM layer without return sequences for final temporal features
     model.add(
       tf.layers.lstm({
@@ -106,7 +140,7 @@ export default class TradeModelFactory {
     model.add(tf.layers.batchNormalization({ name: "bn_lstm3" }));
     model.add(tf.layers.dropout({ rate: MODEL_CONFIG.DROPOUT_RATE }));
 
-    // Final dense layers for classification
+    // Final dense layers with improved architecture
     model.add(
       tf.layers.dense({
         units: MODEL_CONFIG.DENSE_UNITS_1,

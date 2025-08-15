@@ -57,12 +57,51 @@ export class TradeModelPredictor {
       await this.loadWeightsAsync();
     }
 
+    // Create a fresh model instance for each prediction to ensure complete isolation
+    const factory = new TradeModelFactory(
+      MODEL_CONFIG.TIMESTEPS,
+      MODEL_CONFIG.FEATURE_COUNT
+    );
+    const freshModel = factory.createModel();
+
+    // Load weights into the fresh model
+    this.weightManager.setWeights(freshModel);
+
+    // Debug: Log input data to see if it's changing
+    console.log(
+      `DEBUG: Input prices length: ${
+        btcPrices.length
+      }, last 3 prices: [${btcPrices
+        .slice(-3)
+        .map((p) => p.toFixed(2))
+        .join(", ")}]`
+    );
+    console.log(
+      `DEBUG: Input volumes length: ${
+        btcVolumes.length
+      }, last 3 volumes: [${btcVolumes
+        .slice(-3)
+        .map((v) => v.toFixed(2))
+        .join(", ")}]`
+    );
+
     // const startTime = performance.now();
     const startIndex = Math.max(0, btcPrices.length - this.timesteps - 1);
     const endIndex = btcPrices.length - 1;
     const sequence = this.sequenceGenerator
       .generateSequence(btcPrices, btcVolumes, startIndex, endIndex)
       .slice(-this.timesteps);
+
+    // Debug: Log sequence data
+    console.log(
+      `DEBUG: Sequence shape: [${sequence.length}, ${sequence[0]?.length || 0}]`
+    );
+    console.log(
+      `DEBUG: Last sequence features: [${sequence[sequence.length - 1]
+        ?.slice(0, 5)
+        .map((f) => f.toFixed(4))
+        .join(", ")}...]`
+    );
 
     if (
       sequence.length !== MODEL_CONFIG.TIMESTEPS ||
@@ -83,15 +122,15 @@ export class TradeModelPredictor {
     const stds = tf.tensor1d(this.weightManager.getFeatureStds());
     const featuresNormalized = features.sub(means).div(stds.add(1e-6));
 
-    const logits = this.model.predict(featuresNormalized) as tf.Tensor2D;
+    const logits = freshModel.predict(featuresNormalized) as tf.Tensor2D;
     const logitsArray = await logits.data();
     const [sellLogit, buyLogit] = [logitsArray[0], logitsArray[1]];
-    
+
     // Use natural softmax probabilities without any calibration
     const probs = tf.tensor2d([[sellLogit, buyLogit]]).softmax();
     const probArray = await probs.data();
     const [sellProb, buyProb] = [probArray[0], probArray[1]];
-    
+
     const confidence = Math.max(buyProb, sellProb);
 
     // Manual variance calculation

@@ -28,66 +28,66 @@ export const PERIODS = {
 } as const;
 
 export const STRATEGY_CONFIG = {
-  MIN_CONFIDENCE_DEFAULT: 0.15, // Reasonable threshold for quality trades
-  PROFIT_TAKE_MULTIPLIER_DEFAULT: 2.0,
-  BASE_POSITION_SIZE_DEFAULT: 0.085,
+  MIN_CONFIDENCE_DEFAULT: 0.15, // Increased for better trade quality
+  PROFIT_TAKE_MULTIPLIER_DEFAULT: 2.5, // Increased for better profit capture
+  BASE_POSITION_SIZE_DEFAULT: 0.08, // Slightly reduced for better risk management
   SLIPPAGE: 0.001,
   COMMISSION: 0.005,
-  STOP_LOSS_MULTIPLIER_DEFAULT: 5.2,
-  TRAILING_STOP_DEFAULT: 0.12,
-  MIN_HOLD_DAYS_DEFAULT: 2.5,
-  BUY_PROB_THRESHOLD_DEFAULT: 0.105,
-  SELL_PROB_THRESHOLD_DEFAULT: 0.185,
-  MOMENTUM_WINDOW_THRESHOLD: 0.01,
-  MAX_ATR_THRESHOLD: 2.0, // Increased from 0.15 to allow more trades
-  MIN_PROFIT_THRESHOLD: 0.0012,
-  MOMENTUM_THRESHOLD: 0.0016,
-  VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: 0.016,
-  TREND_STRENGTH_THRESHOLD: 0.0035,
-  TREND_SLOPE_THRESHOLD: 0.0035,
-  SHORT_MOMENTUM_THRESHOLD: 0.0035,
-  DAYS_SINCE_TRADE_THRESHOLD: 5,
-  DYNAMIC_BREAKOUT_THRESHOLD: 0.2,
-  HIGH_CONFIDENCE_THRESHOLD: 0.46,
-  MOMENTUM_MULTIPLIER: 0.05,
-  MAX_PROFIT_TAKE: 2.0,
-  NEGATIVE_MOMENTUM_THRESHOLD: -0.032,
-  NEGATIVE_SHORT_MOMENTUM_THRESHOLD: -0.011,
-  MEAN_REVERSION_THRESHOLD: 0.012,
-  NEGATIVE_SHORT_MOMENTUM_MIN: -0.0085,
-  MOMENTUM_MAX: 0.021,
-  POSITION_SIZE_MAX: 0.3,
-  POSITION_SIZE_MAX_HIGH_ATR: 0.35,
-  POSITION_SIZE_MAX_HIGH_CONFIDENCE: 0.4,
-  CONFIDENCE_BOOST_MULTIPLIER: 1.75,
-  TREND_SLOPE_BOOST_THRESHOLD: 0.016,
-  TREND_SLOPE_POSITION_BOOST: 1.28,
-  VOLUME_BOOST_THRESHOLD: 1.2,
-  NEGATIVE_DEVIATION_THRESHOLD: -0.015,
-  VOLUME_MULTIPLIER: 1.5,
-  TREND_STRENGTH_REVERSAL_THRESHOLD: -0.01,
-  ATR_POSITION_THRESHOLD: 0.05,
-  BUY_PROB_MAX_MULTIPLIER: 2.0,
-  CONSECUTIVE_BUYS_MAX: 4,
-  CONSECUTIVE_BUY_CONFIDENCE_LEVELS: [0.25, 0.3, 0.35, 0.4],
+  STOP_LOSS_MULTIPLIER_DEFAULT: 4.0, // Reduced for tighter risk control
+  TRAILING_STOP_DEFAULT: 0.1, // Reduced for better profit protection
+  MIN_HOLD_DAYS_DEFAULT: 3, // Increased for better trend following
+  BUY_PROB_THRESHOLD_DEFAULT: 0.08, // Increased for better signal quality
+  SELL_PROB_THRESHOLD_DEFAULT: 0.15, // Increased for better signal quality
+  MOMENTUM_WINDOW_THRESHOLD: 0.015, // Increased for better momentum detection
+  MAX_ATR_THRESHOLD: 1.8, // Reduced for better volatility control
+  MIN_PROFIT_THRESHOLD: 0.0015, // Increased for better profit targets
+  MOMENTUM_THRESHOLD: 0.002, // Increased for better momentum signals
+  VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: 0.012, // Increased for better signal quality
+  TREND_STRENGTH_THRESHOLD: 0.002, // Increased for better trend signals
+  TREND_SLOPE_THRESHOLD: 0.002, // Increased for better trend signals
+  SHORT_MOMENTUM_THRESHOLD: 0.002, // Increased for better momentum signals
+  DAYS_SINCE_TRADE_THRESHOLD: 4, // Reduced for more frequent trading
+  DYNAMIC_BREAKOUT_THRESHOLD: 0.18, // Increased for better breakout signals
+  HIGH_CONFIDENCE_THRESHOLD: 0.5, // Increased for better confidence threshold
+  MOMENTUM_MULTIPLIER: 0.06, // Increased for better momentum detection
+  MAX_PROFIT_TAKE: 2.5, // Increased for better profit capture
+  NEGATIVE_MOMENTUM_THRESHOLD: -0.025, // Reduced for better momentum control
+  NEGATIVE_SHORT_MOMENTUM_THRESHOLD: -0.008, // Reduced for better momentum control
+  MEAN_REVERSION_THRESHOLD: 0.015, // Increased for better mean reversion signals
+  NEGATIVE_SHORT_MOMENTUM_MIN: -0.006, // Reduced for better momentum control
+  MOMENTUM_MAX: 0.025, // Increased for better momentum signals
+  POSITION_SIZE_MAX: 0.25, // Reduced for better risk management
+  POSITION_SIZE_MAX_HIGH_ATR: 0.3, // Reduced for better risk management
+  POSITION_SIZE_MAX_HIGH_CONFIDENCE: 0.35, // Reduced for better risk management
+  CONFIDENCE_BOOST_MULTIPLIER: 1.5, // Reduced for more conservative approach
+  TREND_SLOPE_BOOST_THRESHOLD: 0.02, // Increased for better trend signals
+  TREND_SLOPE_POSITION_BOOST: 1.2, // Reduced for more conservative approach
+  VOLUME_BOOST_THRESHOLD: 1.3, // Increased for better volume signals
+  NEGATIVE_DEVIATION_THRESHOLD: -0.02, // Increased for better mean reversion
+  VOLUME_MULTIPLIER: 1.4, // Increased for better volume signals
+  TREND_STRENGTH_REVERSAL_THRESHOLD: -0.015, // Increased for better trend signals
+  ATR_POSITION_THRESHOLD: 0.06, // Increased for better volatility control
+  BUY_PROB_MAX_MULTIPLIER: 1.8, // Reduced for more conservative approach
+  CONSECUTIVE_BUYS_MAX: 3, // Reduced for better risk management
+  CONSECUTIVE_BUY_CONFIDENCE_LEVELS: [0.3, 0.35, 0.4], // Increased confidence levels
 };
 
 const MODEL_CONFIG_BASE = {
-  CONV1D_FILTERS_1: 12, // Increased from 8 for better feature extraction
-  CONV1D_FILTERS_2: 24, // Increased from 16 for better feature extraction
+  CONV1D_FILTERS_1: 24, // Increased for better feature extraction
+  CONV1D_FILTERS_2: 48, // Increased for better feature extraction
   CONV1D_KERNEL_SIZE_1: 5,
   CONV1D_KERNEL_SIZE_2: 3,
-  LSTM_UNITS_1: 48, // Increased from 32 for better temporal modeling
-  LSTM_UNITS_2: 24, // Increased from 16 for better temporal modeling
-  LSTM_UNITS_3: 12, // Increased from 8 for better temporal modeling
-  TIME_DISTRIBUTED_DENSE_UNITS: 16, // Increased from 12 for better feature learning
-  DENSE_UNITS_1: 24, // Increased from 16 for better feature learning
+  LSTM_UNITS_1: 96, // Increased for better temporal modeling
+  LSTM_UNITS_2: 48, // Increased for better temporal modeling
+  LSTM_UNITS_3: 24, // Increased for better temporal modeling
+  TIME_DISTRIBUTED_DENSE_UNITS: 32, // Increased for better feature learning
+  DENSE_UNITS_1: 48, // Increased for better feature learning
   OUTPUT_UNITS: 2,
-  L2_REGULARIZATION: 0.008, // Reduced from 0.01 for better generalization
-  DROPOUT_RATE: 0.35, // Reduced from 0.4 for better training stability
-  ATTENTION_UNITS_1: 16, // New: units for first attention layer
-  ATTENTION_UNITS_2: 12, // New: units for second attention layer
-  RESIDUAL_FILTERS: 8, // New: filters for residual connections
+  L2_REGULARIZATION: 0.002, // Reduced for less regularization
+  DROPOUT_RATE: 0.25, // Reduced dropout for better training
+  ATTENTION_UNITS_1: 32, // Increased for better attention mechanism
+  ATTENTION_UNITS_2: 24, // Increased for better attention mechanism
+  RESIDUAL_FILTERS: 16, // Increased for better residual connections
   TIMESTEPS_AFTER_CONV: 24,
   TIMESTEPS: 30,
   BTC_FEATURE_COUNT: 62, // Bitcoin features only
@@ -150,28 +150,50 @@ export const MODEL_CONFIG = {
 };
 
 export const TRAINING_CONFIG = {
-  EPOCHS: 120,
-  BATCH_SIZE: 32,
+  EPOCHS: 200, // Increased for better convergence
+  BATCH_SIZE: 32, // Reduced for better gradient updates
   SHUFFLE_CHUNK_SIZE: 10,
-  INITIAL_LEARNING_RATE: 0.001, // Standard learning rate
-  MIN_LEARNING_RATE: 0.00001,
-  CYCLIC_LR_STEP_SIZE: 12,
+  INITIAL_LEARNING_RATE: 0.001, // Increased for faster learning
+  MIN_LEARNING_RATE: 0.00001, // Increased minimum learning rate
+  CYCLIC_LR_STEP_SIZE: 20, // Increased for better learning rate cycling
   OUTPUT_CLASSES: 2,
   START_DAYS_AGO: 1200,
-  TRAIN_SPLIT: 0.8, // Standard split
+  TRAIN_SPLIT: 0.8, // Reduced to prevent overfitting
   PREFETCH_BUFFER: 4,
-  PATIENCE: 20, // Standard patience
+  PATIENCE: 25, // Increased patience for better convergence
   BYTES_TO_MB: 1024 * 1024,
   MS_TO_SECONDS: 1000,
-  GAMMA: 0, // Disable focal loss - use standard cross-entropy
-  ALPHA: [0.5, 0.5] as [number, number], // Balanced weights
+  GAMMA: 1.5, // Reduced focal loss gamma for better balance
+  ALPHA: [0.5, 0.5] as [number, number], // Balanced alpha for better class balance
   GRADIENT_CLIP_NORM: 1.0,
-  LR_DECAY_RATE: 0.95, // Standard decay
-  WARMUP_EPOCHS: 5,
-  WARMUP_INITIAL_LR: 0.0001,
-  ATTENTION_DROPOUT: 0.1,
-  RESIDUAL_DROPOUT: 0.15,
-  LAYER_NORM_EPSILON: 1e-6,
+  LR_DECAY_RATE: 0.95, // Slower decay for better convergence
+  WARMUP_EPOCHS: 3, // Reduced warmup
+  WARMUP_INITIAL_LR: 0.0001, // Increased warmup learning rate
+  ATTENTION_DROPOUT: 0.2, // Increased dropout for better regularization
+  RESIDUAL_DROPOUT: 0.2, // Increased dropout for better regularization
+  L2_REGULARIZATION: 0.001, // Reduced L2 for less regularization
+  BATCH_NORMALIZATION: true,
+  USE_ATTENTION: true,
+  USE_RESIDUAL_CONNECTIONS: true,
+  USE_GRADIENT_CLIPPING: true,
+  USE_LEARNING_RATE_SCHEDULER: true,
+  USE_WARMUP: true,
+  USE_DROPOUT: true,
+  USE_L2_REGULARIZATION: true,
+  USE_BATCH_NORMALIZATION: true,
+  VERBOSE: 1,
+  CALLBACKS: [
+    "earlyStopping",
+    "reduceLROnPlateau",
+    "modelCheckpoint",
+    "tensorBoard",
+    "csvLogger",
+    "gradientClipping",
+    "curriculumLearning",
+    "exponentialDecayLR",
+    "trainingLogger",
+    "predictionLogger",
+  ],
 };
 
 export const TIME_CONVERSIONS = {

@@ -152,7 +152,14 @@ export class TradeModelTrainer {
 
       this.model.compile({
         optimizer: tf.train.adam(this.config.initialLearningRate),
-        loss: "categoricalCrossentropy", // Use standard cross-entropy
+        loss: (yTrue: tf.Tensor, yPred: tf.Tensor) => {
+          return Metrics.focalLoss(
+            yTrue,
+            yPred,
+            TRAINING_CONFIG.GAMMA,
+            TRAINING_CONFIG.ALPHA
+          );
+        },
         metrics: [
           "binaryAccuracy",
           Metrics.precisionBuy,
@@ -390,6 +397,46 @@ export class TradeModelTrainer {
       bnLstm3MovingVariance: Array.from(
         await this.model.getLayer("bn_lstm3").getWeights()[3].data()
       ),
+
+      // Enhanced features layers (attention mechanism replacement)
+      enhancedFeatures1Weights: Array.from(
+        await this.model.getLayer("enhanced_features1").getWeights()[0].data()
+      ),
+      enhancedFeatures1Bias: Array.from(
+        await this.model.getLayer("enhanced_features1").getWeights()[1].data()
+      ),
+      bnEnhanced1Gamma: Array.from(
+        await this.model.getLayer("bn_enhanced1").getWeights()[0].data()
+      ),
+      bnEnhanced1Beta: Array.from(
+        await this.model.getLayer("bn_enhanced1").getWeights()[1].data()
+      ),
+      bnEnhanced1MovingMean: Array.from(
+        await this.model.getLayer("bn_enhanced1").getWeights()[2].data()
+      ),
+      bnEnhanced1MovingVariance: Array.from(
+        await this.model.getLayer("bn_enhanced1").getWeights()[3].data()
+      ),
+
+      enhancedFeatures2Weights: Array.from(
+        await this.model.getLayer("enhanced_features2").getWeights()[0].data()
+      ),
+      enhancedFeatures2Bias: Array.from(
+        await this.model.getLayer("enhanced_features2").getWeights()[1].data()
+      ),
+      bnEnhanced2Gamma: Array.from(
+        await this.model.getLayer("bn_enhanced2").getWeights()[0].data()
+      ),
+      bnEnhanced2Beta: Array.from(
+        await this.model.getLayer("bn_enhanced2").getWeights()[1].data()
+      ),
+      bnEnhanced2MovingMean: Array.from(
+        await this.model.getLayer("bn_enhanced2").getWeights()[2].data()
+      ),
+      bnEnhanced2MovingVariance: Array.from(
+        await this.model.getLayer("bn_enhanced2").getWeights()[3].data()
+      ),
+
       dense1Weights: Array.from(
         await this.model.getLayer("dense1").getWeights()[0].data()
       ),

@@ -9,43 +9,39 @@ export class Metrics {
     alphaArr: [number, number] = TRAINING_CONFIG.ALPHA
   ): tf.Scalar {
     try {
-      // Apply temperature scaling for better calibration
-      const temperature = 1.2;
-      const scaledPred = tf.div(yPred, temperature);
-      
-      const probs = scaledPred.softmax();
+      // Apply softmax to get probabilities
+      const probs = yPred.softmax();
+
+      // Get the predicted probabilities for the true classes
       const yTrueIndices = yTrue.argMax(-1);
       const gatheredProbs = tf.gather(probs, yTrueIndices, 1);
+
+      // Calculate focal loss components
       const pt = gatheredProbs.squeeze();
-      
-      // Dynamic alpha based on class distribution
       const alpha = tf.tensor1d(alphaArr);
       const alphaWeighted = tf.gather(alpha, yTrueIndices);
-      
-      // Improved focal loss with better numerical stability
+
+      // Focal loss formula: -alpha * (1 - pt)^gamma * log(pt)
       const focalWeight = tf.pow(tf.sub(1, pt), gamma);
-      const ce = tf.log(tf.add(pt, 1e-7)); // Increased epsilon for stability
+      const ce = tf.log(tf.add(pt, 1e-8)); // Add epsilon to prevent log(0)
       const focalLoss = tf.mul(tf.mul(alphaWeighted, focalWeight), tf.neg(ce));
-      
-      // Add label smoothing for better generalization
-      const labelSmoothing = 0.1;
-      const smoothedLoss = tf.mul(focalLoss, tf.sub(1, labelSmoothing));
-      
+
       // Clean up tensors
       probs.dispose();
-      yTrueIndices.dispose();
       gatheredProbs.dispose();
       pt.dispose();
       alpha.dispose();
       alphaWeighted.dispose();
       focalWeight.dispose();
       ce.dispose();
-      focalLoss.dispose();
-      scaledPred.dispose();
-      
-      return smoothedLoss.mean() as tf.Scalar;
+
+      return focalLoss.mean() as tf.Scalar;
     } catch (error) {
-      console.warn("Focal loss calculation failed, falling back to cross-entropy:", error);
+      console.warn(
+        "Focal loss calculation failed, falling back to cross-entropy:",
+        error
+      );
+      // Fallback to standard cross-entropy
       return tf.losses.softmaxCrossEntropy(yTrue, yPred);
     }
   }

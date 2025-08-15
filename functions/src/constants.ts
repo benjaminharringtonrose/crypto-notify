@@ -73,25 +73,146 @@ export const STRATEGY_CONFIG = {
 };
 
 const MODEL_CONFIG_BASE = {
-  CONV1D_FILTERS_1: 24, // Increased for better feature extraction
-  CONV1D_FILTERS_2: 48, // Increased for better feature extraction
+  CONV1D_FILTERS_1: 16, // Reduced for simpler model
+  CONV1D_FILTERS_2: 32, // Reduced for simpler model
   CONV1D_KERNEL_SIZE_1: 5,
   CONV1D_KERNEL_SIZE_2: 3,
-  LSTM_UNITS_1: 96, // Increased for better temporal modeling
-  LSTM_UNITS_2: 48, // Increased for better temporal modeling
-  LSTM_UNITS_3: 24, // Increased for better temporal modeling
-  TIME_DISTRIBUTED_DENSE_UNITS: 32, // Increased for better feature learning
-  DENSE_UNITS_1: 48, // Increased for better feature learning
+  LSTM_UNITS_1: 32, // Reduced for simpler model
+  LSTM_UNITS_2: 16, // Reduced for simpler model
+  LSTM_UNITS_3: 8, // Reduced for simpler model
+  TIME_DISTRIBUTED_DENSE_UNITS: 16, // Reduced for simpler model
+  DENSE_UNITS_1: 24, // Reduced for simpler model
   OUTPUT_UNITS: 2,
-  L2_REGULARIZATION: 0.002, // Reduced for less regularization
-  DROPOUT_RATE: 0.25, // Reduced dropout for better training
-  ATTENTION_UNITS_1: 32, // Increased for better attention mechanism
-  ATTENTION_UNITS_2: 24, // Increased for better attention mechanism
-  RESIDUAL_FILTERS: 16, // Increased for better residual connections
-  TIMESTEPS_AFTER_CONV: 24,
-  TIMESTEPS: 30,
-  BTC_FEATURE_COUNT: 62, // Bitcoin features only
-  FEATURE_COUNT: 62, // Total features
+  L2_REGULARIZATION: 0.001, // Increased for better regularization
+  DROPOUT_RATE: 0.3, // Increased dropout to prevent overfitting
+  ATTENTION_UNITS_1: 16, // Reduced for simpler model
+  ATTENTION_UNITS_2: 12, // Reduced for simpler model
+  RESIDUAL_UNITS_1: 16, // Reduced for simpler model
+  RESIDUAL_UNITS_2: 12, // Reduced for simpler model
+  FEATURE_COUNT: 62, // Number of features (actual count)
+  BTC_FEATURE_COUNT: 62, // Number of BTC features (actual count)
+  TIMESTEPS: 24, // Number of timesteps
+  BATCH_NORM_MOMENTUM: 0.99,
+  BATCH_NORM_EPSILON: 0.001,
+  ACTIVATION: "relu" as const,
+  RECURRENT_ACTIVATION: "sigmoid" as const,
+  KERNEL_INITIALIZER: "glorotNormal" as const,
+  RECURRENT_INITIALIZER: "orthogonal" as const,
+  BIAS_INITIALIZER: "zeros" as const,
+  KERNEL_REGULARIZER: "l2" as const,
+  RECURRENT_REGULARIZER: "l2" as const,
+  BIAS_REGULARIZER: "l2" as const,
+  ACTIVITY_REGULARIZER: "l2" as const,
+  KERNEL_CONSTRAINT: "maxNorm" as const,
+  RECURRENT_CONSTRAINT: "maxNorm" as const,
+  BIAS_CONSTRAINT: "maxNorm" as const,
+  DROPOUT_IMPLEMENTATION: 1,
+  UNROLL: false,
+  TIME_MAJOR: false,
+  GO_BACKWARDS: false,
+  STATEFUL: false,
+  RETURN_SEQUENCES: true,
+  RETURN_STATE: false,
+  IMPLEMENTATION: 1,
+  RESET_AFTER: true,
+  USE_BIAS: true,
+  TRAINABLE: true,
+  DYNAMIC: false,
+  INPUT_SHAPE: [24, 62] as [number, number],
+  OUTPUT_SHAPE: [2] as [number],
+  LOSS: "focalLoss" as const,
+  OPTIMIZER: "adam" as const,
+  METRICS: ["binaryAccuracy", "customF1Buy", "customF1Sell"] as const,
+  CALLBACKS: [
+    "earlyStopping",
+    "reduceLROnPlateau",
+    "modelCheckpoint",
+    "tensorBoard",
+    "csvLogger",
+    "gradientClipping",
+    "curriculumLearning",
+    "exponentialDecayLR",
+    "trainingLogger",
+    "predictionLogger",
+  ] as const,
+  COMPILE_OPTIONS: {
+    loss: "focalLoss",
+    optimizer: "adam",
+    metrics: ["binaryAccuracy", "customF1Buy", "customF1Sell"],
+  },
+  FIT_OPTIONS: {
+    epochs: 200,
+    batchSize: 64,
+    validationSplit: 0.15,
+    shuffle: true,
+    verbose: 1,
+    callbacks: [
+      "earlyStopping",
+      "reduceLROnPlateau",
+      "modelCheckpoint",
+      "tensorBoard",
+      "csvLogger",
+      "gradientClipping",
+      "curriculumLearning",
+      "exponentialDecayLR",
+      "trainingLogger",
+      "predictionLogger",
+    ],
+  },
+  PREDICT_OPTIONS: {
+    batchSize: 32,
+    verbose: 0,
+  },
+  EVALUATE_OPTIONS: {
+    batchSize: 32,
+    verbose: 0,
+  },
+  SAVE_OPTIONS: {
+    includeOptimizer: false,
+    saveFormat: "tfjs" as const,
+  },
+  LOAD_OPTIONS: {
+    customObjects: {},
+  },
+  SUMMARY_OPTIONS: {
+    lineLength: 80,
+    positions: [0.44, 0.62, 0.75, 1.0] as [number, number, number, number],
+  },
+  PLOT_OPTIONS: {
+    showShapes: true,
+    showLayerNames: true,
+    showLayerActivations: true,
+    showLayerWeights: true,
+    showLayerGradients: true,
+    showLayerOutputs: true,
+    showLayerInputs: true,
+    showLayerConfigs: true,
+    showLayerSummaries: true,
+    showLayerMetrics: true,
+  },
+  DEBUG_OPTIONS: {
+    verbose: true,
+    logLevel: "info" as const,
+    logFormat: "detailed" as const,
+    logTiming: true,
+    logMemory: true,
+    logGradients: true,
+    logWeights: true,
+    logActivations: true,
+    logPredictions: true,
+    logMetrics: true,
+    logCallbacks: true,
+    logTraining: true,
+    logValidation: true,
+    logTesting: true,
+    logInference: true,
+    logPerformance: true,
+    logOptimization: true,
+    logRegularization: true,
+    logNormalization: true,
+    logAugmentation: true,
+    logBalancing: true,
+  },
 };
 
 export const MODEL_CONFIG = {
@@ -150,28 +271,28 @@ export const MODEL_CONFIG = {
 };
 
 export const TRAINING_CONFIG = {
-  EPOCHS: 200, // Increased for better convergence
-  BATCH_SIZE: 32, // Reduced for better gradient updates
+  EPOCHS: 100, // Increased for better convergence
+  BATCH_SIZE: 64, // Back to original for stability
   SHUFFLE_CHUNK_SIZE: 10,
-  INITIAL_LEARNING_RATE: 0.001, // Increased for faster learning
-  MIN_LEARNING_RATE: 0.00001, // Increased minimum learning rate
-  CYCLIC_LR_STEP_SIZE: 20, // Increased for better learning rate cycling
+  INITIAL_LEARNING_RATE: 0.0008, // Back to original stable learning rate
+  MIN_LEARNING_RATE: 0.000005, // Back to original
+  CYCLIC_LR_STEP_SIZE: 15, // Back to original
   OUTPUT_CLASSES: 2,
   START_DAYS_AGO: 1200,
-  TRAIN_SPLIT: 0.8, // Reduced to prevent overfitting
+  TRAIN_SPLIT: 0.85, // Back to original
   PREFETCH_BUFFER: 4,
-  PATIENCE: 25, // Increased patience for better convergence
+  PATIENCE: 15, // Back to original
   BYTES_TO_MB: 1024 * 1024,
   MS_TO_SECONDS: 1000,
-  GAMMA: 1.5, // Reduced focal loss gamma for better balance
-  ALPHA: [0.5, 0.5] as [number, number], // Balanced alpha for better class balance
+  GAMMA: 2.0, // Keep original focal loss gamma
+  ALPHA: [0.4, 0.6] as [number, number], // Keep original balanced alpha
   GRADIENT_CLIP_NORM: 1.0,
-  LR_DECAY_RATE: 0.95, // Slower decay for better convergence
-  WARMUP_EPOCHS: 3, // Reduced warmup
-  WARMUP_INITIAL_LR: 0.0001, // Increased warmup learning rate
-  ATTENTION_DROPOUT: 0.2, // Increased dropout for better regularization
-  RESIDUAL_DROPOUT: 0.2, // Increased dropout for better regularization
-  L2_REGULARIZATION: 0.001, // Reduced L2 for less regularization
+  LR_DECAY_RATE: 0.92, // Back to original
+  WARMUP_EPOCHS: 5, // Back to original
+  WARMUP_INITIAL_LR: 0.00005, // Back to original
+  ATTENTION_DROPOUT: 0.15, // Back to original
+  RESIDUAL_DROPOUT: 0.15, // Back to original
+  L2_REGULARIZATION: 0.0008, // Back to original
   BATCH_NORMALIZATION: true,
   USE_ATTENTION: true,
   USE_RESIDUAL_CONNECTIONS: true,

@@ -158,75 +158,45 @@ export class DataProcessor {
     return sequence;
   }
 
-  private balanceDataset(X: number[][][], y: number[]): { X: number[][][]; y: number[] } {
-    const buyIndices: number[] = [];
-    const sellIndices: number[] = [];
+  private balanceDataset(
+    X: number[][][],
+    y: number[]
+  ): { X: number[][][]; y: number[] } {
+    const buySamples = X.filter((_, i) => y[i] === 1);
+    const sellSamples = X.filter((_, i) => y[i] === 0);
 
-    y.forEach((label, index) => {
-      if (label === 0) {
-        buyIndices.push(index);
-      } else {
-        sellIndices.push(index);
-      }
+    console.log(
+      `Before balancing - Buy samples: ${buySamples.length}, Sell samples: ${sellSamples.length}`
+    );
+
+    // Ensure we have both classes
+    if (buySamples.length === 0 || sellSamples.length === 0) {
+      console.warn(
+        "Warning: Missing one of the classes, using original dataset"
+      );
+      return { X, y };
+    }
+
+    // Force perfect balance - equal number of samples from each class
+    const minSamples = Math.min(buySamples.length, sellSamples.length);
+    const targetSamplesPerClass = Math.min(minSamples, 100); // Cap at 100 samples per class
+
+    const balancedX: number[][][] = [];
+    const balancedY: number[] = [];
+
+    // Add buy samples (exactly targetSamplesPerClass)
+    const selectedBuySamples = buySamples.slice(0, targetSamplesPerClass);
+    selectedBuySamples.forEach((sample) => {
+      balancedX.push(sample);
+      balancedY.push(1);
     });
 
-    console.log(`Before balancing - Buy samples: ${buyIndices.length}, Sell samples: ${sellIndices.length}`);
-
-    // Force better balance - target 40/60 ratio
-    const targetRatio = 0.4; // 40% buy, 60% sell
-    const buyCount = buyIndices.length;
-    const sellCount = sellIndices.length;
-    
-    let balancedX: number[][][] = [];
-    let balancedY: number[] = [];
-
-    if (buyCount === 0) {
-      console.error("ERROR: No buy samples found! This indicates a problem with the labeling logic.");
-      // Create some synthetic buy samples by flipping sell samples
-      sellIndices.slice(0, Math.min(50, sellCount)).forEach(index => {
-        const flippedSample = this.flipSample(X[index]);
-        balancedX.push(flippedSample);
-        balancedY.push(0); // Buy label
-      });
-      
-      // Add original sell samples
-      sellIndices.forEach(index => {
-        balancedX.push(X[index]);
-        balancedY.push(y[index]);
-      });
-    } else if (sellCount === 0) {
-      console.error("ERROR: No sell samples found! This indicates a problem with the labeling logic.");
-      // Create some synthetic sell samples by flipping buy samples
-      buyIndices.slice(0, Math.min(50, buyCount)).forEach(index => {
-        const flippedSample = this.flipSample(X[index]);
-        balancedX.push(flippedSample);
-        balancedY.push(1); // Sell label
-      });
-      
-      // Add original buy samples
-      buyIndices.forEach(index => {
-        balancedX.push(X[index]);
-        balancedY.push(y[index]);
-      });
-    } else {
-      // Normal balancing
-      const targetBuyCount = Math.floor(sellCount * targetRatio);
-      const targetSellCount = Math.floor(buyCount / targetRatio);
-      
-      // Add buy samples (oversample if needed)
-      for (let i = 0; i < targetBuyCount; i++) {
-        const index = buyIndices[i % buyCount];
-        balancedX.push(X[index]);
-        balancedY.push(y[index]);
-      }
-      
-      // Add sell samples (oversample if needed)
-      for (let i = 0; i < targetSellCount; i++) {
-        const index = sellIndices[i % sellCount];
-        balancedX.push(X[index]);
-        balancedY.push(y[index]);
-      }
-    }
+    // Add sell samples (exactly targetSamplesPerClass)
+    const selectedSellSamples = sellSamples.slice(0, targetSamplesPerClass);
+    selectedSellSamples.forEach((sample) => {
+      balancedX.push(sample);
+      balancedY.push(0);
+    });
 
     // Shuffle the balanced dataset
     const indices = Array.from({ length: balancedX.length }, (_, i) => i);
@@ -234,28 +204,26 @@ export class DataProcessor {
       const j = Math.floor(Math.random() * (i + 1));
       [indices[i], indices[j]] = [indices[j], indices[i]];
     }
-    
-    const shuffledX = indices.map(i => balancedX[i]);
-    const shuffledY = indices.map(i => balancedY[i]);
 
-    const finalBuyCount = shuffledY.filter(label => label === 0).length;
-    const finalSellCount = shuffledY.filter(label => label === 1).length;
-    console.log(`After balancing - Buy samples: ${finalBuyCount}, Sell samples: ${finalSellCount}`);
+    const shuffledX = indices.map((i) => balancedX[i]);
+    const shuffledY = indices.map((i) => balancedY[i]);
+
+    console.log(
+      `After balancing - Buy samples: ${
+        shuffledY.filter((l) => l === 1).length
+      }, Sell samples: ${shuffledY.filter((l) => l === 0).length}`
+    );
+
+    // Final safety check
+    if (
+      shuffledY.filter((l) => l === 1).length === 0 ||
+      shuffledY.filter((l) => l === 0).length === 0
+    ) {
+      console.error("Error: Still missing one of the classes after balancing!");
+      return { X, y }; // Return original dataset as fallback
+    }
 
     return { X: shuffledX, y: shuffledY };
-  }
-
-  private flipSample(sample: number[][]): number[][] {
-    // Create a synthetic sample by inverting the price movements
-    return sample.map(sequence => 
-      sequence.map((value, i) => {
-        // Invert price-related features (assuming first few features are price-related)
-        if (i < 10) {
-          return -value; // Invert price movements
-        }
-        return value; // Keep other features as is
-      })
-    );
   }
 
   private labelData({
@@ -270,20 +238,26 @@ export class DataProcessor {
     horizon?: number;
   }): number {
     if (dayIndex + horizon >= prices.length) return 0;
-    
+
     const currentPrice = prices[dayIndex];
     const futureAvg =
       prices
         .slice(dayIndex + 1, dayIndex + horizon + 1)
         .reduce((a, b) => a + b, 0) / horizon;
-    
+
     const priceChangePercent = (futureAvg - currentPrice) / currentPrice;
-    
+
     // Debug: Log some labeling examples
     if (dayIndex % 100 === 0) {
-      console.log(`Labeling example - Day ${dayIndex}: Current=${currentPrice.toFixed(2)}, Future=${futureAvg.toFixed(2)}, Change=${(priceChangePercent*100).toFixed(2)}%, Label=${priceChangePercent > threshold ? 1 : 0}`);
+      console.log(
+        `Labeling example - Day ${dayIndex}: Current=${currentPrice.toFixed(
+          2
+        )}, Future=${futureAvg.toFixed(2)}, Change=${(
+          priceChangePercent * 100
+        ).toFixed(2)}%, Label=${priceChangePercent > threshold ? 1 : 0}`
+      );
     }
-    
+
     return priceChangePercent > threshold ? 1 : 0;
   }
 

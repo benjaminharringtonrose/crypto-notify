@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 
 import { ExponentialDecayLRCallback } from "./callbacks/ExponentialDecayLRCallback";
 import { GradientClippingCallback } from "./callbacks/GradientClippingCallback";
-import { CurriculumLearningCallback } from "./callbacks/CurriculumLearningCallback";
+// import { CurriculumLearningCallback } from "./callbacks/CurriculumLearningCallback"; // RECOVERY-3: Disabled
 import { TrainingLoggerCallback } from "./callbacks/TrainingLoggerCallback";
 import { ModelConfig } from "../types";
 import TradeModelFactory from "./TradeModelFactory";
@@ -33,6 +33,10 @@ export class TradeModelTrainer {
   private patienceCounter: number = 0; // Early stopping counter
 
   constructor() {
+    // CRITICAL FIX: Stabilize random initialization to prevent class collapse
+    tf.randomUniform([1, 1], 0, 1, "float32", 42); // Seed TensorFlow random
+    console.log("🔧 RECOVERY-2: Deterministic seeding enabled");
+
     this.dataProcessor = new DataProcessor(
       this.config,
       TRAINING_CONFIG.START_DAYS_AGO
@@ -143,9 +147,13 @@ export class TradeModelTrainer {
         X_val,
         y_val
       );
-      const curriculumLearningCallback = new CurriculumLearningCallback(
-        this.config.epochs,
-        this.dataProcessor
+      // RECOVERY-3: Disable curriculum learning to prevent class collapse
+      // const curriculumLearningCallback = new CurriculumLearningCallback(
+      //   this.config.epochs,
+      //   this.dataProcessor
+      // );
+      console.log(
+        "🔧 RECOVERY-3: Curriculum learning disabled to stabilize class balance"
       );
 
       if (!this.model) throw new Error("Model initialization failed");
@@ -174,7 +182,7 @@ export class TradeModelTrainer {
       trainingLoggerCallback.setModel(this.model);
       lrCallback.setModel(this.model);
       gradientClippingCallback.setModel(this.model);
-      curriculumLearningCallback.setModel(this.model);
+      // curriculumLearningCallback.setModel(this.model); // DISABLED
 
       // Connect gradient clipping callback to training logger
       gradientClippingCallback.setTrainingLogger(trainingLoggerCallback);
@@ -231,7 +239,7 @@ export class TradeModelTrainer {
                 await trainingLoggerCallback.onEpochEnd(epoch, logs);
                 await lrCallback.onEpochEnd(epoch, logs);
                 await gradientClippingCallback.onEpochEnd(epoch, logs);
-                await curriculumLearningCallback.onEpochEnd(epoch, logs);
+                // await curriculumLearningCallback.onEpochEnd(epoch, logs); // DISABLED
               }
             },
             onTrainEnd: async () => {

@@ -91,7 +91,7 @@ const MODEL_CONFIG_BASE = {
   RESIDUAL_UNITS_2: 16, // Much smaller for faster training
   FEATURE_COUNT: 25, // EXPERIMENT NEW-6: Reduced core feature set
   BTC_FEATURE_COUNT: 25, // EXPERIMENT NEW-6: Core indicators only
-  TIMESTEPS: 24, // Number of timesteps
+  TIMESTEPS: 30, // EXPERIMENT NEXT-A: Increased for weekly pattern capture
   BATCH_NORM_MOMENTUM: 0.99,
   BATCH_NORM_EPSILON: 0.001,
   ACTIVATION: "relu" as const,
@@ -118,7 +118,7 @@ const MODEL_CONFIG_BASE = {
   USE_BIAS: true,
   TRAINABLE: true,
   DYNAMIC: false,
-  INPUT_SHAPE: [24, 25] as [number, number], // EXPERIMENT NEW-6: Updated for core features
+  INPUT_SHAPE: [30, 25] as [number, number], // EXPERIMENT NEXT-A: 30 timesteps, 25 features
   OUTPUT_SHAPE: [2] as [number],
   LOSS: "focalLoss" as const,
   OPTIMIZER: "adam" as const,
@@ -285,8 +285,8 @@ export const TRAINING_CONFIG = {
   PATIENCE: 10, // REDUCED: 15 → 10 for faster stopping
   BYTES_TO_MB: 1024 * 1024,
   MS_TO_SECONDS: 1000,
-  GAMMA: 1.5, // REVERTED: 2.5 → 1.5, stronger gamma reduced performance
-  ALPHA: [0.4, 0.6] as [number, number], // REVERTED: [0.3, 0.7] → [0.4, 0.6] for balanced focus
+  GAMMA: 1.5, // OPTIMAL: Found in experiments, prevents class collapse
+  ALPHA: [0.4, 0.6] as [number, number], // OPTIMAL: Balanced focus, prevents buy bias
   GRADIENT_CLIP_NORM: 1.0, // REDUCED: 5.0 → 1.0 for natural gradients
   LR_DECAY_RATE: 0.8, // REDUCED: was 0.92, now 0.8 for more aggressive decay
   WARMUP_EPOCHS: 2, // REDUCED: was 5, now 2 for faster warmup
@@ -327,6 +327,6 @@ export const TIME_CONVERSIONS = {
   ONE_HOUR_IN_SECONDS: 3600,
   ONE_DAY_IN_MILLISECONDS: 86400000,
   ONE_DAY_IN_SECONDS: 86400,
-  TIMESTEP_IN_SECONDS: MODEL_CONFIG_BASE.TIMESTEPS * 86400,
+  TIMESTEP_IN_SECONDS: MODEL_CONFIG_BASE.TIMESTEPS * 86400, // Updated with new timesteps
   ONE_MONTH_IN_DAYS: 30,
 };

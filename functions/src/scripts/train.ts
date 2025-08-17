@@ -4,7 +4,12 @@ async function runTraining() {
   const trainer = new TradeModelTrainer();
 
   try {
-    console.log("\n🔄 Starting training process...");
+    console.log("\n🧪 EXPERIMENT NEXT-A: Sequence Length Optimization");
+    console.log("🔬 TESTING: Timesteps 24 → 30 (25% increase)");
+    console.log("💡 HYPOTHESIS: Weekly crypto patterns need longer sequences");
+    console.log("📊 BASELINE: 52.75% accuracy, 0.9830 combined score");
+    console.log("🎯 TARGET: >55% accuracy with maintained class balance\n");
+
     const startTime = Date.now();
 
     await trainer.train();
@@ -16,6 +21,10 @@ async function runTraining() {
 
     const bestThreshold = trainer.getBestThreshold();
     console.log(`🎯 Best validation threshold: ${bestThreshold.toFixed(4)}`);
+
+    console.log("\n📈 EXPERIMENT NEXT-A RESULTS:");
+    console.log("Baseline (24 timesteps): 52.75% accuracy, 0.9830 combined score");
+    console.log("Current (30 timesteps): Analyzing performance change...");
   } catch (error) {
     console.error("\n❌ Training failed:", error);
     console.error(

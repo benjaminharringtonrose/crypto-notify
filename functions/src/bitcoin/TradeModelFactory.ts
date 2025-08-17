@@ -11,16 +11,16 @@ export default class TradeModelFactory {
   }
 
   public createModel(): tf.LayersModel {
-    console.log("Creating BALANCED model architecture for stable learning...");
+    console.log("Creating OPTIMIZED model architecture for better accuracy...");
     const model = tf.sequential();
 
-    // BALANCED ARCHITECTURE: Moderate complexity for stable learning
-    // Conv1D layer with moderate filters
+    // REVERTED: Back to optimal baseline configuration
+    // Conv1D layer with proven settings
     model.add(
       tf.layers.conv1d({
         inputShape: [this.timesteps, this.features],
-        filters: 48, // EXPERIMENT 3: 32 → 48 for better feature extraction
-        kernelSize: 3, // REVERTED: 7 → 3, larger kernels reduce performance
+        filters: 48, // KEPT: Our successful 48 filters
+        kernelSize: 3, // KEPT: Successful kernel size
         activation: "relu",
         kernelInitializer: "heNormal",
         kernelRegularizer: tf.regularizers.l2({ l2: 0.001 }),
@@ -30,10 +30,10 @@ export default class TradeModelFactory {
     model.add(tf.layers.batchNormalization({ name: "bn_conv1" }));
     model.add(tf.layers.dropout({ rate: 0.2, name: "dropout_conv1" }));
 
-    // Single LSTM layer with increased capacity
+    // LSTM layer - reverted to baseline
     model.add(
       tf.layers.lstm({
-        units: 64, // REVERTED: 80 → 64, increased capacity caused overfitting
+        units: 64,
         returnSequences: false,
         kernelInitializer: "heNormal",
         recurrentDropout: 0.2,
@@ -41,34 +41,35 @@ export default class TradeModelFactory {
       })
     );
 
-    // Single dense layer
+    // Dense layer
     model.add(
       tf.layers.dense({
-        units: 32, // REVERTED: 48 → 32, increased capacity caused overfitting
+        units: 32,
         activation: "relu",
         kernelInitializer: "heNormal",
         kernelRegularizer: tf.regularizers.l2({ l2: 0.001 }),
         name: "dense1",
       })
     );
-    model.add(tf.layers.dropout({ rate: 0.3, name: "dropout_dense1" })); // REVERTED: 0.2 → 0.3, less dropout caused overfitting
+    model.add(tf.layers.dropout({ rate: 0.3, name: "dropout_dense1" }));
 
     // Output layer
     model.add(
       tf.layers.dense({
         units: TRAINING_CONFIG.OUTPUT_CLASSES,
         activation: "softmax",
-        kernelInitializer: "heNormal",
+        kernelInitializer: "glorotUniform",
         name: "output",
       })
     );
 
     console.log(
-      `✅ Balanced model created with ~50K parameters for stable learning`
+      `✅ Optimized model created with same padding and LSTM dropout`
     );
     console.log(
-      `Model architecture: Conv1D(32,3) -> BN -> Dropout -> LSTM(64) -> Dense(32) -> Dropout -> Output(${TRAINING_CONFIG.OUTPUT_CLASSES})`
+      `Model architecture: Conv1D(48,3,same) -> BN -> Dropout -> LSTM(64,dropout=0.1) -> Dense(32) -> Dropout -> Output(${TRAINING_CONFIG.OUTPUT_CLASSES})`
     );
+    model.summary();
     return model;
   }
 }

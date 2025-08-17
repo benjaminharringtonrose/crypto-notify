@@ -256,7 +256,7 @@ export class DataProcessor {
   private labelData({
     prices,
     dayIndex,
-    threshold = 0.0015, // EXPERIMENT 1: 0.001 → 0.0015 for higher quality signals
+    threshold = 0.001, // INVESTIGATION: Revert 0.0015 → 0.001 to check if threshold is causing imbalance
     horizon = 1, // REVERTED: 2 → 1, shorter horizon has stronger signals
   }: {
     prices: number[];
@@ -274,14 +274,14 @@ export class DataProcessor {
     // SIMPLIFIED: Use simple threshold without complex adjustments
     const label = priceChangePercent > threshold ? 1 : 0;
 
-    // Debug: Log some labeling examples for verification
-    if (dayIndex % 100 === 0) {
+    // Debug: Enhanced logging to track labeling distribution
+    if (dayIndex % 50 === 0) {
       console.log(
         `Labeling Day ${dayIndex}: Current=${currentPrice.toFixed(
           2
         )}, Next=${nextPrice.toFixed(2)}, Change=${(
           priceChangePercent * 100
-        ).toFixed(3)}%, Label=${label}`
+        ).toFixed(3)}%, Threshold=${(threshold * 100).toFixed(3)}%, Label=${label === 1 ? 'BUY' : 'SELL'}`
       );
     }
 

@@ -34,10 +34,10 @@ export default class TradeModelFactory {
     model.add(tf.layers.batchNormalization({ name: "bn_conv1" }));
     model.add(tf.layers.dropout({ rate: 0.3, name: "dropout_conv1" })); // PROVEN: 0.2→0.3 critical
 
-    // LSTM layer - PROVEN optimal baseline (single LSTM, 64 units)
+    // LSTM layer - 7DAY-2: Increased capacity for better 7-day pattern learning
     model.add(
       tf.layers.lstm({
-        units: 64, // PROVEN OPTIMAL: 80 units failed (overfitting), 64 is limit
+        units: 72, // 7DAY-2: Moderate increase from 64 to help both buy/sell patterns
         returnSequences: false, // PROVEN: returnSequences=true failed
         kernelInitializer: "heNormal",
         recurrentDropout: 0.1, // Standard dropout
@@ -67,12 +67,16 @@ export default class TradeModelFactory {
       })
     );
 
-    console.log("✅ RECOVERY-1: Restored proven optimal baseline");
-    console.log("🎯 Target: 65.96% validation accuracy (documented optimal)");
+    console.log("🚀 v1.3.0: Timestep optimization for monthly cycle capture");
     console.log(
-      `📊 Architecture: Conv1D(48,3) → BN → Dropout(0.3) → LSTM(64) → Dense(32) → Dropout(0.3) → Output(2)`
+      "🎯 Target: Capture 5 weeks of history for better 7-day predictions"
     );
-    console.log(`📈 Features: ${this.features} (should be 25 core indicators)`);
+    console.log(
+      `📊 Architecture: Conv1D(48,3) → BN → Dropout(0.3) → LSTM(72) → Dense(32) → Dropout(0.3) → Output(2)`
+    );
+    console.log(
+      `📈 Timesteps: ${this.timesteps} (35 days), Features: ${this.features} (25 core indicators)`
+    );
 
     model.summary();
     return model;

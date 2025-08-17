@@ -91,7 +91,7 @@ const MODEL_CONFIG_BASE = {
   RESIDUAL_UNITS_2: 16, // Much smaller for faster training
   FEATURE_COUNT: 25, // EXPERIMENT NEW-6: Reduced core feature set
   BTC_FEATURE_COUNT: 25, // EXPERIMENT NEW-6: Core indicators only
-  TIMESTEPS: 30, // EXPERIMENT NEXT-A: Increased for weekly pattern capture
+  TIMESTEPS: 35, // v1.3.0: Increased for monthly cycle capture in 7-day predictions
   BATCH_NORM_MOMENTUM: 0.99,
   BATCH_NORM_EPSILON: 0.001,
   ACTIVATION: "relu" as const,
@@ -118,7 +118,7 @@ const MODEL_CONFIG_BASE = {
   USE_BIAS: true,
   TRAINABLE: true,
   DYNAMIC: false,
-  INPUT_SHAPE: [30, 25] as [number, number], // EXPERIMENT NEXT-A: 30 timesteps, 25 features
+  INPUT_SHAPE: [35, 25] as [number, number], // v1.3.0: 35 timesteps, 25 features
   OUTPUT_SHAPE: [2] as [number],
   LOSS: "focalLoss" as const,
   OPTIMIZER: "adam" as const,
@@ -327,6 +327,6 @@ export const TIME_CONVERSIONS = {
   ONE_HOUR_IN_SECONDS: 3600,
   ONE_DAY_IN_MILLISECONDS: 86400000,
   ONE_DAY_IN_SECONDS: 86400,
-  TIMESTEP_IN_SECONDS: MODEL_CONFIG_BASE.TIMESTEPS * 86400, // Updated with new timesteps
+  TIMESTEP_IN_SECONDS: MODEL_CONFIG_BASE.TIMESTEPS * 86400, // v1.3.0: Updated with 35 timesteps
   ONE_MONTH_IN_DAYS: 30,
 };

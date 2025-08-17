@@ -4,21 +4,19 @@ async function runTraining() {
   const trainer = new TradeModelTrainer();
 
   try {
-    console.log("\n🚀 EXPERIMENT 7DAY-1: CLASS BALANCE + LR OPTIMIZATION");
-    console.log("🎯 IMPROVING: 7-day baseline with class balance optimization");
+    console.log("\n🚀 EXPERIMENT v1.3.0: TIMESTEP OPTIMIZATION");
     console.log(
-      "📊 ARCHITECTURE: Conv1D(48,3) → BN → LSTM(64) → Dense(32) → Output(2)"
-    );
-    console.log("⚙️ TRAINING: Alpha [0.45,0.55], Min LR 0.00005, 30 epochs");
-    console.log(
-      "🔮 PREDICTION: 7-day ahead buy/sell signals (established baseline)"
+      "🎯 BUILDING ON: v1.2.0 success (58.97% balanced accuracy, MCC 0.1795)"
     );
     console.log(
-      "🔬 HYPOTHESIS: Better class balance + higher LR floor improves 7-day predictions"
+      "📊 ARCHITECTURE: Conv1D(48,3) → BN → LSTM(72) → Dense(32) → Output(2)"
     );
+    console.log("⚙️ CHANGE: Timesteps 30 → 35 (+16.7% history, ~5 weeks)");
+    console.log("🔮 PREDICTION: 7-day ahead buy/sell signals");
     console.log(
-      "🎯 TARGET: Improve balanced accuracy from 53.85% and MCC from 0.0789\n"
+      "🔬 HYPOTHESIS: 5 weeks of history captures monthly cycles for better 7-day predictions"
     );
+    console.log("🎯 TARGET: Balanced accuracy >60% and MCC >0.18\n");
 
     const startTime = Date.now();
 
@@ -34,14 +32,14 @@ async function runTraining() {
     const bestThreshold = trainer.getBestThreshold();
     console.log(`🎯 Best validation threshold: ${bestThreshold.toFixed(4)}`);
 
-    console.log("\n📈 EXPERIMENT 7DAY-1 ANALYSIS:");
-    console.log("✅ Compare balanced accuracy vs baseline 53.85%");
-    console.log("✅ Monitor MCC improvement from baseline 0.0789");
-    console.log("✅ Check F1 score balance (baseline: 0.5555/0.5279)");
-    console.log("✅ Verify class balance remains stable");
-    console.log("💡 Focal loss Alpha [0.45,0.55] should improve class balance");
+    console.log("\n📈 EXPERIMENT v1.3.0 ANALYSIS:");
+    console.log("✅ Compare balanced accuracy vs v1.2.0: 58.97%");
+    console.log("✅ Monitor MCC improvement from v1.2.0: 0.1795");
+    console.log("✅ Target: Both Buy & Sell F1 >0.58 (balanced excellence)");
+    console.log("✅ Watch training time (35 timesteps = +16.7% computation)");
+    console.log("💡 5 weeks of history should capture monthly market cycles");
     console.log(
-      "💡 Higher min LR should prevent over-conservative convergence"
+      "💡 Better context for 7-day predictions without overfitting risk"
     );
   } catch (error) {
     console.error("\n❌ Training failed:", error);

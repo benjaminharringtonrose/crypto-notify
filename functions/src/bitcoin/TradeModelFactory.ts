@@ -35,7 +35,7 @@ export default class TradeModelFactory {
     // LSTM layer - optimal baseline
     model.add(
       tf.layers.lstm({
-        units: 64, // OPTIMAL: Capacity limit found
+        units: 64, // REVERTED: 80 caused severe class imbalance
         returnSequences: false, // OPTIMAL: For binary classification
         kernelInitializer: "heNormal",
         recurrentDropout: 0.2,
@@ -49,7 +49,7 @@ export default class TradeModelFactory {
         units: 32, // OPTIMAL: Capacity limit found
         activation: "relu",
         kernelInitializer: "heNormal",
-        kernelRegularizer: tf.regularizers.l2({ l2: 0.001 }),
+        kernelRegularizer: tf.regularizers.l1l2({ l1: 0.0005, l2: 0.001 }), // EXPERIMENT NEXT-F: L1+L2 regularization
         name: "dense1",
       })
     );

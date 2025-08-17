@@ -273,7 +273,7 @@ export const MODEL_CONFIG = {
 export const TRAINING_CONFIG = {
   // EMERGENCY FIX: Stable training configuration
   EPOCHS: 30, // REVERTED: 50 → 30, higher epochs caused overfitting
-  BATCH_SIZE: 16, // Keep moderate batch size
+  BATCH_SIZE: 32, // EXPERIMENT NEXT-E: Increased from 16 for better gradient estimates
   SHUFFLE_CHUNK_SIZE: 10,
   INITIAL_LEARNING_RATE: 0.0005, // REVERTED: 0.0008 → 0.0005, back to optimal baseline
   MIN_LEARNING_RATE: 0.00001, // REVERTED: 0.00005 → 0.00001, back to baseline

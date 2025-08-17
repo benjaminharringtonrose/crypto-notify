@@ -926,7 +926,7 @@ export default class FeatureCalculator {
 
       // 4-6: Trend Indicators (3 features)
       indicators.sma7,
-      indicators.sma21, 
+      indicators.sma21,
       indicators.sma50 || indicators.sma20,
 
       // 7-9: Momentum Indicators (3 features)
@@ -960,11 +960,12 @@ export default class FeatureCalculator {
       indicators.prevRsi, // Previous RSI for momentum
       indicators.macdLine - indicators.signalLine, // MACD histogram
       indicators.atr / (indicators.currentPrice || 1), // Normalized ATR
-      volumes[dayIndex] / 
+      volumes[dayIndex] /
         (volumes
           .slice(Math.max(0, dayIndex - 19), dayIndex + 1)
-          .reduce((a, b) => a + b, 0) / Math.min(20, dayIndex + 1)), // Volume ratio
-      indicators.momentum // Raw momentum
+          .reduce((a, b) => a + b, 0) /
+          Math.min(20, dayIndex + 1)), // Volume ratio
+      indicators.momentum, // Raw momentum
     ];
 
     return coreFeatures;

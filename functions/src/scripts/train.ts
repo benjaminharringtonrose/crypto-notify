@@ -47,25 +47,10 @@ async function runTraining() {
     const endTime = Date.now();
     const trainingTime = (endTime - startTime) / 1000;
 
-    console.log("\n✅ FAST Training completed successfully!");
     console.log(`⏱️  Total training time: ${trainingTime.toFixed(2)} seconds`);
-    console.log(
-      `⚡ Speed improvement: Expected 3-5x faster than previous runs`
-    );
 
     const bestThreshold = trainer.getBestThreshold();
     console.log(`🎯 Best validation threshold: ${bestThreshold.toFixed(4)}`);
-
-    console.log("\n📈 Expected Improvements:");
-    console.log("   🎯 Dynamic predictions (no more static 0.0232/0.9768)");
-    console.log("   🚀 Much faster convergence (30 epochs vs 200)");
-    console.log("   📊 Better class balance through stratified splitting");
-    console.log("   💰 Improved win rate through better learning");
-
-    console.log("\n📋 Next Steps:");
-    console.log("   1. Run backtest to verify dynamic predictions");
-    console.log("   2. Check for improved win rate (target: >50%)");
-    console.log("   3. Monitor training convergence and learning");
   } catch (error) {
     console.error("\n❌ Training failed:", error);
     console.error(

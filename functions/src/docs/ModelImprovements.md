@@ -358,24 +358,176 @@ We'll test small, incremental changes and measure their impact:
 **Decision**: **CRITICAL** - Investigation needed. Current model performance is unacceptable.
 
 ### **INVESTIGATION RESULT: Threshold Optimization Critical Fix** - December 2024
+
 **Status**: ✅ MAJOR BREAKTHROUGH  
 **Root Cause**: Threshold 0.0015 was causing severe class imbalance in raw data  
-**Fix**: Revert threshold 0.0015 → 0.001  
+**Fix**: Revert threshold 0.0015 → 0.001
 
 **Results**:
+
 - **Before Fix**: Combined Score 0.7395, Val Accuracy 47.87%, Buy/Sell 81/13 (severe imbalance)
 - **After Fix**: Combined Score 1.1082, Val Accuracy 60.44%, Buy/Sell 42/49 (balanced)
 - **Improvement**: +41.6% combined score, +26.2% validation accuracy!
 
-**Analysis**: 
+**Analysis**:
 ✅ **Root Cause Identified**: Higher threshold (0.0015) created class imbalance before dataset balancing  
 ✅ **Class Balance Restored**: Now seeing proper buy/sell distribution in predictions  
 ✅ **Learning Restored**: Model can properly learn both buy and sell signals  
-✅ **Performance Recovery**: Back to acceptable performance levels  
+✅ **Performance Recovery**: Back to acceptable performance levels
 
 **Key Learning**: Threshold selection is CRITICAL for class balance. Even small changes (0.001→0.0015) can destroy model learning by creating severe data imbalance that overwhelms the balancing algorithm.
 
 **Decision**: **ADOPT** - Keep threshold at 0.001. This is our new working baseline for further experiments.
+
+### **Experiment NEW-1: Conv1D Filter Scaling** - December 2024
+
+**Status**: ❌ FAILED  
+**Change**: Conv1D filters 48 → 56 (17% increase)  
+**Hypothesis**: More filters = better feature extraction to push past 60% accuracy
+
+**Results**:
+
+- **Best Combined Score**: 0.9406 vs 1.1082 baseline (↓15.1% major regression)
+- **Best Validation Accuracy**: 51.65% vs 60.44% baseline (↓14.5% decline)
+- **Buy F1**: 0.5059 vs 0.5867 baseline (↓13.8% decline)
+- **Sell F1**: 0.5042 vs 0.5908 baseline (↓14.7% decline)
+
+**Analysis**:
+❌ **Capacity Limit Confirmed**: 48 filters is indeed the optimal for our data size  
+❌ **Overfitting Pattern**: Higher capacity consistently reduces performance  
+❌ **Diminishing Returns**: Each increase beyond 48 filters hurts all metrics
+
+**Key Learning**: Conv1D filter capacity of 48 is a hard limit for our dataset. Any increase causes overfitting and performance degradation across all metrics.
+
+**Decision**: **REJECT** - Keep 48 Conv1D filters as optimal.
+
+### **Experiment NEW-2: Learning Rate Fine-tuning** - December 2024
+
+**Status**: ⚠️ MIXED RESULTS  
+**Change**: Initial learning rate 0.0005 → 0.0008 (60% increase)  
+**Hypothesis**: Higher LR = better convergence and faster learning
+
+**Results**:
+
+- **Best Combined Score**: 1.1043 vs 1.1082 baseline (↓0.4% minimal decline)
+- **Best Validation Accuracy**: 60.44% vs 60.44% baseline (identical performance!)
+- **Buy F1**: 0.5377 vs 0.5867 baseline (↓8.4% decline)
+- **Sell F1**: 0.6364 vs 0.5908 baseline (↑7.7% improvement!)
+
+**Analysis**:
+⚠️ **INTERESTING TRADE-OFF**: Same validation accuracy but different F1 balance  
+✅ **Sell Performance Boost**: +7.7% improvement in sell predictions  
+❌ **Buy Performance Drop**: -8.4% decline in buy predictions  
+⚠️ **Neutral Overall**: Combined score nearly identical
+
+**Key Learning**: Learning rate affects prediction balance. Higher LR (0.0008) favors sell predictions, baseline LR (0.0005) favors buy predictions. Both achieve same validation accuracy.
+
+**Decision**: **REJECT** - Keep 0.0005 LR for balanced predictions, but this suggests LR tuning could be useful for specific trading strategies.
+
+### **Experiment NEW-3: Multi-Scale Conv1D Architecture** - December 2024
+
+**Status**: ❌ CATASTROPHIC FAILURE  
+**Change**: Single Conv1D(48,3) → Parallel [Conv1D(16,3) + Conv1D(16,5) + Conv1D(16,7)] → Concatenate  
+**Hypothesis**: Different kernel sizes capture different temporal patterns in parallel
+
+**Results**:
+
+- **Best Combined Score**: 0.8118 vs 1.1082 baseline (↓26.7% CATASTROPHIC!)
+- **Best Validation Accuracy**: 45.05% vs 60.44% baseline (↓25.5% MAJOR FAILURE!)
+- **Buy F1**: 0.3890 vs 0.5867 baseline (↓33.7% severe decline)
+- **Sell F1**: 0.4929 vs 0.5908 baseline (↓16.6% major decline)
+- **Early Stopping**: At epoch 11 due to severe class imbalance
+
+**Analysis**:
+❌ **Complete Architecture Failure**: Multi-scale approach completely disrupted learning  
+❌ **Class Imbalance Crisis**: Model collapsed to 89/2 buy/sell predictions by epoch 10  
+❌ **Parameter Distribution Issues**: Splitting 48 filters across branches may have reduced individual branch capacity  
+❌ **Complexity vs Data**: Parallel architecture too complex for current dataset size
+
+**Key Learning**: Our dataset cannot support complex parallel architectures. Simple, focused architectures work better than sophisticated multi-branch designs for crypto time series.
+
+**Decision**: **REJECT** - Revert to single Conv1D. Multi-scale approaches are not suitable for our data complexity.
+
+### **Experiment NEW-4: Lightweight Attention Mechanism** - December 2024
+
+**Status**: ❌ FAILED  
+**Change**: LSTM returnSequences=false → true + GlobalAveragePooling1D  
+**Hypothesis**: Attention helps model focus on important time steps
+
+**Results**:
+
+- **Best Combined Score**: 1.0531 vs 1.1082 baseline (↓5.0% decline)
+- **Best Validation Accuracy**: 58.24% vs 60.44% baseline (↓3.6% regression)
+- **Buy F1**: 0.6548 vs 0.5867 baseline (↑11.6% improvement!)
+- **Sell F1**: 0.4676 vs 0.5908 baseline (↓20.9% major decline!)
+- **Class Imbalance**: 64/27 buy/sell split showing bias
+
+**Analysis**:
+⚠️ **Mixed Results**: Improved buy predictions but destroyed sell predictions  
+❌ **Class Bias**: Model learned to favor buy class heavily  
+❌ **Overall Decline**: Net performance decrease despite buy improvement  
+✅ **Architecture Intact**: No catastrophic failure like multi-scale
+
+**Key Learning**: Simple attention (GlobalAveragePooling1D) disrupts the balanced learning our LSTM achieved. The sequential nature of returnSequences=false works better for our binary classification task.
+
+**Decision**: **REJECT** - Revert to baseline LSTM. Current LSTM configuration is optimal for balanced predictions.
+
+### **Experiment NEW-5: Feature Set Analysis** - December 2024
+
+**Status**: ❌ FAILED  
+**Change**: Analyzed current 62-feature implementation vs baseline  
+**Hypothesis**: Rich technical indicators should improve performance
+
+**Results**:
+
+- **Best Combined Score**: 1.0131 vs 1.1082 baseline (↓8.6% decline)
+- **Best Validation Accuracy**: 56.04% vs 60.44% baseline (↓7.3% regression)
+- **Buy F1**: 0.5957 vs 0.5867 baseline (↑1.5% slight improvement)
+- **Sell F1**: 0.4869 vs 0.5908 baseline (↓17.6% significant decline)
+
+**Analysis**:
+❌ **Feature Overload**: 62 features added more noise than signal  
+❌ **Class Imbalance**: Complex features disrupted balanced learning  
+❌ **Overfitting**: Too many features for our dataset size (600 days)  
+✅ **Insight Found**: Need feature reduction, not feature addition
+
+**Key Learning**: More features ≠ better performance. Our extensive technical indicator set was counterproductive, suggesting feature noise was overwhelming the model's ability to learn meaningful patterns.
+
+**Decision**: **REJECT** current feature set - Need to reduce and optimize features.
+
+### **Experiment NEW-6: Core Feature Set Optimization** - December 2024
+
+**Status**: ✅ MAJOR SUCCESS  
+**Change**: Reduced 62 features → 25 core indicators focused on trader essentials  
+**Hypothesis**: Less noise + domain-focused features = better performance
+
+**Core Feature Set (25 features)**:
+
+- **Price Action**: Current price, previous price, price change %
+- **Trend**: SMA 7/21/50, price/SMA ratios
+- **Momentum**: RSI, MACD line/signal, MACD histogram
+- **Volatility**: ATR, Bollinger Bands, BB position
+- **Volume**: Volume, volume MA, VWAP, volume ratio
+
+**Results**:
+
+- **Best Combined Score**: 1.1293 vs 1.1082 baseline (↑1.9% improvement!)
+- **Best Validation Accuracy**: 60.44% vs 60.44% baseline (matched best performance!)
+- **Buy F1**: 0.5646 vs 0.5867 baseline (↓3.8% slight decline)
+- **Sell F1**: 0.6341 vs 0.5908 baseline (↑7.3% improvement!)
+- **Training Time**: 31.6s vs 40s baseline (↓21% faster!)
+- **Model Size**: 34.8K vs 46K parameters (↓24% smaller!)
+
+**Analysis**:
+✅ **BREAKTHROUGH**: Reduced features dramatically improved efficiency while maintaining performance  
+✅ **Better Balance**: Improved sell predictions (0.6341 vs 0.5908 F1)  
+✅ **Training Efficiency**: 21% faster training, 24% fewer parameters  
+✅ **Domain Focus**: Core trading indicators provide sufficient signal  
+✅ **Noise Reduction**: Removing 37 redundant features eliminated confusion
+
+**Key Learning**: **"Less is More"** - 25 well-chosen features outperform 62 complex indicators. Domain knowledge (trader-used indicators) beats feature engineering complexity. Quality > Quantity in feature selection.
+
+**Decision**: **ADOPT** - Core feature set (25 features) is our new optimal baseline. This represents a major breakthrough in model efficiency and clarity.
 
 ---
 

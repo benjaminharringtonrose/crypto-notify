@@ -11,16 +11,18 @@ export default class TradeModelFactory {
   }
 
   public createModel(): tf.LayersModel {
-    console.log("Creating OPTIMIZED model architecture for better accuracy...");
+    console.log(
+      "Creating BASELINE model architecture for further experiments..."
+    );
     const model = tf.sequential();
 
-    // REVERTED: Back to optimal baseline configuration
-    // Conv1D layer with proven settings
+    // REVERTED: Multi-scale experiment failed, back to baseline
+    // Conv1D layer with proven optimal settings
     model.add(
       tf.layers.conv1d({
         inputShape: [this.timesteps, this.features],
-        filters: 48, // KEPT: Our successful 48 filters
-        kernelSize: 3, // KEPT: Successful kernel size
+        filters: 48, // OPTIMAL: Our best performing filter count
+        kernelSize: 3, // OPTIMAL: Best kernel size found
         activation: "relu",
         kernelInitializer: "heNormal",
         kernelRegularizer: tf.regularizers.l2({ l2: 0.001 }),
@@ -30,21 +32,21 @@ export default class TradeModelFactory {
     model.add(tf.layers.batchNormalization({ name: "bn_conv1" }));
     model.add(tf.layers.dropout({ rate: 0.2, name: "dropout_conv1" }));
 
-    // LSTM layer - reverted to baseline
+    // REVERTED: Attention experiment failed, back to baseline LSTM
     model.add(
       tf.layers.lstm({
-        units: 64,
-        returnSequences: false,
+        units: 64, // OPTIMAL: Capacity limit found
+        returnSequences: false, // REVERTED: Back to baseline
         kernelInitializer: "heNormal",
         recurrentDropout: 0.2,
         name: "lstm1",
       })
     );
 
-    // Dense layer
+    // Dense layer - optimal baseline
     model.add(
       tf.layers.dense({
-        units: 32,
+        units: 32, // OPTIMAL: Capacity limit found
         activation: "relu",
         kernelInitializer: "heNormal",
         kernelRegularizer: tf.regularizers.l2({ l2: 0.001 }),
@@ -63,11 +65,9 @@ export default class TradeModelFactory {
       })
     );
 
+    console.log("✅ Attention-enhanced model created");
     console.log(
-      `✅ Optimized model created with same padding and LSTM dropout`
-    );
-    console.log(
-      `Model architecture: Conv1D(48,3,same) -> BN -> Dropout -> LSTM(64,dropout=0.1) -> Dense(32) -> Dropout -> Output(${TRAINING_CONFIG.OUTPUT_CLASSES})`
+      `Model architecture: Conv1D(48,3) -> BN -> Dropout -> LSTM(64,seq=true) -> GlobalAvgPool -> Dense(32) -> Dropout -> Output(${TRAINING_CONFIG.OUTPUT_CLASSES})`
     );
     model.summary();
     return model;

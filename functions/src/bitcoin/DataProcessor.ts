@@ -281,7 +281,9 @@ export class DataProcessor {
           2
         )}, Next=${nextPrice.toFixed(2)}, Change=${(
           priceChangePercent * 100
-        ).toFixed(3)}%, Threshold=${(threshold * 100).toFixed(3)}%, Label=${label === 1 ? 'BUY' : 'SELL'}`
+        ).toFixed(3)}%, Threshold=${(threshold * 100).toFixed(3)}%, Label=${
+          label === 1 ? "BUY" : "SELL"
+        }`
       );
     }
 

@@ -89,8 +89,8 @@ const MODEL_CONFIG_BASE = {
   ATTENTION_UNITS_2: 16, // Much smaller for faster training
   RESIDUAL_UNITS_1: 32, // Much smaller for faster training
   RESIDUAL_UNITS_2: 16, // Much smaller for faster training
-  FEATURE_COUNT: 62, // Number of features (actual count)
-  BTC_FEATURE_COUNT: 62, // Number of BTC features (actual count)
+  FEATURE_COUNT: 25, // EXPERIMENT NEW-6: Reduced core feature set
+  BTC_FEATURE_COUNT: 25, // EXPERIMENT NEW-6: Core indicators only
   TIMESTEPS: 24, // Number of timesteps
   BATCH_NORM_MOMENTUM: 0.99,
   BATCH_NORM_EPSILON: 0.001,
@@ -118,7 +118,7 @@ const MODEL_CONFIG_BASE = {
   USE_BIAS: true,
   TRAINABLE: true,
   DYNAMIC: false,
-  INPUT_SHAPE: [24, 62] as [number, number],
+  INPUT_SHAPE: [24, 25] as [number, number], // EXPERIMENT NEW-6: Updated for core features
   OUTPUT_SHAPE: [2] as [number],
   LOSS: "focalLoss" as const,
   OPTIMIZER: "adam" as const,
@@ -275,7 +275,7 @@ export const TRAINING_CONFIG = {
   EPOCHS: 30, // REVERTED: 50 → 30, higher epochs caused overfitting
   BATCH_SIZE: 16, // Keep moderate batch size
   SHUFFLE_CHUNK_SIZE: 10,
-  INITIAL_LEARNING_RATE: 0.0005, // REVERTED: 0.001 → 0.0005, back to stable baseline
+  INITIAL_LEARNING_RATE: 0.0005, // REVERTED: 0.0008 → 0.0005, back to optimal baseline
   MIN_LEARNING_RATE: 0.00001, // REVERTED: 0.00005 → 0.00001, back to baseline
   CYCLIC_LR_STEP_SIZE: 15, // REVERTED: 10 → 15, back to baseline
   OUTPUT_CLASSES: 2,

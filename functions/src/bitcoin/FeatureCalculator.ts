@@ -915,93 +915,58 @@ export default class FeatureCalculator {
       dayIndex,
       currentPrice,
     });
-    const baseFeatures = [
-      indicators.rsi,
-      indicators.prevRsi,
+
+    // EXPERIMENT NEW-6: Reduced Core Feature Set (25 features)
+    // Focus on essential indicators that crypto traders actually use
+    const coreFeatures = [
+      // 1-3: Price Action (3 features)
+      indicators.currentPrice,
+      dayIndex > 0 ? prices[dayIndex - 1] : prices[0], // Previous price
+      indicators.priceChangePct, // Price change %
+
+      // 4-6: Trend Indicators (3 features)
       indicators.sma7,
-      indicators.sma21,
-      indicators.prevSma7,
-      indicators.prevSma21,
+      indicators.sma21, 
+      indicators.sma50 || indicators.sma20,
+
+      // 7-9: Momentum Indicators (3 features)
+      indicators.rsi,
       indicators.macdLine,
       indicators.signalLine,
-      indicators.currentPrice,
-      indicators.upperBand,
-      indicators.lowerBand,
-      indicators.obvValues[indicators.obvValues.length - 1] / 1e6,
-      indicators.obv,
+
+      // 10-12: Volatility Indicators (3 features)
       indicators.atr,
-      indicators.atrBaseline,
-      indicators.zScore,
+      indicators.upperBand, // Bollinger Band upper
+      indicators.lowerBand, // Bollinger Band lower
+
+      // 13-15: Volume Indicators (3 features)
+      volumes[dayIndex],
+      // Volume MA (20-day)
+      volumes
+        .slice(Math.max(0, dayIndex - 19), dayIndex + 1)
+        .reduce((a, b) => a + b, 0) / Math.min(20, dayIndex + 1),
       indicators.vwap,
-      indicators.stochRsi,
-      indicators.stochRsiSignal,
-      indicators.prevStochRsi,
-      indicators.fib61_8,
-      dayIndex > 0 ? prices[dayIndex - 1] : prices[0],
-      indicators.volumeOscillator,
-      indicators.prevVolumeOscillator,
-      indicators.isDoubleTop ? 1 : 0,
-      indicators.isHeadAndShoulders ? 1 : 0,
-      indicators.prevMacdLine,
-      indicators.isTripleTop ? 1 : 0,
-      indicators.isTripleBottom ? 1 : 0,
-      indicators.isVolumeSpike ? 1 : 0,
-      indicators.momentum,
-      indicators.priceChangePct,
-      indicators.sma20,
-      indicators.volAdjustedMomentum,
-      indicators.trendRegime,
-      indicators.adxProxy,
-      // Market Regime Features
-      indicators.volatilityRegimeScore,
-      indicators.trendRegimeScore,
-      indicators.momentumRegimeScore,
-      indicators.realizedVolatility,
-      indicators.regimeScore,
-      // Additional technical indicators
-      indicators.sma50 || indicators.sma20,
-      indicators.sma200 || indicators.sma20,
-      // Price-based features
-      currentPrice / (indicators.sma20 || currentPrice),
-      currentPrice / (indicators.sma50 || currentPrice),
-      currentPrice / (indicators.sma200 || currentPrice),
-      // Volume-based features
-      volumes[dayIndex] /
-        (volumes
-          .slice(Math.max(0, dayIndex - 20), dayIndex + 1)
-          .reduce((a, b) => a + b, 0) /
-          Math.min(21, dayIndex + 1)),
-      volumes[dayIndex] /
-        (volumes
-          .slice(Math.max(0, dayIndex - 50), dayIndex + 1)
-          .reduce((a, b) => a + b, 0) /
-          Math.min(51, dayIndex + 1)),
-      // Momentum features
-      indicators.momentum / (indicators.atr || 1),
-      indicators.priceChangePct / (indicators.atr || 1),
-      // RSI-based features
-      indicators.rsi / 100,
-      indicators.prevRsi / 100,
-      // MACD-based features
-      indicators.macdLine / (indicators.currentPrice || 1),
-      indicators.signalLine / (indicators.currentPrice || 1),
-      // Bollinger Bands features
-      (indicators.currentPrice - indicators.upperBand) /
-        (indicators.upperBand - indicators.lowerBand || 1),
+
+      // 16-20: Relative/Ratio Features (5 features)
+      currentPrice / (indicators.sma7 || currentPrice), // Price/SMA7 ratio
+      currentPrice / (indicators.sma21 || currentPrice), // Price/SMA21 ratio
+      currentPrice / (indicators.sma50 || indicators.sma20 || currentPrice), // Price/SMA50 ratio
+      indicators.rsi / 100, // Normalized RSI
+      // Bollinger Band position (0-1 scale)
       (indicators.currentPrice - indicators.lowerBand) /
         (indicators.upperBand - indicators.lowerBand || 1),
-      // Stochastic features
-      indicators.stochRsi / 100,
-      indicators.stochRsiSignal / 100,
-      // Fibonacci features
-      indicators.fib61_8 / (indicators.currentPrice || 1),
-      // ATR-based features
-      indicators.atr / (indicators.currentPrice || 1),
-      indicators.atrBaseline / (indicators.currentPrice || 1),
-      // VWAP features
-      indicators.vwap / (indicators.currentPrice || 1),
+
+      // 21-25: Secondary Indicators (5 features)
+      indicators.prevRsi, // Previous RSI for momentum
+      indicators.macdLine - indicators.signalLine, // MACD histogram
+      indicators.atr / (indicators.currentPrice || 1), // Normalized ATR
+      volumes[dayIndex] / 
+        (volumes
+          .slice(Math.max(0, dayIndex - 19), dayIndex + 1)
+          .reduce((a, b) => a + b, 0) / Math.min(20, dayIndex + 1)), // Volume ratio
+      indicators.momentum // Raw momentum
     ];
 
-    return baseFeatures;
+    return coreFeatures;
   }
 }

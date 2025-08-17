@@ -2,19 +2,6 @@ import { TradeModelTrainer } from "../bitcoin/TradeModelTrainer";
 import { TRAINING_CONFIG } from "../constants";
 
 async function runTraining() {
-  console.log("🚀 Starting FAST-LEARNING BTC Model Training");
-  console.log("=".repeat(60));
-  console.log("🎯 OPTIMIZATIONS APPLIED:");
-  console.log("   ✅ Simplified CNN-LSTM architecture (Conv1D+LSTM+Dense)");
-  console.log("   ✅ Stratified data splitting for diverse market conditions");
-  console.log("   ✅ Reduced epochs (30), increased learning rate (0.002)");
-  console.log("   ✅ Reduced data size (300 days), increased batch size (32)");
-  console.log(
-    "   ✅ Removed complex features (attention, residual, batch norm)"
-  );
-  console.log("   ✅ Simple labeling with 0.05% threshold");
-  console.log("=".repeat(60));
-
   console.log("\n📊 Training Configuration:");
   console.log(`   Epochs: ${TRAINING_CONFIG.EPOCHS} (REDUCED for speed)`);
   console.log(
@@ -39,7 +26,7 @@ async function runTraining() {
   const trainer = new TradeModelTrainer();
 
   try {
-    console.log("\n🔄 Starting OPTIMIZED training process...");
+    console.log("\n🔄 Starting training process...");
     const startTime = Date.now();
 
     await trainer.train();

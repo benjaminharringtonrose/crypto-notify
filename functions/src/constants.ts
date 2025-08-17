@@ -89,8 +89,8 @@ const MODEL_CONFIG_BASE = {
   ATTENTION_UNITS_2: 16, // Much smaller for faster training
   RESIDUAL_UNITS_1: 32, // Much smaller for faster training
   RESIDUAL_UNITS_2: 16, // Much smaller for faster training
-  FEATURE_COUNT: 25, // EXPERIMENT NEW-6: Reduced core feature set
-  BTC_FEATURE_COUNT: 25, // EXPERIMENT NEW-6: Core indicators only
+  FEATURE_COUNT: 30, // v1.4.0: Enhanced feature set with multi-timeframe indicators
+  BTC_FEATURE_COUNT: 30, // v1.4.0: Advanced technical indicators
   TIMESTEPS: 35, // v1.3.0: Increased for monthly cycle capture in 7-day predictions
   BATCH_NORM_MOMENTUM: 0.99,
   BATCH_NORM_EPSILON: 0.001,
@@ -118,7 +118,7 @@ const MODEL_CONFIG_BASE = {
   USE_BIAS: true,
   TRAINABLE: true,
   DYNAMIC: false,
-  INPUT_SHAPE: [35, 25] as [number, number], // v1.3.0: 35 timesteps, 25 features
+  INPUT_SHAPE: [35, 30] as [number, number], // v1.4.0: 35 timesteps, 30 enhanced features
   OUTPUT_SHAPE: [2] as [number],
   LOSS: "focalLoss" as const,
   OPTIMIZER: "adam" as const,

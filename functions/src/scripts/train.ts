@@ -4,19 +4,23 @@ async function runTraining() {
   const trainer = new TradeModelTrainer();
 
   try {
-    console.log("\n🚀 EXPERIMENT v1.3.0: TIMESTEP OPTIMIZATION");
+    console.log("\n🚀 EXPERIMENT v1.4.0: ADVANCED FEATURE ENGINEERING");
     console.log(
-      "🎯 BUILDING ON: v1.2.0 success (58.97% balanced accuracy, MCC 0.1795)"
+      "🎯 BUILDING ON: v1.3.0 breakthrough (59.35% balanced accuracy, MCC 0.2242)"
     );
     console.log(
       "📊 ARCHITECTURE: Conv1D(48,3) → BN → LSTM(72) → Dense(32) → Output(2)"
     );
-    console.log("⚙️ CHANGE: Timesteps 30 → 35 (+16.7% history, ~5 weeks)");
+    console.log(
+      "⚙️ CHANGE: Enhanced technical indicators (multi-timeframe RSI, volume momentum)"
+    );
     console.log("🔮 PREDICTION: 7-day ahead buy/sell signals");
     console.log(
-      "🔬 HYPOTHESIS: 5 weeks of history captures monthly cycles for better 7-day predictions"
+      "🔬 HYPOTHESIS: Advanced features improve sell predictions while maintaining buy excellence"
     );
-    console.log("🎯 TARGET: Balanced accuracy >60% and MCC >0.18\n");
+    console.log(
+      "🎯 TARGET: Buy F1 >0.67, Sell F1 >0.55, Balanced accuracy >60%\n"
+    );
 
     const startTime = Date.now();
 
@@ -32,14 +36,16 @@ async function runTraining() {
     const bestThreshold = trainer.getBestThreshold();
     console.log(`🎯 Best validation threshold: ${bestThreshold.toFixed(4)}`);
 
-    console.log("\n📈 EXPERIMENT v1.3.0 ANALYSIS:");
-    console.log("✅ Compare balanced accuracy vs v1.2.0: 58.97%");
-    console.log("✅ Monitor MCC improvement from v1.2.0: 0.1795");
-    console.log("✅ Target: Both Buy & Sell F1 >0.58 (balanced excellence)");
-    console.log("✅ Watch training time (35 timesteps = +16.7% computation)");
-    console.log("💡 5 weeks of history should capture monthly market cycles");
+    console.log("\n📈 EXPERIMENT v1.4.0 ANALYSIS:");
+    console.log("✅ Compare balanced accuracy vs v1.3.0: 59.35%");
+    console.log("✅ Monitor MCC improvement from v1.3.0: 0.2242");
+    console.log("✅ Target: Buy F1 maintain >0.67, Sell F1 improve >0.55");
+    console.log("✅ Watch for feature dilution with enhanced indicator set");
     console.log(
-      "💡 Better context for 7-day predictions without overfitting risk"
+      "💡 Multi-timeframe RSI should capture different momentum patterns"
+    );
+    console.log(
+      "💡 Volume momentum should help identify sell pressure patterns"
     );
   } catch (error) {
     console.error("\n❌ Training failed:", error);

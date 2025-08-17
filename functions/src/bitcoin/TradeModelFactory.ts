@@ -67,15 +67,17 @@ export default class TradeModelFactory {
       })
     );
 
-    console.log("🚀 v1.3.0: Timestep optimization for monthly cycle capture");
     console.log(
-      "🎯 Target: Capture 5 weeks of history for better 7-day predictions"
+      "🚀 v1.4.0: Advanced feature engineering for balanced predictions"
+    );
+    console.log(
+      "🎯 Target: Maintain buy excellence while improving sell predictions"
     );
     console.log(
       `📊 Architecture: Conv1D(48,3) → BN → Dropout(0.3) → LSTM(72) → Dense(32) → Dropout(0.3) → Output(2)`
     );
     console.log(
-      `📈 Timesteps: ${this.timesteps} (35 days), Features: ${this.features} (25 core indicators)`
+      `📈 Timesteps: ${this.timesteps} (35 days), Features: ${this.features} (30 enhanced indicators)`
     );
 
     model.summary();

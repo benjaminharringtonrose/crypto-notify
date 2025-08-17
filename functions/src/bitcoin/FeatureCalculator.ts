@@ -82,7 +82,7 @@ export default class FeatureCalculator {
     return data.slice(-periods - offset, offset === 0 ? undefined : -offset);
   }
 
-  public calculateRSI(prices: number[], period = PERIODS.RSI): number {
+  public calculateRSI(prices: number[], period: number = PERIODS.RSI): number {
     if (prices.length < period + 1) return 50;
     let gains = 0,
       losses = 0;
@@ -929,8 +929,10 @@ export default class FeatureCalculator {
       indicators.sma21,
       indicators.sma50 || indicators.sma20,
 
-      // 7-9: Momentum Indicators (3 features)
-      indicators.rsi,
+      // 7-11: Enhanced Momentum Indicators (5 features) - v1.4.0
+      indicators.rsi, // 14-day RSI (standard)
+      this.calculateRSI(prices.slice(0, dayIndex + 1), 21), // 21-day RSI for longer trend
+      this.calculateRSI(prices.slice(0, dayIndex + 1), 7), // 7-day RSI for short-term momentum
       indicators.macdLine,
       indicators.signalLine,
 
@@ -939,13 +941,21 @@ export default class FeatureCalculator {
       indicators.upperBand, // Bollinger Band upper
       indicators.lowerBand, // Bollinger Band lower
 
-      // 13-15: Volume Indicators (3 features)
+      // 15-18: Enhanced Volume Indicators (4 features) - v1.4.0
       volumes[dayIndex],
       // Volume MA (20-day)
       volumes
         .slice(Math.max(0, dayIndex - 19), dayIndex + 1)
         .reduce((a, b) => a + b, 0) / Math.min(20, dayIndex + 1),
       indicators.vwap,
+      // Volume momentum: current vs 5-day average
+      dayIndex >= 4
+        ? volumes[dayIndex] /
+          (volumes
+            .slice(Math.max(0, dayIndex - 4), dayIndex + 1)
+            .reduce((a, b) => a + b, 0) /
+            Math.min(5, dayIndex + 1))
+        : 1,
 
       // 16-20: Relative/Ratio Features (5 features)
       currentPrice / (indicators.sma7 || currentPrice), // Price/SMA7 ratio
@@ -956,7 +966,7 @@ export default class FeatureCalculator {
       (indicators.currentPrice - indicators.lowerBand) /
         (indicators.upperBand - indicators.lowerBand || 1),
 
-      // 21-25: Secondary Indicators (5 features)
+      // 19-25: Enhanced Secondary Indicators (7 features) - v1.4.0
       indicators.prevRsi, // Previous RSI for momentum
       indicators.macdLine - indicators.signalLine, // MACD histogram
       indicators.atr / (indicators.currentPrice || 1), // Normalized ATR
@@ -966,6 +976,16 @@ export default class FeatureCalculator {
           .reduce((a, b) => a + b, 0) /
           Math.min(20, dayIndex + 1)), // Volume ratio
       indicators.momentum, // Raw momentum
+      // Bollinger Band squeeze indicator (tight bands = low volatility)
+      dayIndex >= 20
+        ? (indicators.upperBand - indicators.lowerBand) /
+          indicators.currentPrice
+        : 0.1,
+      // RSI divergence signal (price vs RSI momentum alignment)
+      dayIndex >= 1
+        ? Math.sign(indicators.currentPrice - prices[dayIndex - 1]) *
+          Math.sign(indicators.rsi - indicators.prevRsi)
+        : 0,
     ];
 
     return coreFeatures;

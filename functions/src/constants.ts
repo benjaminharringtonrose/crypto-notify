@@ -271,23 +271,23 @@ export const MODEL_CONFIG = {
 };
 
 export const TRAINING_CONFIG = {
-  // CRITICAL OPTIMIZATION: Much faster training configuration
-  EPOCHS: 30, // DRASTICALLY REDUCED: was 200, now 30 for much faster training
-  BATCH_SIZE: 32, // INCREASED: was 16, now 32 for faster convergence
+  // EMERGENCY FIX: Stable training configuration
+  EPOCHS: 30, // EXPERIMENT: 50 → 30 for faster iteration
+  BATCH_SIZE: 16, // Keep moderate batch size
   SHUFFLE_CHUNK_SIZE: 10,
-  INITIAL_LEARNING_RATE: 0.002, // DOUBLED: was 0.001, now 0.002 for faster learning
-  MIN_LEARNING_RATE: 0.0001, // INCREASED: was 0.000005, now 0.0001
-  CYCLIC_LR_STEP_SIZE: 10, // REDUCED: was 15, now 10 for faster cycling
+  INITIAL_LEARNING_RATE: 0.0005, // REDUCED: 0.001 → 0.0005 for stability
+  MIN_LEARNING_RATE: 0.00001, // Keep low minimum
+  CYCLIC_LR_STEP_SIZE: 15, // REDUCED: 20 → 15 for faster adaptation
   OUTPUT_CLASSES: 2,
-  START_DAYS_AGO: 300, // DRASTICALLY REDUCED: was 1200, now 300 for faster data processing
-  TRAIN_SPLIT: 0.8, // REDUCED: was 0.85, now 0.8 for more validation data
+  START_DAYS_AGO: 600, // REDUCED: 800 → 600 for manageable data size
+  TRAIN_SPLIT: 0.8, // REDUCED: 0.85 → 0.8 for more validation data
   PREFETCH_BUFFER: 4,
-  PATIENCE: 5, // DRASTICALLY REDUCED: was 20, now 5 for much faster stopping
+  PATIENCE: 10, // REDUCED: 15 → 10 for faster stopping
   BYTES_TO_MB: 1024 * 1024,
   MS_TO_SECONDS: 1000,
-  GAMMA: 2.0, // INCREASED: was 0.5, now 2.0 for stronger focal loss
-  ALPHA: [0.3, 0.7] as [number, number], // Keep class bias toward buy class
-  GRADIENT_CLIP_NORM: 5.0, // INCREASED: was 1.0, now 5.0 for more stable gradients
+  GAMMA: 1.5, // BALANCED: 2.0 → 1.5 for moderate focal loss
+  ALPHA: [0.4, 0.6] as [number, number], // MORE BALANCED: less bias toward buy class
+  GRADIENT_CLIP_NORM: 1.0, // REDUCED: 5.0 → 1.0 for natural gradients
   LR_DECAY_RATE: 0.8, // REDUCED: was 0.92, now 0.8 for more aggressive decay
   WARMUP_EPOCHS: 2, // REDUCED: was 5, now 2 for faster warmup
   WARMUP_INITIAL_LR: 0.0001, // INCREASED: was 0.00005, now 0.0001

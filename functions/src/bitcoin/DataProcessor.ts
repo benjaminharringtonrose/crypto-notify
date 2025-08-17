@@ -256,8 +256,8 @@ export class DataProcessor {
   private labelData({
     prices,
     dayIndex,
-    threshold = 0.0005, // CRITICAL: Much lower threshold for balanced labels
-    horizon = 1, // Immediate next day signal
+    threshold = 0.0015, // EXPERIMENT 1: 0.001 → 0.0015 for higher quality signals
+    horizon = 1, // REVERTED: 2 → 1, shorter horizon has stronger signals
   }: {
     prices: number[];
     dayIndex: number;

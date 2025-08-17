@@ -281,21 +281,46 @@ export class TradeModelTrainer {
 
     // SIMPLIFIED: Only save weights that exist in our simplified architecture
     const weights = {
+      // Conv1D layer
       conv1Weights: Array.from(
         await this.model.getLayer("conv1d_input").getWeights()[0].data()
       ),
       conv1Bias: Array.from(
         await this.model.getLayer("conv1d_input").getWeights()[1].data()
       ),
-      lstmWeights: Array.from(
-        await this.model.getLayer("lstm_simple").getWeights()[0].data()
+      bnConv1Gamma: Array.from(
+        await this.model.getLayer("bn_conv1").getWeights()[0].data()
       ),
-      lstmRecurrentWeights: Array.from(
-        await this.model.getLayer("lstm_simple").getWeights()[1].data()
+      bnConv1Beta: Array.from(
+        await this.model.getLayer("bn_conv1").getWeights()[1].data()
       ),
-      lstmBias: Array.from(
-        await this.model.getLayer("lstm_simple").getWeights()[2].data()
+      bnConv1MovingMean: Array.from(
+        await this.model.getLayer("bn_conv1").getWeights()[2].data()
       ),
+      bnConv1MovingVariance: Array.from(
+        await this.model.getLayer("bn_conv1").getWeights()[3].data()
+      ),
+
+      // LSTM layer
+      lstm1Weights: Array.from(
+        await this.model.getLayer("lstm1").getWeights()[0].data()
+      ),
+      lstm1RecurrentWeights: Array.from(
+        await this.model.getLayer("lstm1").getWeights()[1].data()
+      ),
+      lstm1Bias: Array.from(
+        await this.model.getLayer("lstm1").getWeights()[2].data()
+      ),
+
+      // Dense layer
+      dense1Weights: Array.from(
+        await this.model.getLayer("dense1").getWeights()[0].data()
+      ),
+      dense1Bias: Array.from(
+        await this.model.getLayer("dense1").getWeights()[1].data()
+      ),
+
+      // Output layer
       outputWeights: Array.from(
         await this.model.getLayer("output").getWeights()[0].data()
       ),

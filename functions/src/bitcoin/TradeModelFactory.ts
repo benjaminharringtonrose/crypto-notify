@@ -11,58 +11,63 @@ export default class TradeModelFactory {
   }
 
   public createModel(): tf.LayersModel {
-    console.log("Creating SIMPLIFIED fast-learning model architecture...");
+    console.log("Creating BALANCED model architecture for stable learning...");
     const model = tf.sequential();
 
-    // CRITICAL OPTIMIZATION: Much simpler architecture for faster training
-    // Single Conv1D layer with minimal filters
+    // BALANCED ARCHITECTURE: Moderate complexity for stable learning
+    // Conv1D layer with moderate filters
     model.add(
       tf.layers.conv1d({
         inputShape: [this.timesteps, this.features],
-        filters: 16, // REDUCED: was 32-128, now 16 for speed
-        kernelSize: 3, // REDUCED: was 5-7, now 3 for speed
+        filters: 48, // EXPERIMENT 3: 32 → 48 for better feature extraction
+        kernelSize: 3, // REVERTED: 7 → 3, larger kernels reduce performance
         activation: "relu",
         kernelInitializer: "heNormal",
-        kernelRegularizer: tf.regularizers.l2({
-          l2: 0.0001, // REDUCED: was 0.001, now 0.0001
-        }),
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.001 }),
         name: "conv1d_input",
       })
     );
-    model.add(tf.layers.dropout({ rate: 0.1 })); // REDUCED: was 0.2, now 0.1
+    model.add(tf.layers.batchNormalization({ name: "bn_conv1" }));
+    model.add(tf.layers.dropout({ rate: 0.2, name: "dropout_conv1" }));
 
-    // SKIP second conv layer and attention - go directly to LSTM for speed
-
-    // Single simplified LSTM layer
+    // Single LSTM layer with increased capacity
     model.add(
       tf.layers.lstm({
-        units: 32, // MUCH REDUCED: was 64-256, now 32
-        returnSequences: false, // Don't return sequences for speed
+        units: 64, // REVERTED: 80 → 64, increased capacity caused overfitting
+        returnSequences: false,
         kernelInitializer: "heNormal",
-        kernelRegularizer: tf.regularizers.l2({
-          l2: 0.0001, // REDUCED regularization
-        }),
-        name: "lstm_simple",
+        recurrentDropout: 0.2,
+        name: "lstm1",
       })
     );
-    model.add(tf.layers.dropout({ rate: 0.1 })); // REDUCED dropout
 
-    // Direct to output - skip intermediate dense layers for speed
+    // Single dense layer
     model.add(
       tf.layers.dense({
-        units: TRAINING_CONFIG.OUTPUT_CLASSES, // Direct to output
+        units: 32, // REVERTED: 48 → 32, increased capacity caused overfitting
+        activation: "relu",
+        kernelInitializer: "heNormal",
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.001 }),
+        name: "dense1",
+      })
+    );
+    model.add(tf.layers.dropout({ rate: 0.3, name: "dropout_dense1" })); // REVERTED: 0.2 → 0.3, less dropout caused overfitting
+
+    // Output layer
+    model.add(
+      tf.layers.dense({
+        units: TRAINING_CONFIG.OUTPUT_CLASSES,
         activation: "softmax",
         kernelInitializer: "heNormal",
-        kernelRegularizer: tf.regularizers.l2({
-          l2: 0.0001,
-        }),
         name: "output",
       })
     );
 
-    console.log("SIMPLIFIED model created - much faster training expected");
     console.log(
-      `Model parameters: Conv1D(16) -> LSTM(32) -> Dense(${TRAINING_CONFIG.OUTPUT_CLASSES})`
+      `✅ Balanced model created with ~50K parameters for stable learning`
+    );
+    console.log(
+      `Model architecture: Conv1D(32,3) -> BN -> Dropout -> LSTM(64) -> Dense(32) -> Dropout -> Output(${TRAINING_CONFIG.OUTPUT_CLASSES})`
     );
     return model;
   }

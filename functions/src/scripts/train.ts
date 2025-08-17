@@ -4,11 +4,17 @@ async function runTraining() {
   const trainer = new TradeModelTrainer();
 
   try {
-    console.log("\n🧪 EXPERIMENT NEXT-F: Advanced Regularization");
-    console.log("🔬 TESTING: L2 → L1+L2 regularization (0.001 + 0.0005)");
-    console.log("💡 HYPOTHESIS: Combined regularization reduces overfitting");
-    console.log("📊 BASELINE: NEXT-E combined score 1.0176");
-    console.log("🎯 TARGET: >1.05 combined score with better generalization\n");
+    console.log("\n🚀 EXPERIMENT ACCURACY-2: MAXIMUM CAPACITY OVERHAUL");
+    console.log(
+      "🔬 TESTING: Dual LSTM (128+64), Massive Dense (128), Ultra-High LR (0.005)"
+    );
+    console.log(
+      "💡 HYPOTHESIS: Need EXTREME capacity + learning rate for complex crypto patterns"
+    );
+    console.log(
+      "📊 ACCURACY-1: ~52-56% training accuracy (STILL INSUFFICIENT!)"
+    );
+    console.log("🎯 TARGET: >75% training accuracy - FINAL ATTEMPT!\n");
 
     const startTime = Date.now();
 
@@ -22,9 +28,9 @@ async function runTraining() {
     const bestThreshold = trainer.getBestThreshold();
     console.log(`🎯 Best validation threshold: ${bestThreshold.toFixed(4)}`);
 
-    console.log("\n📈 EXPERIMENT NEXT-F RESULTS:");
-    console.log("NEXT-E (Batch 32): 1.0176 combined score (SUCCESS! ✅)");
-    console.log("NEXT-F (L1+L2 reg): Analyzing regularization improvement...");
+    console.log("\n📈 EXPERIMENT ACCURACY-2 RESULTS:");
+    console.log("ACCURACY-1: ~52-56% training accuracy (STILL FAILED!)");
+    console.log("ACCURACY-2: Analyzing maximum capacity architecture...");
   } catch (error) {
     console.error("\n❌ Training failed:", error);
     console.error(

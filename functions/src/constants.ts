@@ -141,7 +141,7 @@ const MODEL_CONFIG_BASE = {
     metrics: ["binaryAccuracy", "customF1Buy", "customF1Sell"],
   },
   FIT_OPTIONS: {
-    epochs: 200,
+    epochs: 100,
     batchSize: 64,
     validationSplit: 0.15,
     shuffle: true,
@@ -272,11 +272,11 @@ export const MODEL_CONFIG = {
 
 export const TRAINING_CONFIG = {
   // EMERGENCY FIX: Stable training configuration
-  EPOCHS: 30, // REVERTED: 50 → 30, higher epochs caused overfitting
-  BATCH_SIZE: 32, // EXPERIMENT NEXT-E: Increased from 16 for better gradient estimates
+  EPOCHS: 50, // ACCURACY-1: Focus on effective training rather than long runs
+  BATCH_SIZE: 16, // ACCURACY-2: Smaller batches for more gradient updates
   SHUFFLE_CHUNK_SIZE: 10,
-  INITIAL_LEARNING_RATE: 0.0005, // REVERTED: 0.0008 → 0.0005, back to optimal baseline
-  MIN_LEARNING_RATE: 0.00001, // REVERTED: 0.00005 → 0.00001, back to baseline
+  INITIAL_LEARNING_RATE: 0.005, // ACCURACY-2: Even more aggressive learning
+  MIN_LEARNING_RATE: 0.0001, // ACCURACY-1: Increased from 0.00001 to maintain learning
   CYCLIC_LR_STEP_SIZE: 15, // REVERTED: 10 → 15, back to baseline
   OUTPUT_CLASSES: 2,
   START_DAYS_AGO: 600, // REDUCED: 800 → 600 for manageable data size

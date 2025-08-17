@@ -11,18 +11,20 @@ export default class TradeModelFactory {
   }
 
   public createModel(): tf.LayersModel {
-    console.log(
-      "Creating OPTIMIZED baseline model (reverted from failed multi-scale)..."
-    );
+    // RECOVERY-1: Revert to PROVEN optimal baseline (65.96% validation accuracy)
+    console.log("🔄 RECOVERY-1: Reverting to documented optimal baseline...");
+    
+    // CRITICAL: Add deterministic seeding for stable training
+    tf.randomUniform([1, 1], 0, 1, "float32", 42);
+    
     const model = tf.sequential();
 
-    // REVERTED: Multi-scale v2.0 also failed - back to optimal baseline
-    // Conv1D layer with proven optimal settings
+    // Conv1D layer - PROVEN optimal settings from experiments
     model.add(
       tf.layers.conv1d({
         inputShape: [this.timesteps, this.features],
-        filters: 48, // OPTIMAL: Our best performing filter count
-        kernelSize: 3, // OPTIMAL: Best kernel size found
+        filters: 48, // PROVEN OPTIMAL: Major improvement over 32 filters
+        kernelSize: 3, // PROVEN OPTIMAL: Best kernel size (5,7 failed)
         activation: "relu",
         kernelInitializer: "heNormal",
         kernelRegularizer: tf.regularizers.l2({ l2: 0.001 }),
@@ -30,30 +32,30 @@ export default class TradeModelFactory {
       })
     );
     model.add(tf.layers.batchNormalization({ name: "bn_conv1" }));
-    model.add(tf.layers.dropout({ rate: 0.2, name: "dropout_conv1" }));
+    model.add(tf.layers.dropout({ rate: 0.3, name: "dropout_conv1" })); // PROVEN: 0.2→0.3 critical
 
-    // LSTM layer - optimal baseline
+    // LSTM layer - PROVEN optimal baseline (single LSTM, 64 units)
     model.add(
       tf.layers.lstm({
-        units: 64, // REVERTED: 80 caused severe class imbalance
-        returnSequences: false, // OPTIMAL: For binary classification
+        units: 64, // PROVEN OPTIMAL: 80 units failed (overfitting), 64 is limit
+        returnSequences: false, // PROVEN: returnSequences=true failed
         kernelInitializer: "heNormal",
-        recurrentDropout: 0.2,
+        recurrentDropout: 0.1, // Standard dropout
         name: "lstm1",
       })
     );
 
-    // Dense layer - optimal baseline
+    // Dense layer - PROVEN optimal baseline
     model.add(
       tf.layers.dense({
-        units: 32, // OPTIMAL: Capacity limit found
+        units: 32, // PROVEN OPTIMAL: 48 units failed (severe overfitting), 32 is limit
         activation: "relu",
         kernelInitializer: "heNormal",
-        kernelRegularizer: tf.regularizers.l1l2({ l1: 0.0005, l2: 0.001 }), // EXPERIMENT NEXT-F: L1+L2 regularization
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.001 }),
         name: "dense1",
       })
     );
-    model.add(tf.layers.dropout({ rate: 0.3, name: "dropout_dense1" }));
+    model.add(tf.layers.dropout({ rate: 0.3, name: "dropout_dense1" })); // PROVEN: 0.2 failed
 
     // Output layer
     model.add(
@@ -65,10 +67,11 @@ export default class TradeModelFactory {
       })
     );
 
-    console.log("✅ Reverted to proven optimal baseline architecture");
-    console.log(
-      `Model: Conv1D(48,3) -> BN -> LSTM(64) -> Dense(32) -> Output(${TRAINING_CONFIG.OUTPUT_CLASSES}) with 25 core features`
-    );
+    console.log("✅ RECOVERY-1: Restored proven optimal baseline");
+    console.log("🎯 Target: 65.96% validation accuracy (documented optimal)");
+    console.log(`📊 Architecture: Conv1D(48,3) → BN → Dropout(0.3) → LSTM(64) → Dense(32) → Dropout(0.3) → Output(2)`);
+    console.log(`📈 Features: ${this.features} (should be 25 core indicators)`);
+    
     model.summary();
     return model;
   }

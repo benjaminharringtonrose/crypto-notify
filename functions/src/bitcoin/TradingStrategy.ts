@@ -554,11 +554,16 @@ export class TradingStrategy {
         ? this.trailingStop * 0.8
         : this.trailingStop;
 
-    const dynamicProfitTake = Math.min(
-      this.profitTakeMultiplier *
-        (momentum > 0.1 ? STRATEGY_CONFIG.CONFIDENCE_BOOST_MULTIPLIER : 1.0),
-      STRATEGY_CONFIG.MAX_PROFIT_TAKE
-    );
+    const dynamicProfitTake =
+      currentPrice *
+      (1 +
+        Math.min(
+          this.profitTakeMultiplier *
+            (momentum > 0.1
+              ? STRATEGY_CONFIG.CONFIDENCE_BOOST_MULTIPLIER
+              : 1.0),
+          STRATEGY_CONFIG.MAX_PROFIT_TAKE
+        ));
 
     const atrAdjustedHold = Math.max(
       this.currentStrategy === StrategyType.MeanReversion ? 3 : 5,
@@ -636,9 +641,10 @@ export class TradingStrategy {
         btcVolumes,
         dynamicBreakoutThreshold
       );
-      // Trade quality filtering - optimized for better returns
-      const tradeQuality = buyProb * confidence > 0.052; // Back to successful setting
-      const minProfitPotential = 0.0045; // Back to successful setting (0.45% minimum profit potential)
+
+      // Trade quality filtering - much more permissive
+      const tradeQuality = buyProb * confidence > 0.01;
+      const minProfitPotential = 0.001;
       const profitPotential = (dynamicProfitTake - currentPrice) / currentPrice;
       const hasProfitPotential = profitPotential >= minProfitPotential;
 

@@ -9,36 +9,38 @@ export class Metrics {
     alphaArr: [number, number] = TRAINING_CONFIG.ALPHA
   ): tf.Scalar {
     try {
+      // Use standard cross-entropy with label smoothing for better learning
+      const labelSmoothing = 0.1;
+
       // Apply softmax to get probabilities
       const probs = yPred.softmax();
 
       // Get the predicted probabilities for the true classes
       const yTrueIndices = yTrue.argMax(-1);
       const gatheredProbs = tf.gather(probs, yTrueIndices, 1);
-
-      // Calculate focal loss components
       const pt = gatheredProbs.squeeze();
-      const alpha = tf.tensor1d(alphaArr);
-      const alphaWeighted = tf.gather(alpha, yTrueIndices);
 
-      // Focal loss formula: -alpha * (1 - pt)^gamma * log(pt)
-      const focalWeight = tf.pow(tf.sub(1, pt), gamma);
-      const ce = tf.log(tf.add(pt, 1e-8)); // Add epsilon to prevent log(0)
-      const focalLoss = tf.mul(tf.mul(alphaWeighted, focalWeight), tf.neg(ce));
+      // Apply label smoothing
+      const smoothedPt = tf.add(
+        tf.mul(pt, tf.sub(1, labelSmoothing)),
+        tf.mul(labelSmoothing, 0.5)
+      );
+
+      // Simple cross-entropy loss with smoothing
+      const ce = tf.log(tf.add(smoothedPt, 1e-8));
+      const loss = tf.neg(ce);
 
       // Clean up tensors
       probs.dispose();
       gatheredProbs.dispose();
       pt.dispose();
-      alpha.dispose();
-      alphaWeighted.dispose();
-      focalWeight.dispose();
+      smoothedPt.dispose();
       ce.dispose();
 
-      return focalLoss.mean() as tf.Scalar;
+      return loss.mean() as tf.Scalar;
     } catch (error) {
       console.warn(
-        "Focal loss calculation failed, falling back to cross-entropy:",
+        "Loss calculation failed, falling back to cross-entropy:",
         error
       );
       // Fallback to standard cross-entropy
@@ -305,5 +307,43 @@ export class Metrics {
       [tn, fp],
       [fn, tp],
     ]; // [Sell, Buy] x [Sell, Buy]
+  }
+
+  // Custom balanced accuracy metric for imbalanced datasets
+  static balancedAccuracy(yTrue: tf.Tensor, yPred: tf.Tensor): tf.Scalar {
+    try {
+      const predLabels = yPred.argMax(-1);
+      const trueLabels = yTrue.argMax(-1);
+
+      // Calculate accuracy for each class
+      const buyMask = trueLabels.equal(1);
+      const sellMask = trueLabels.equal(0);
+
+      const buyCorrect = tf
+        .logicalAnd(buyMask, predLabels.equal(1))
+        .cast("float32")
+        .sum();
+      const sellCorrect = tf
+        .logicalAnd(sellMask, predLabels.equal(0))
+        .cast("float32")
+        .sum();
+
+      const buyTotal = buyMask.cast("float32").sum();
+      const sellTotal = sellMask.cast("float32").sum();
+
+      const buyAccuracy = buyCorrect.div(buyTotal.add(tf.scalar(1e-8)));
+      const sellAccuracy = sellCorrect.div(sellTotal.add(tf.scalar(1e-8)));
+
+      // Balanced accuracy is the average of per-class accuracies
+      const balancedAcc = tf.div(
+        tf.add(buyAccuracy, sellAccuracy),
+        tf.scalar(2)
+      );
+
+      return balancedAcc as tf.Scalar;
+    } catch (error) {
+      console.warn("Error in balancedAccuracy calculation:", error);
+      return tf.scalar(0) as tf.Scalar;
+    }
   }
 }

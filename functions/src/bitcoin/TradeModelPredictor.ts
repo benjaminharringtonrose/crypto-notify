@@ -57,15 +57,10 @@ export class TradeModelPredictor {
       await this.loadWeightsAsync();
     }
 
-    // Create a fresh model instance for each prediction to ensure complete isolation
-    const factory = new TradeModelFactory(
-      MODEL_CONFIG.TIMESTEPS,
-      MODEL_CONFIG.FEATURE_COUNT
-    );
-    const freshModel = factory.createModel();
-
-    // Load weights into the fresh model
-    this.weightManager.setWeights(freshModel);
+    // Use the existing model instance with loaded weights
+    if (!this.model) {
+      throw new Error("Model not initialized");
+    }
 
     // Debug: Log input data to see if it's changing
     console.log(
@@ -122,7 +117,7 @@ export class TradeModelPredictor {
     const stds = tf.tensor1d(this.weightManager.getFeatureStds());
     const featuresNormalized = features.sub(means).div(stds.add(1e-6));
 
-    const logits = freshModel.predict(featuresNormalized) as tf.Tensor2D;
+    const logits = this.model.predict(featuresNormalized) as tf.Tensor2D;
     const logitsArray = await logits.data();
     const [sellLogit, buyLogit] = [logitsArray[0], logitsArray[1]];
 

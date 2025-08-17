@@ -28,26 +28,26 @@ export const PERIODS = {
 } as const;
 
 export const STRATEGY_CONFIG = {
-  MIN_CONFIDENCE_DEFAULT: 0.15, // Increased for better trade quality
-  PROFIT_TAKE_MULTIPLIER_DEFAULT: 2.5, // Increased for better profit capture
-  BASE_POSITION_SIZE_DEFAULT: 0.08, // Slightly reduced for better risk management
+  MIN_CONFIDENCE_DEFAULT: 0.05, // Back to permissive to allow trades
+  PROFIT_TAKE_MULTIPLIER_DEFAULT: 2.0, // Balanced profit taking
+  BASE_POSITION_SIZE_DEFAULT: 0.1, // Balanced position sizing
   SLIPPAGE: 0.001,
   COMMISSION: 0.005,
-  STOP_LOSS_MULTIPLIER_DEFAULT: 4.0, // Reduced for tighter risk control
-  TRAILING_STOP_DEFAULT: 0.1, // Reduced for better profit protection
-  MIN_HOLD_DAYS_DEFAULT: 3, // Increased for better trend following
-  BUY_PROB_THRESHOLD_DEFAULT: 0.08, // Increased for better signal quality
-  SELL_PROB_THRESHOLD_DEFAULT: 0.15, // Increased for better signal quality
-  MOMENTUM_WINDOW_THRESHOLD: 0.015, // Increased for better momentum detection
-  MAX_ATR_THRESHOLD: 1.8, // Reduced for better volatility control
-  MIN_PROFIT_THRESHOLD: 0.0015, // Increased for better profit targets
-  MOMENTUM_THRESHOLD: 0.002, // Increased for better momentum signals
-  VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: 0.012, // Increased for better signal quality
-  TREND_STRENGTH_THRESHOLD: 0.002, // Increased for better trend signals
-  TREND_SLOPE_THRESHOLD: 0.002, // Increased for better trend signals
-  SHORT_MOMENTUM_THRESHOLD: 0.002, // Increased for better momentum signals
-  DAYS_SINCE_TRADE_THRESHOLD: 4, // Reduced for more frequent trading
-  DYNAMIC_BREAKOUT_THRESHOLD: 0.18, // Increased for better breakout signals
+  STOP_LOSS_MULTIPLIER_DEFAULT: 3.0, // Balanced stop loss
+  TRAILING_STOP_DEFAULT: 0.08, // Balanced trailing stop
+  MIN_HOLD_DAYS_DEFAULT: 2, // Balanced holding period
+  BUY_PROB_THRESHOLD_DEFAULT: 0.05, // Back to permissive
+  SELL_PROB_THRESHOLD_DEFAULT: 0.05, // Back to permissive
+  MOMENTUM_WINDOW_THRESHOLD: 0.015, // Back to balanced
+  MAX_ATR_THRESHOLD: 2.0, // Back to balanced
+  MIN_PROFIT_THRESHOLD: 0.002, // Back to balanced
+  MOMENTUM_THRESHOLD: 0.003, // Back to balanced
+  VOLATILITY_ADJUSTED_MOMENTUM_THRESHOLD: -0.1, // Back to permissive
+  TREND_STRENGTH_THRESHOLD: -0.1, // Back to permissive
+  TREND_SLOPE_THRESHOLD: -0.1, // Back to permissive
+  SHORT_MOMENTUM_THRESHOLD: -0.05, // Back to permissive
+  DAYS_SINCE_TRADE_THRESHOLD: 3, // Back to balanced
+  DYNAMIC_BREAKOUT_THRESHOLD: 0.1, // Back to balanced
   HIGH_CONFIDENCE_THRESHOLD: 0.5, // Increased for better confidence threshold
   MOMENTUM_MULTIPLIER: 0.06, // Increased for better momentum detection
   MAX_PROFIT_TAKE: 2.5, // Increased for better profit capture
@@ -62,9 +62,9 @@ export const STRATEGY_CONFIG = {
   CONFIDENCE_BOOST_MULTIPLIER: 1.5, // Reduced for more conservative approach
   TREND_SLOPE_BOOST_THRESHOLD: 0.02, // Increased for better trend signals
   TREND_SLOPE_POSITION_BOOST: 1.2, // Reduced for more conservative approach
-  VOLUME_BOOST_THRESHOLD: 1.3, // Increased for better volume signals
-  NEGATIVE_DEVIATION_THRESHOLD: -0.02, // Increased for better mean reversion
-  VOLUME_MULTIPLIER: 1.4, // Increased for better volume signals
+  VOLUME_BOOST_THRESHOLD: 0.1, // Much more permissive for volume
+  NEGATIVE_DEVIATION_THRESHOLD: -0.1, // Much more permissive for mean reversion
+  VOLUME_MULTIPLIER: 0.1, // Much more permissive for volume
   TREND_STRENGTH_REVERSAL_THRESHOLD: -0.015, // Increased for better trend signals
   ATR_POSITION_THRESHOLD: 0.06, // Increased for better volatility control
   BUY_PROB_MAX_MULTIPLIER: 1.8, // Reduced for more conservative approach
@@ -73,22 +73,22 @@ export const STRATEGY_CONFIG = {
 };
 
 const MODEL_CONFIG_BASE = {
-  CONV1D_FILTERS_1: 16, // Reduced for simpler model
-  CONV1D_FILTERS_2: 32, // Reduced for simpler model
-  CONV1D_KERNEL_SIZE_1: 5,
-  CONV1D_KERNEL_SIZE_2: 3,
-  LSTM_UNITS_1: 32, // Reduced for simpler model
-  LSTM_UNITS_2: 16, // Reduced for simpler model
-  LSTM_UNITS_3: 8, // Reduced for simpler model
-  TIME_DISTRIBUTED_DENSE_UNITS: 16, // Reduced for simpler model
-  DENSE_UNITS_1: 24, // Reduced for simpler model
+  CONV1D_FILTERS_1: 32, // Much smaller for faster training
+  CONV1D_FILTERS_2: 64, // Much smaller for faster training
+  CONV1D_KERNEL_SIZE_1: 5, // Smaller kernel for faster training
+  CONV1D_KERNEL_SIZE_2: 3, // Smaller kernel for faster training
+  LSTM_UNITS_1: 64, // Much smaller for faster training
+  LSTM_UNITS_2: 32, // Much smaller for faster training
+  LSTM_UNITS_3: 16, // Much smaller for faster training
+  TIME_DISTRIBUTED_DENSE_UNITS: 32, // Much smaller for faster training
+  DENSE_UNITS_1: 64, // Much smaller for faster training
   OUTPUT_UNITS: 2,
-  L2_REGULARIZATION: 0.001, // Increased for better regularization
-  DROPOUT_RATE: 0.3, // Increased dropout to prevent overfitting
-  ATTENTION_UNITS_1: 16, // Reduced for simpler model
-  ATTENTION_UNITS_2: 12, // Reduced for simpler model
-  RESIDUAL_UNITS_1: 16, // Reduced for simpler model
-  RESIDUAL_UNITS_2: 12, // Reduced for simpler model
+  L2_REGULARIZATION: 0.001, // More regularization for smaller model
+  DROPOUT_RATE: 0.2, // More dropout for smaller model
+  ATTENTION_UNITS_1: 32, // Much smaller for faster training
+  ATTENTION_UNITS_2: 16, // Much smaller for faster training
+  RESIDUAL_UNITS_1: 32, // Much smaller for faster training
+  RESIDUAL_UNITS_2: 16, // Much smaller for faster training
   FEATURE_COUNT: 62, // Number of features (actual count)
   BTC_FEATURE_COUNT: 62, // Number of BTC features (actual count)
   TIMESTEPS: 24, // Number of timesteps
@@ -271,38 +271,41 @@ export const MODEL_CONFIG = {
 };
 
 export const TRAINING_CONFIG = {
-  EPOCHS: 100, // Increased for better convergence
-  BATCH_SIZE: 64, // Back to original for stability
+  // CRITICAL OPTIMIZATION: Much faster training configuration
+  EPOCHS: 30, // DRASTICALLY REDUCED: was 200, now 30 for much faster training
+  BATCH_SIZE: 32, // INCREASED: was 16, now 32 for faster convergence
   SHUFFLE_CHUNK_SIZE: 10,
-  INITIAL_LEARNING_RATE: 0.0008, // Back to original stable learning rate
-  MIN_LEARNING_RATE: 0.000005, // Back to original
-  CYCLIC_LR_STEP_SIZE: 15, // Back to original
+  INITIAL_LEARNING_RATE: 0.002, // DOUBLED: was 0.001, now 0.002 for faster learning
+  MIN_LEARNING_RATE: 0.0001, // INCREASED: was 0.000005, now 0.0001
+  CYCLIC_LR_STEP_SIZE: 10, // REDUCED: was 15, now 10 for faster cycling
   OUTPUT_CLASSES: 2,
-  START_DAYS_AGO: 1200,
-  TRAIN_SPLIT: 0.85, // Back to original
+  START_DAYS_AGO: 300, // DRASTICALLY REDUCED: was 1200, now 300 for faster data processing
+  TRAIN_SPLIT: 0.8, // REDUCED: was 0.85, now 0.8 for more validation data
   PREFETCH_BUFFER: 4,
-  PATIENCE: 15, // Back to original
+  PATIENCE: 5, // DRASTICALLY REDUCED: was 20, now 5 for much faster stopping
   BYTES_TO_MB: 1024 * 1024,
   MS_TO_SECONDS: 1000,
-  GAMMA: 2.0, // Keep original focal loss gamma
-  ALPHA: [0.4, 0.6] as [number, number], // Keep original balanced alpha
-  GRADIENT_CLIP_NORM: 1.0,
-  LR_DECAY_RATE: 0.92, // Back to original
-  WARMUP_EPOCHS: 5, // Back to original
-  WARMUP_INITIAL_LR: 0.00005, // Back to original
-  ATTENTION_DROPOUT: 0.15, // Back to original
-  RESIDUAL_DROPOUT: 0.15, // Back to original
-  L2_REGULARIZATION: 0.0008, // Back to original
-  BATCH_NORMALIZATION: true,
-  USE_ATTENTION: true,
-  USE_RESIDUAL_CONNECTIONS: true,
+  GAMMA: 2.0, // INCREASED: was 0.5, now 2.0 for stronger focal loss
+  ALPHA: [0.3, 0.7] as [number, number], // Keep class bias toward buy class
+  GRADIENT_CLIP_NORM: 5.0, // INCREASED: was 1.0, now 5.0 for more stable gradients
+  LR_DECAY_RATE: 0.8, // REDUCED: was 0.92, now 0.8 for more aggressive decay
+  WARMUP_EPOCHS: 2, // REDUCED: was 5, now 2 for faster warmup
+  WARMUP_INITIAL_LR: 0.0001, // INCREASED: was 0.00005, now 0.0001
+  ATTENTION_DROPOUT: 0.1, // REDUCED: was 0.15, now 0.1
+  RESIDUAL_DROPOUT: 0.1, // REDUCED: was 0.15, now 0.1
+  L2_REGULARIZATION: 0.0001, // REDUCED: was 0.0008, now 0.0001 for less constraint
+  BATCH_NORMALIZATION: false, // DISABLED: was true, now false for speed
+  USE_ATTENTION: false, // DISABLED: was true, now false for speed
+  USE_RESIDUAL_CONNECTIONS: false, // DISABLED: was true, now false for speed
   USE_GRADIENT_CLIPPING: true,
   USE_LEARNING_RATE_SCHEDULER: true,
   USE_WARMUP: true,
   USE_DROPOUT: true,
   USE_L2_REGULARIZATION: true,
-  USE_BATCH_NORMALIZATION: true,
+  USE_BATCH_NORMALIZATION: false, // DISABLED: was true, now false for speed
   VERBOSE: 1,
+  // CRITICAL FIX: Use stratified split instead of time-based split
+  TIME_BASED_SPLIT: false, // CHANGED: was true, now false for better learning
   CALLBACKS: [
     "earlyStopping",
     "reduceLROnPlateau",

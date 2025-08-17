@@ -229,32 +229,42 @@ export class ModelWeightManager {
           this.weights.enhancedFeatures2Weights &&
           this.weights.enhancedFeatures2Weights.length > 0
         ) {
-          const enhanced2Shape: [number, number] = [
-            MODEL_CONFIG.LSTM_UNITS_3,
-            MODEL_CONFIG.ATTENTION_UNITS_2,
-          ];
-          const expectedEnhanced2Size = enhanced2Shape[0] * enhanced2Shape[1];
+          const expectedEnhanced2Size =
+            MODEL_CONFIG.LSTM_UNITS_3 * MODEL_CONFIG.ATTENTION_UNITS_2;
+          const actualSize = this.weights.enhancedFeatures2Weights.length;
 
-          if (
-            this.weights.enhancedFeatures2Weights.length ===
-            expectedEnhanced2Size
-          ) {
-            model
-              .getLayer("enhanced_features2")
-              .setWeights([
-                tf.tensor2d(
-                  this.weights.enhancedFeatures2Weights,
-                  enhanced2Shape
-                ),
-                tf.tensor1d(this.weights.enhancedFeatures2Bias),
-              ]);
-            console.log("✅ Enhanced features 2 weights loaded successfully");
+          // Try to determine the correct shape based on the actual size
+          let enhanced2Shape: [number, number];
+          if (actualSize === expectedEnhanced2Size) {
+            // Perfect match
+            enhanced2Shape = [
+              MODEL_CONFIG.LSTM_UNITS_3,
+              MODEL_CONFIG.ATTENTION_UNITS_2,
+            ];
+          } else if (actualSize === 192) {
+            // Legacy size - use the shape that matches our current architecture best
+            enhanced2Shape = [16, 12] as [number, number];
+            console.log(
+              `Using legacy enhanced features 2 shape: ${enhanced2Shape[0]}x${enhanced2Shape[1]} (actual size: ${actualSize})`
+            );
           } else {
             console.warn(
-              `Enhanced features 2 weights size mismatch: expected ${expectedEnhanced2Size}, got ${this.weights.enhancedFeatures2Weights.length}`
+              `Enhanced features 2 weights size mismatch: expected ${expectedEnhanced2Size}, got ${actualSize}`
             );
             console.warn("Skipping enhanced features 2 weights");
+            return;
           }
+
+          model
+            .getLayer("enhanced_features2")
+            .setWeights([
+              tf.tensor2d(
+                this.weights.enhancedFeatures2Weights,
+                enhanced2Shape
+              ),
+              tf.tensor1d(this.weights.enhancedFeatures2Bias),
+            ]);
+          console.log("✅ Enhanced features 2 weights loaded successfully");
         } else {
           console.log(
             "No enhanced features 2 weights found, using random initialization"

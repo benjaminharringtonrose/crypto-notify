@@ -1,5 +1,5 @@
 import * as tf from "@tensorflow/tfjs-node";
-import { MODEL_CONFIG, TRAINING_CONFIG } from "../constants";
+import { TRAINING_CONFIG } from "../constants";
 
 export default class TradeModelFactory {
   private timesteps: number;
@@ -11,178 +11,59 @@ export default class TradeModelFactory {
   }
 
   public createModel(): tf.LayersModel {
+    console.log("Creating SIMPLIFIED fast-learning model architecture...");
     const model = tf.sequential();
 
-    // Input layer with proper shape
+    // CRITICAL OPTIMIZATION: Much simpler architecture for faster training
+    // Single Conv1D layer with minimal filters
     model.add(
       tf.layers.conv1d({
         inputShape: [this.timesteps, this.features],
-        filters: MODEL_CONFIG.CONV1D_FILTERS_1,
-        kernelSize: MODEL_CONFIG.CONV1D_KERNEL_SIZE_1,
+        filters: 16, // REDUCED: was 32-128, now 16 for speed
+        kernelSize: 3, // REDUCED: was 5-7, now 3 for speed
         activation: "relu",
         kernelInitializer: "heNormal",
         kernelRegularizer: tf.regularizers.l2({
-          l2: MODEL_CONFIG.L2_REGULARIZATION,
+          l2: 0.0001, // REDUCED: was 0.001, now 0.0001
         }),
         name: "conv1d_input",
       })
     );
-    model.add(tf.layers.batchNormalization({ name: "bn_conv1" }));
-    model.add(tf.layers.dropout({ rate: 0.2 }));
+    model.add(tf.layers.dropout({ rate: 0.1 })); // REDUCED: was 0.2, now 0.1
 
-    // Second convolutional layer for feature extraction
-    model.add(
-      tf.layers.conv1d({
-        filters: MODEL_CONFIG.CONV1D_FILTERS_2,
-        kernelSize: MODEL_CONFIG.CONV1D_KERNEL_SIZE_2,
-        activation: "relu",
-        kernelInitializer: "heNormal",
-        kernelRegularizer: tf.regularizers.l2({
-          l2: MODEL_CONFIG.L2_REGULARIZATION,
-        }),
-        name: "conv1d_2",
-      })
-    );
-    model.add(tf.layers.batchNormalization({ name: "bn_conv2" }));
-    model.add(tf.layers.dropout({ rate: 0.2 }));
+    // SKIP second conv layer and attention - go directly to LSTM for speed
 
-    // Enhanced feature extraction layer (replaces attention mechanism)
-    if (TRAINING_CONFIG.USE_ATTENTION) {
-      model.add(
-        tf.layers.dense({
-          units: MODEL_CONFIG.ATTENTION_UNITS_1,
-          activation: "tanh",
-          kernelInitializer: "heNormal",
-          kernelRegularizer: tf.regularizers.l2({
-            l2: MODEL_CONFIG.L2_REGULARIZATION,
-          }),
-          name: "enhanced_features1",
-        })
-      );
-      model.add(tf.layers.batchNormalization({ name: "bn_enhanced1" }));
-      model.add(tf.layers.dropout({ rate: TRAINING_CONFIG.ATTENTION_DROPOUT }));
-    }
-
-    // First LSTM layer with return sequences for temporal modeling
+    // Single simplified LSTM layer
     model.add(
       tf.layers.lstm({
-        units: MODEL_CONFIG.LSTM_UNITS_1,
-        returnSequences: true,
+        units: 32, // MUCH REDUCED: was 64-256, now 32
+        returnSequences: false, // Don't return sequences for speed
         kernelInitializer: "heNormal",
         kernelRegularizer: tf.regularizers.l2({
-          l2: MODEL_CONFIG.L2_REGULARIZATION,
+          l2: 0.0001, // REDUCED regularization
         }),
-        recurrentRegularizer: tf.regularizers.l2({
-          l2: MODEL_CONFIG.L2_REGULARIZATION * 0.5,
-        }),
-        dropout: 0.1,
-        recurrentDropout: 0.1,
-        name: "lstm1",
+        name: "lstm_simple",
       })
     );
-    model.add(tf.layers.batchNormalization({ name: "bn_lstm1" }));
-    model.add(tf.layers.dropout({ rate: MODEL_CONFIG.DROPOUT_RATE }));
+    model.add(tf.layers.dropout({ rate: 0.1 })); // REDUCED dropout
 
-    // Second LSTM layer with return sequences
-    model.add(
-      tf.layers.lstm({
-        units: MODEL_CONFIG.LSTM_UNITS_2,
-        returnSequences: true,
-        kernelInitializer: "heNormal",
-        kernelRegularizer: tf.regularizers.l2({
-          l2: MODEL_CONFIG.L2_REGULARIZATION,
-        }),
-        recurrentRegularizer: tf.regularizers.l2({
-          l2: MODEL_CONFIG.L2_REGULARIZATION * 0.5,
-        }),
-        dropout: 0.1,
-        recurrentDropout: 0.1,
-        name: "lstm2",
-      })
-    );
-    model.add(tf.layers.batchNormalization({ name: "bn_lstm2" }));
-    model.add(tf.layers.dropout({ rate: MODEL_CONFIG.DROPOUT_RATE }));
-
-    // Second enhanced feature layer (replaces attention mechanism)
-    if (TRAINING_CONFIG.USE_ATTENTION) {
-      model.add(
-        tf.layers.dense({
-          units: MODEL_CONFIG.ATTENTION_UNITS_2,
-          activation: "tanh",
-          kernelInitializer: "heNormal",
-          kernelRegularizer: tf.regularizers.l2({
-            l2: MODEL_CONFIG.L2_REGULARIZATION,
-          }),
-          name: "enhanced_features2",
-        })
-      );
-      model.add(tf.layers.batchNormalization({ name: "bn_enhanced2" }));
-      model.add(tf.layers.dropout({ rate: TRAINING_CONFIG.ATTENTION_DROPOUT }));
-    }
-
-    // Third LSTM layer without return sequences for final temporal features
-    model.add(
-      tf.layers.lstm({
-        units: MODEL_CONFIG.LSTM_UNITS_3,
-        returnSequences: false,
-        kernelInitializer: "heNormal",
-        kernelRegularizer: tf.regularizers.l2({
-          l2: MODEL_CONFIG.L2_REGULARIZATION,
-        }),
-        recurrentRegularizer: tf.regularizers.l2({
-          l2: MODEL_CONFIG.L2_REGULARIZATION * 0.5,
-        }),
-        dropout: 0.1,
-        recurrentDropout: 0.1,
-        name: "lstm3",
-      })
-    );
-    model.add(tf.layers.batchNormalization({ name: "bn_lstm3" }));
-    model.add(tf.layers.dropout({ rate: MODEL_CONFIG.DROPOUT_RATE }));
-
-    // Final dense layers with improved architecture
+    // Direct to output - skip intermediate dense layers for speed
     model.add(
       tf.layers.dense({
-        units: MODEL_CONFIG.DENSE_UNITS_1,
-        activation: "relu",
+        units: TRAINING_CONFIG.OUTPUT_CLASSES, // Direct to output
+        activation: "softmax",
         kernelInitializer: "heNormal",
         kernelRegularizer: tf.regularizers.l2({
-          l2: MODEL_CONFIG.L2_REGULARIZATION,
-        }),
-        name: "dense1",
-      })
-    );
-    model.add(tf.layers.batchNormalization({ name: "bn_dense1" }));
-    model.add(tf.layers.dropout({ rate: MODEL_CONFIG.DROPOUT_RATE }));
-
-    // Additional dense layer for better feature learning
-    model.add(
-      tf.layers.dense({
-        units: Math.floor(MODEL_CONFIG.DENSE_UNITS_1 / 2),
-        activation: "relu",
-        kernelInitializer: "heNormal",
-        kernelRegularizer: tf.regularizers.l2({
-          l2: MODEL_CONFIG.L2_REGULARIZATION,
-        }),
-        name: "dense2",
-      })
-    );
-    model.add(tf.layers.batchNormalization({ name: "bn_dense2" }));
-    model.add(tf.layers.dropout({ rate: MODEL_CONFIG.DROPOUT_RATE * 0.5 }));
-
-    // Output layer with linear activation for logits (temperature scaling applied in predictor)
-    model.add(
-      tf.layers.dense({
-        units: MODEL_CONFIG.OUTPUT_UNITS,
-        activation: "linear", // Use linear activation for logits
-        kernelInitializer: "glorotNormal",
-        kernelRegularizer: tf.regularizers.l2({
-          l2: MODEL_CONFIG.L2_REGULARIZATION * 0.5, // Reduced regularization for output
+          l2: 0.0001,
         }),
         name: "output",
       })
     );
 
+    console.log("SIMPLIFIED model created - much faster training expected");
+    console.log(
+      `Model parameters: Conv1D(16) -> LSTM(32) -> Dense(${TRAINING_CONFIG.OUTPUT_CLASSES})`
+    );
     return model;
   }
 }

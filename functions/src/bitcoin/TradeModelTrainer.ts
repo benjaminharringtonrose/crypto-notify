@@ -277,26 +277,9 @@ export class TradeModelTrainer {
     X_std: tf.Tensor
   ): Promise<void> {
     if (!this.model) throw new Error("Model not initialized");
-    // Debug weight shapes before saving
-    const dense2Weights = await this.model
-      .getLayer("dense2")
-      .getWeights()[0]
-      .data();
-    const outputWeights = await this.model
-      .getLayer("output")
-      .getWeights()[0]
-      .data();
-    console.log(
-      "Saving weights - dense2 shape:",
-      this.model.getLayer("dense2").getWeights()[0].shape
-    );
-    console.log("Saving weights - dense2 length:", dense2Weights.length);
-    console.log(
-      "Saving weights - output shape:",
-      this.model.getLayer("output").getWeights()[0].shape
-    );
-    console.log("Saving weights - output length:", outputWeights.length);
+    console.log("Saving simplified model weights...");
 
+    // SIMPLIFIED: Only save weights that exist in our simplified architecture
     const weights = {
       conv1Weights: Array.from(
         await this.model.getLayer("conv1d_input").getWeights()[0].data()
@@ -304,180 +287,20 @@ export class TradeModelTrainer {
       conv1Bias: Array.from(
         await this.model.getLayer("conv1d_input").getWeights()[1].data()
       ),
-      bnConv1Gamma: Array.from(
-        await this.model.getLayer("bn_conv1").getWeights()[0].data()
+      lstmWeights: Array.from(
+        await this.model.getLayer("lstm_simple").getWeights()[0].data()
       ),
-      bnConv1Beta: Array.from(
-        await this.model.getLayer("bn_conv1").getWeights()[1].data()
+      lstmRecurrentWeights: Array.from(
+        await this.model.getLayer("lstm_simple").getWeights()[1].data()
       ),
-      bnConv1MovingMean: Array.from(
-        await this.model.getLayer("bn_conv1").getWeights()[2].data()
-      ),
-      bnConv1MovingVariance: Array.from(
-        await this.model.getLayer("bn_conv1").getWeights()[3].data()
-      ),
-      conv2Weights: Array.from(
-        await this.model.getLayer("conv1d_2").getWeights()[0].data()
-      ),
-      conv2Bias: Array.from(
-        await this.model.getLayer("conv1d_2").getWeights()[1].data()
-      ),
-      bnConv2Gamma: Array.from(
-        await this.model.getLayer("bn_conv2").getWeights()[0].data()
-      ),
-      bnConv2Beta: Array.from(
-        await this.model.getLayer("bn_conv2").getWeights()[1].data()
-      ),
-      bnConv2MovingMean: Array.from(
-        await this.model.getLayer("bn_conv2").getWeights()[2].data()
-      ),
-      bnConv2MovingVariance: Array.from(
-        await this.model.getLayer("bn_conv2").getWeights()[3].data()
-      ),
-      lstm1Weights: Array.from(
-        await this.model.getLayer("lstm1").getWeights()[0].data()
-      ),
-      lstm1RecurrentWeights: Array.from(
-        await this.model.getLayer("lstm1").getWeights()[1].data()
-      ),
-      lstm1Bias: Array.from(
-        await this.model.getLayer("lstm1").getWeights()[2].data()
-      ),
-      bnLstm1Gamma: Array.from(
-        await this.model.getLayer("bn_lstm1").getWeights()[0].data()
-      ),
-      bnLstm1Beta: Array.from(
-        await this.model.getLayer("bn_lstm1").getWeights()[1].data()
-      ),
-      bnLstm1MovingMean: Array.from(
-        await this.model.getLayer("bn_lstm1").getWeights()[2].data()
-      ),
-      bnLstm1MovingVariance: Array.from(
-        await this.model.getLayer("bn_lstm1").getWeights()[3].data()
-      ),
-      lstm2Weights: Array.from(
-        await this.model.getLayer("lstm2").getWeights()[0].data()
-      ),
-      lstm2RecurrentWeights: Array.from(
-        await this.model.getLayer("lstm2").getWeights()[1].data()
-      ),
-      lstm2Bias: Array.from(
-        await this.model.getLayer("lstm2").getWeights()[2].data()
-      ),
-      bnLstm2Gamma: Array.from(
-        await this.model.getLayer("bn_lstm2").getWeights()[0].data()
-      ),
-      bnLstm2Beta: Array.from(
-        await this.model.getLayer("bn_lstm2").getWeights()[1].data()
-      ),
-      bnLstm2MovingMean: Array.from(
-        await this.model.getLayer("bn_lstm2").getWeights()[2].data()
-      ),
-      bnLstm2MovingVariance: Array.from(
-        await this.model.getLayer("bn_lstm2").getWeights()[3].data()
-      ),
-      lstm3Weights: Array.from(
-        await this.model.getLayer("lstm3").getWeights()[0].data()
-      ),
-      lstm3RecurrentWeights: Array.from(
-        await this.model.getLayer("lstm3").getWeights()[1].data()
-      ),
-      lstm3Bias: Array.from(
-        await this.model.getLayer("lstm3").getWeights()[2].data()
-      ),
-      bnLstm3Gamma: Array.from(
-        await this.model.getLayer("bn_lstm3").getWeights()[0].data()
-      ),
-      bnLstm3Beta: Array.from(
-        await this.model.getLayer("bn_lstm3").getWeights()[1].data()
-      ),
-      bnLstm3MovingMean: Array.from(
-        await this.model.getLayer("bn_lstm3").getWeights()[2].data()
-      ),
-      bnLstm3MovingVariance: Array.from(
-        await this.model.getLayer("bn_lstm3").getWeights()[3].data()
-      ),
-
-      // Enhanced features layers (attention mechanism replacement)
-      enhancedFeatures1Weights: Array.from(
-        await this.model.getLayer("enhanced_features1").getWeights()[0].data()
-      ),
-      enhancedFeatures1Bias: Array.from(
-        await this.model.getLayer("enhanced_features1").getWeights()[1].data()
-      ),
-      bnEnhanced1Gamma: Array.from(
-        await this.model.getLayer("bn_enhanced1").getWeights()[0].data()
-      ),
-      bnEnhanced1Beta: Array.from(
-        await this.model.getLayer("bn_enhanced1").getWeights()[1].data()
-      ),
-      bnEnhanced1MovingMean: Array.from(
-        await this.model.getLayer("bn_enhanced1").getWeights()[2].data()
-      ),
-      bnEnhanced1MovingVariance: Array.from(
-        await this.model.getLayer("bn_enhanced1").getWeights()[3].data()
-      ),
-
-      enhancedFeatures2Weights: Array.from(
-        await this.model.getLayer("enhanced_features2").getWeights()[0].data()
-      ),
-      enhancedFeatures2Bias: Array.from(
-        await this.model.getLayer("enhanced_features2").getWeights()[1].data()
-      ),
-      bnEnhanced2Gamma: Array.from(
-        await this.model.getLayer("bn_enhanced2").getWeights()[0].data()
-      ),
-      bnEnhanced2Beta: Array.from(
-        await this.model.getLayer("bn_enhanced2").getWeights()[1].data()
-      ),
-      bnEnhanced2MovingMean: Array.from(
-        await this.model.getLayer("bn_enhanced2").getWeights()[2].data()
-      ),
-      bnEnhanced2MovingVariance: Array.from(
-        await this.model.getLayer("bn_enhanced2").getWeights()[3].data()
-      ),
-
-      dense1Weights: Array.from(
-        await this.model.getLayer("dense1").getWeights()[0].data()
-      ),
-      dense1Bias: Array.from(
-        await this.model.getLayer("dense1").getWeights()[1].data()
-      ),
-      dense2Weights: Array.from(
-        await this.model.getLayer("dense2").getWeights()[0].data()
-      ),
-      dense2Bias: Array.from(
-        await this.model.getLayer("dense2").getWeights()[1].data()
+      lstmBias: Array.from(
+        await this.model.getLayer("lstm_simple").getWeights()[2].data()
       ),
       outputWeights: Array.from(
         await this.model.getLayer("output").getWeights()[0].data()
       ),
       outputBias: Array.from(
         await this.model.getLayer("output").getWeights()[1].data()
-      ),
-      bnDense1Gamma: Array.from(
-        await this.model.getLayer("bn_dense1").getWeights()[0].data()
-      ),
-      bnDense1Beta: Array.from(
-        await this.model.getLayer("bn_dense1").getWeights()[1].data()
-      ),
-      bnDense1MovingMean: Array.from(
-        await this.model.getLayer("bn_dense1").getWeights()[2].data()
-      ),
-      bnDense1MovingVariance: Array.from(
-        await this.model.getLayer("bn_dense1").getWeights()[3].data()
-      ),
-      bnDense2Gamma: Array.from(
-        await this.model.getLayer("bn_dense2").getWeights()[0].data()
-      ),
-      bnDense2Beta: Array.from(
-        await this.model.getLayer("bn_dense2").getWeights()[1].data()
-      ),
-      bnDense2MovingMean: Array.from(
-        await this.model.getLayer("bn_dense2").getWeights()[2].data()
-      ),
-      bnDense2MovingVariance: Array.from(
-        await this.model.getLayer("bn_dense2").getWeights()[3].data()
       ),
       featureMeans: Array.from(await X_mean.data()),
       featureStds: Array.from(await X_std.data()),

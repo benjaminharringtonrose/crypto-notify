@@ -49,7 +49,7 @@ export class DataProcessor {
 
       // Calculate volatility score
       for (let j = 1; j < sample.length; j++) {
-        const priceChange = Math.abs(sample[j][0] - sample[j - 1][0]); // Assuming first feature is price
+        const priceChange = Math.abs(sample[j][0] - sample[j - 1][0]); // Assuming first feature is price-like first feature
         volatilityScore += priceChange;
       }
 
@@ -75,7 +75,10 @@ export class DataProcessor {
     difficultyScores.sort((a, b) => a.score - b.score);
 
     // Select easiest samples based on difficulty level
-    const numSamples = Math.floor(X.length * this.difficultyLevel);
+    const numSamples = Math.max(
+      50,
+      Math.floor(X.length * this.difficultyLevel)
+    );
     const selectedIndices = difficultyScores
       .slice(0, numSamples)
       .map((item) => item.index);
@@ -148,7 +151,27 @@ export class DataProcessor {
   }
 
   private addNoise(features: number[], scale: number): number[] {
-    return features.map((f) => f * scale + (Math.random() - 0.5) * 0.05); // Reduced noise amplitude
+    // Simplified but effective data augmentation
+    const noiseLevel = 0.01; // Very low noise for stability
+    const shiftProb = 0.2; // 20% chance of temporal shift
+
+    if (Math.random() < shiftProb) {
+      // Add slight temporal shift for robustness
+      const shift = Math.floor(Math.random() * 3) - 1; // -1, 0, or 1
+      if (shift !== 0) {
+        const shiftedFeatures = [...features];
+        // Apply small shift to price-related features (first few features)
+        for (let i = 0; i < Math.min(10, features.length); i++) {
+          shiftedFeatures[i] = features[i] * (1 + shift * 0.005);
+        }
+        return shiftedFeatures.map(
+          (f) => f * scale + (Math.random() - 0.5) * noiseLevel
+        );
+      }
+    }
+
+    // Simple noise addition
+    return features.map((f) => f * scale + (Math.random() - 0.5) * noiseLevel);
   }
 
   private adjustSequenceLength(sequence: number[][]): number[][] {
@@ -177,9 +200,13 @@ export class DataProcessor {
       return { X, y };
     }
 
-    // Force perfect balance - equal number of samples from each class
+    // Use all available samples but ensure minimum balance
     const minSamples = Math.min(buySamples.length, sellSamples.length);
-    const targetSamplesPerClass = Math.min(minSamples, 100); // Cap at 100 samples per class
+    const maxSamples = Math.max(buySamples.length, sellSamples.length);
+    const targetSamplesPerClass = Math.min(
+      minSamples,
+      Math.floor(maxSamples * 0.8)
+    ); // Ensure reasonable balance
 
     const balancedX: number[][][] = [];
     const balancedY: number[] = [];
@@ -229,8 +256,8 @@ export class DataProcessor {
   private labelData({
     prices,
     dayIndex,
-    threshold = 0.01, // Reduced threshold for more balanced labels
-    horizon = 5, // Reduced horizon for more immediate signals
+    threshold = 0.0005, // CRITICAL: Much lower threshold for balanced labels
+    horizon = 1, // Immediate next day signal
   }: {
     prices: number[];
     dayIndex: number;
@@ -240,25 +267,25 @@ export class DataProcessor {
     if (dayIndex + horizon >= prices.length) return 0;
 
     const currentPrice = prices[dayIndex];
-    const futureAvg =
-      prices
-        .slice(dayIndex + 1, dayIndex + horizon + 1)
-        .reduce((a, b) => a + b, 0) / horizon;
+    const nextPrice = prices[dayIndex + horizon];
 
-    const priceChangePercent = (futureAvg - currentPrice) / currentPrice;
+    const priceChangePercent = (nextPrice - currentPrice) / currentPrice;
 
-    // Debug: Log some labeling examples
+    // SIMPLIFIED: Use simple threshold without complex adjustments
+    const label = priceChangePercent > threshold ? 1 : 0;
+
+    // Debug: Log some labeling examples for verification
     if (dayIndex % 100 === 0) {
       console.log(
-        `Labeling example - Day ${dayIndex}: Current=${currentPrice.toFixed(
+        `Labeling Day ${dayIndex}: Current=${currentPrice.toFixed(
           2
-        )}, Future=${futureAvg.toFixed(2)}, Change=${(
+        )}, Next=${nextPrice.toFixed(2)}, Change=${(
           priceChangePercent * 100
-        ).toFixed(2)}%, Label=${priceChangePercent > threshold ? 1 : 0}`
+        ).toFixed(3)}%, Label=${label}`
       );
     }
 
-    return priceChangePercent > threshold ? 1 : 0;
+    return label;
   }
 
   public computeFeatureStats(features: number[][]): {

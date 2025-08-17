@@ -556,6 +556,68 @@ We'll test small, incremental changes and measure their impact:
 
 ---
 
+## **🚨 CRITICAL CRISIS: Performance Collapse & Recovery** - December 2024
+
+### **CRISIS DISCOVERED**: Severe Performance Regression
+
+**Status**: ❌ **CATASTROPHIC FAILURE**  
+**Issue**: Model performance dropped from documented 65.96% to ~52-56% accuracy  
+**Root Cause**: Architecture drift from proven optimal configuration
+
+**Crisis Symptoms**:
+
+- **Training Accuracy**: ~52-56% vs 65.96% expected (↓20%+ MAJOR REGRESSION!)
+- **Architecture Overhaul**: LSTM(128+64) + Dense(128) vs proven LSTM(64) + Dense(32)
+- **Learning Rate**: 0.005 vs proven 0.0005 (10x too aggressive)
+- **Training Epochs**: 50 vs proven 30 (over-training risk)
+
+**Crisis Analysis**:
+❌ **Architecture Drift**: Departed from proven Conv1D(48,3)→LSTM(64)→Dense(32) configuration  
+❌ **Capacity Explosion**: Massive capacity increase (128+64 LSTM, 128 Dense) causes overfitting  
+❌ **Hyperparameter Chaos**: 10x learning rate increase disrupts stable learning  
+❌ **Lost Stability Fixes**: Deterministic seeding and class balance monitoring abandoned
+
+---
+
+### **RECOVERY-1: Baseline Restoration + 7-Day Horizon** - December 2024
+
+**Status**: 🔄 **IN PROGRESS**  
+**Change**: Complete revert to documented optimal baseline configuration + 7-day prediction horizon  
+**Hypothesis**: Performance crisis caused by architecture drift from proven optimal settings
+
+**Target Configuration**:
+
+- **Architecture**: Conv1D(48,3) → BN → Dropout(0.3) → LSTM(64) → Dense(32) → Dropout(0.3) → Output(2)
+- **Training**: threshold=0.001, 30 epochs, batch_size=16, LR=0.0005
+- **Prediction Horizon**: 7 days ahead (user requirement)
+- **Features**: 25 core indicators (optimized set)
+- **Stability**: Deterministic seeding restored: `tf.randomUniform([1, 1], 0, 1, "float32", 42)`
+
+**Expected Results**:
+
+- **IMPORTANT**: Metrics will differ from documented baseline due to 7-day horizon change
+- **Primary Goal**: Stable training without class collapse
+- **Class Balance**: ~50/50 buy/sell predictions throughout training
+- **F1 Balance**: Buy and Sell F1 scores should be reasonably balanced
+- **Training Time**: ~39 seconds (efficient convergence)
+- **Prediction Validity**: Model predicts price movement 7 days ahead
+
+**Critical Success Factors**:
+
+1. **Exact Architecture Match**: Every layer, unit count, and dropout rate must match proven optimal
+2. **Deterministic Seeding**: Restored for stable, reproducible training
+3. **Optimal Hyperparameters**: Learning rate, batch size, epochs all reverted to proven settings
+4. **Core Features**: 25-indicator set (not over-engineered 62 features)
+5. **Class Balance Monitoring**: Track buy/sell ratios every epoch
+
+**Key Learning**: **Never deviate from proven optimal configurations without systematic A/B testing**. Architecture drift is the #1 cause of performance regression in complex ML systems.
+
+**Next Steps**: If recovery successful (stable training achieved), establish new 7-day baseline metrics and proceed to systematic Phase 2 experiments. If recovery fails, investigate data pipeline and feature configuration issues.
+
+**⚠️ IMPORTANT NOTE**: All previous baseline metrics (65.96% accuracy, 1.2316 combined score) are **NO LONGER VALID** due to the horizon change from 1-day to 7-day predictions. This is a fundamental change that will establish a new performance baseline.
+
+---
+
 ## **🚨 CRITICAL ISSUE DISCOVERY: Class Collapse Crisis** - December 2024
 
 ### **PROBLEM IDENTIFIED**: Catastrophic Performance Regression

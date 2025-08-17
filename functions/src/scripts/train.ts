@@ -4,17 +4,21 @@ async function runTraining() {
   const trainer = new TradeModelTrainer();
 
   try {
-    console.log("\n🚀 EXPERIMENT ACCURACY-2: MAXIMUM CAPACITY OVERHAUL");
+    console.log("\n🚀 EXPERIMENT 7DAY-1: CLASS BALANCE + LR OPTIMIZATION");
+    console.log("🎯 IMPROVING: 7-day baseline with class balance optimization");
     console.log(
-      "🔬 TESTING: Dual LSTM (128+64), Massive Dense (128), Ultra-High LR (0.005)"
+      "📊 ARCHITECTURE: Conv1D(48,3) → BN → LSTM(64) → Dense(32) → Output(2)"
+    );
+    console.log("⚙️ TRAINING: Alpha [0.45,0.55], Min LR 0.00005, 30 epochs");
+    console.log(
+      "🔮 PREDICTION: 7-day ahead buy/sell signals (established baseline)"
     );
     console.log(
-      "💡 HYPOTHESIS: Need EXTREME capacity + learning rate for complex crypto patterns"
+      "🔬 HYPOTHESIS: Better class balance + higher LR floor improves 7-day predictions"
     );
     console.log(
-      "📊 ACCURACY-1: ~52-56% training accuracy (STILL INSUFFICIENT!)"
+      "🎯 TARGET: Improve balanced accuracy from 53.85% and MCC from 0.0789\n"
     );
-    console.log("🎯 TARGET: >75% training accuracy - FINAL ATTEMPT!\n");
 
     const startTime = Date.now();
 
@@ -23,14 +27,22 @@ async function runTraining() {
     const endTime = Date.now();
     const trainingTime = (endTime - startTime) / 1000;
 
-    console.log(`⏱️  Total training time: ${trainingTime.toFixed(2)} seconds`);
+    console.log(
+      `\n⏱️  Training completed in: ${trainingTime.toFixed(2)} seconds`
+    );
 
     const bestThreshold = trainer.getBestThreshold();
     console.log(`🎯 Best validation threshold: ${bestThreshold.toFixed(4)}`);
 
-    console.log("\n📈 EXPERIMENT ACCURACY-2 RESULTS:");
-    console.log("ACCURACY-1: ~52-56% training accuracy (STILL FAILED!)");
-    console.log("ACCURACY-2: Analyzing maximum capacity architecture...");
+    console.log("\n📈 EXPERIMENT 7DAY-1 ANALYSIS:");
+    console.log("✅ Compare balanced accuracy vs baseline 53.85%");
+    console.log("✅ Monitor MCC improvement from baseline 0.0789");
+    console.log("✅ Check F1 score balance (baseline: 0.5555/0.5279)");
+    console.log("✅ Verify class balance remains stable");
+    console.log("💡 Focal loss Alpha [0.45,0.55] should improve class balance");
+    console.log(
+      "💡 Higher min LR should prevent over-conservative convergence"
+    );
   } catch (error) {
     console.error("\n❌ Training failed:", error);
     console.error(

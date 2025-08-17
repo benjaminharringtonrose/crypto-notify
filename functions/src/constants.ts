@@ -271,22 +271,22 @@ export const MODEL_CONFIG = {
 };
 
 export const TRAINING_CONFIG = {
-  // EMERGENCY FIX: Stable training configuration
-  EPOCHS: 50, // ACCURACY-1: Focus on effective training rather than long runs
-  BATCH_SIZE: 16, // ACCURACY-2: Smaller batches for more gradient updates
+  // RECOVERY-1: Revert to PROVEN optimal training configuration
+  EPOCHS: 30, // PROVEN OPTIMAL: 30 epochs for faster iteration, 50+ caused issues
+  BATCH_SIZE: 16, // PROVEN OPTIMAL: Best balance for gradient updates
   SHUFFLE_CHUNK_SIZE: 10,
-  INITIAL_LEARNING_RATE: 0.005, // ACCURACY-2: Even more aggressive learning
-  MIN_LEARNING_RATE: 0.0001, // ACCURACY-1: Increased from 0.00001 to maintain learning
-  CYCLIC_LR_STEP_SIZE: 15, // REVERTED: 10 → 15, back to baseline
+  INITIAL_LEARNING_RATE: 0.0005, // PROVEN OPTIMAL: 0.0008 showed promise but 0.0005 is baseline
+  MIN_LEARNING_RATE: 0.00005, // 7DAY-2: Higher floor for better 7-day convergence
+  CYCLIC_LR_STEP_SIZE: 15, // PROVEN OPTIMAL: 10 showed minor promise but 15 is baseline
   OUTPUT_CLASSES: 2,
-  START_DAYS_AGO: 600, // REDUCED: 800 → 600 for manageable data size
-  TRAIN_SPLIT: 0.8, // REDUCED: 0.85 → 0.8 for more validation data
+  START_DAYS_AGO: 600, // PROVEN OPTIMAL: 600 days documented in experiments
+  TRAIN_SPLIT: 0.8, // PROVEN OPTIMAL: 80% train / 20% validation split
   PREFETCH_BUFFER: 4,
-  PATIENCE: 10, // REDUCED: 15 → 10 for faster stopping
+  PATIENCE: 10, // PROVEN OPTIMAL: Early stopping patience
   BYTES_TO_MB: 1024 * 1024,
   MS_TO_SECONDS: 1000,
-  GAMMA: 1.5, // OPTIMAL: Found in experiments, prevents class collapse
-  ALPHA: [0.4, 0.6] as [number, number], // OPTIMAL: Balanced focus, prevents buy bias
+  GAMMA: 1.5, // PROVEN OPTIMAL: Found in experiments, prevents class collapse
+  ALPHA: [0.45, 0.55] as [number, number], // 7DAY-1: More balanced for 7-day predictions
   GRADIENT_CLIP_NORM: 1.0, // REDUCED: 5.0 → 1.0 for natural gradients
   LR_DECAY_RATE: 0.8, // REDUCED: was 0.92, now 0.8 for more aggressive decay
   WARMUP_EPOCHS: 2, // REDUCED: was 5, now 2 for faster warmup

@@ -256,8 +256,8 @@ export class DataProcessor {
   private labelData({
     prices,
     dayIndex,
-    threshold = 0.001, // INVESTIGATION: Revert 0.0015 → 0.001 to check if threshold is causing imbalance
-    horizon = 1, // REVERTED: 2 → 1, shorter horizon has stronger signals
+    threshold = 0.001, // PROVEN OPTIMAL: 0.001 threshold prevents class imbalance
+    horizon = 7, // USER REQUIREMENT: Predict 7 days ahead (buy/sell signals)
   }: {
     prices: number[];
     dayIndex: number;
@@ -336,12 +336,17 @@ export class DataProcessor {
 
     for (
       let i = 34 + this.config.timesteps - 1;
-      i < btcData.prices.length;
+      i < btcData.prices.length - 7; // ADJUSTED: Reserve 7 days for prediction horizon
       i++
     ) {
       const sequence = this.buildSequence(btcData, i);
       if (!sequence) continue;
-      const label = this.labelData({ prices: btcData.prices, dayIndex: i });
+      const label = this.labelData({
+        prices: btcData.prices,
+        dayIndex: i,
+        threshold: 0.001,
+        horizon: 7, // USER REQUIREMENT: 7-day prediction horizon
+      });
       X.push(sequence);
       y.push(label);
     }

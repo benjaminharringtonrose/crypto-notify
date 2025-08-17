@@ -13,10 +13,10 @@ export default class TradeModelFactory {
   public createModel(): tf.LayersModel {
     // RECOVERY-1: Revert to PROVEN optimal baseline (65.96% validation accuracy)
     console.log("🔄 RECOVERY-1: Reverting to documented optimal baseline...");
-    
+
     // CRITICAL: Add deterministic seeding for stable training
     tf.randomUniform([1, 1], 0, 1, "float32", 42);
-    
+
     const model = tf.sequential();
 
     // Conv1D layer - PROVEN optimal settings from experiments
@@ -69,9 +69,11 @@ export default class TradeModelFactory {
 
     console.log("✅ RECOVERY-1: Restored proven optimal baseline");
     console.log("🎯 Target: 65.96% validation accuracy (documented optimal)");
-    console.log(`📊 Architecture: Conv1D(48,3) → BN → Dropout(0.3) → LSTM(64) → Dense(32) → Dropout(0.3) → Output(2)`);
+    console.log(
+      `📊 Architecture: Conv1D(48,3) → BN → Dropout(0.3) → LSTM(64) → Dense(32) → Dropout(0.3) → Output(2)`
+    );
     console.log(`📈 Features: ${this.features} (should be 25 core indicators)`);
-    
+
     model.summary();
     return model;
   }

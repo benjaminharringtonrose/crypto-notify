@@ -1,28 +1,6 @@
 import { TradeModelTrainer } from "../bitcoin/TradeModelTrainer";
-import { TRAINING_CONFIG } from "../constants";
 
 async function runTraining() {
-  console.log("\n📊 Training Configuration:");
-  console.log(`   Epochs: ${TRAINING_CONFIG.EPOCHS} (REDUCED for speed)`);
-  console.log(
-    `   Batch Size: ${TRAINING_CONFIG.BATCH_SIZE} (INCREASED for stability)`
-  );
-  console.log(
-    `   Learning Rate: ${TRAINING_CONFIG.INITIAL_LEARNING_RATE} (INCREASED for faster learning)`
-  );
-  console.log(
-    `   Data Days: ${TRAINING_CONFIG.START_DAYS_AGO} (REDUCED for speed)`
-  );
-  console.log(
-    `   Train Split: ${TRAINING_CONFIG.TRAIN_SPLIT} (Stratified split)`
-  );
-  console.log(
-    `   Patience: ${TRAINING_CONFIG.PATIENCE} (REDUCED for faster stopping)`
-  );
-  console.log(
-    `   Time-based Split: ${TRAINING_CONFIG.TIME_BASED_SPLIT} (DISABLED)`
-  );
-
   const trainer = new TradeModelTrainer();
 
   try {

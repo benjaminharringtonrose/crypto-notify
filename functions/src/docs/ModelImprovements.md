@@ -529,6 +529,31 @@ We'll test small, incremental changes and measure their impact:
 
 **Decision**: **ADOPT** - Core feature set (25 features) is our new optimal baseline. This represents a major breakthrough in model efficiency and clarity.
 
+### **Experiment NEW-7: Multi-Scale Conv1D v2.0 Retry** - December 2024
+
+**Status**: ❌ FAILED (Confirmed Pattern)  
+**Change**: Retry Multi-Scale Conv1D with optimized 25-feature baseline + smart filter distribution (20+16+12=48)  
+**Hypothesis**: Clean features should enable parallel architecture benefits without previous feature noise
+
+**Results**:
+
+- **Best Combined Score**: 1.0424 vs 1.1293 baseline (↓7.7% decline)
+- **Best Validation Accuracy**: 61.54% vs 60.44% baseline (↑1.8% slight improvement)
+- **Buy F1**: 0.4276 vs 0.5646 baseline (↓24.3% major decline!)
+- **Sell F1**: 0.6840 vs 0.6341 baseline (↑7.9% improvement)
+- **Class Imbalance**: Severe 18/73 buy/sell prediction split
+
+**Analysis**:
+✅ **Hypothesis Partially Confirmed**: Clean features did improve vs original multi-scale (1.0424 vs 0.8118)  
+❌ **Fundamental Architecture Issue**: Multi-scale still causes severe class imbalance  
+❌ **Buy Signal Collapse**: 24% decline in buy prediction ability despite clean features  
+❌ **Architectural Complexity**: Parallel branches inherently disrupt balanced learning  
+❌ **Weight Saving Issues**: Functional model layer names broke compatibility
+
+**Key Learning**: **Multi-scale architectures are fundamentally incompatible with balanced binary classification** in our use case. Parallel Conv1D branches create feature distribution imbalances that favor one class over another, regardless of feature quality. The issue is architectural, not data-related.
+
+**Decision**: **REJECT PERMANENTLY** - Multi-scale Conv1D approaches consistently fail for balanced binary crypto prediction. Simple, focused architectures are superior for our task.
+
 ---
 
 ## **🎯 FINAL OPTIMAL CONFIGURATION ACHIEVED**

@@ -12,11 +12,11 @@ export default class TradeModelFactory {
 
   public createModel(): tf.LayersModel {
     console.log(
-      "Creating BASELINE model architecture for further experiments..."
+      "Creating OPTIMIZED baseline model (reverted from failed multi-scale)..."
     );
     const model = tf.sequential();
 
-    // REVERTED: Multi-scale experiment failed, back to baseline
+    // REVERTED: Multi-scale v2.0 also failed - back to optimal baseline
     // Conv1D layer with proven optimal settings
     model.add(
       tf.layers.conv1d({
@@ -32,11 +32,11 @@ export default class TradeModelFactory {
     model.add(tf.layers.batchNormalization({ name: "bn_conv1" }));
     model.add(tf.layers.dropout({ rate: 0.2, name: "dropout_conv1" }));
 
-    // REVERTED: Attention experiment failed, back to baseline LSTM
+    // LSTM layer - optimal baseline
     model.add(
       tf.layers.lstm({
         units: 64, // OPTIMAL: Capacity limit found
-        returnSequences: false, // REVERTED: Back to baseline
+        returnSequences: false, // OPTIMAL: For binary classification
         kernelInitializer: "heNormal",
         recurrentDropout: 0.2,
         name: "lstm1",
@@ -65,9 +65,9 @@ export default class TradeModelFactory {
       })
     );
 
-    console.log("✅ Attention-enhanced model created");
+    console.log("✅ Reverted to proven optimal baseline architecture");
     console.log(
-      `Model architecture: Conv1D(48,3) -> BN -> Dropout -> LSTM(64,seq=true) -> GlobalAvgPool -> Dense(32) -> Dropout -> Output(${TRAINING_CONFIG.OUTPUT_CLASSES})`
+      `Model: Conv1D(48,3) -> BN -> LSTM(64) -> Dense(32) -> Output(${TRAINING_CONFIG.OUTPUT_CLASSES}) with 25 core features`
     );
     model.summary();
     return model;

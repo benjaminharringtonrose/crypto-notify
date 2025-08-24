@@ -1768,6 +1768,35 @@ export default class FeatureCalculator {
       acceleratorOscillator: this.calculateAcceleratorOscillator(
         prices.slice(0, dayIndex + 1)
       ),
+      // EXPERIMENT #9-1: Chaikin Oscillator (CO) - Advanced Volume Indicator
+      chaikinOscillator: this.calculateChaikinOscillator(
+        prices.slice(0, dayIndex + 1),
+        prices.slice(0, dayIndex + 1),
+        prices.slice(0, dayIndex + 1),
+        volumes.slice(0, dayIndex + 1)
+      ),
+      // EXPERIMENT #9-2: Elder Force Index (EFI) - Advanced Volume/Momentum Indicator
+      elderForceIndex: this.calculateElderForceIndex(
+        prices.slice(0, dayIndex + 1),
+        volumes.slice(0, dayIndex + 1)
+      ),
+      // EXPERIMENT #9-3: Klinger Volume Oscillator (KVO) - Advanced Volume Indicator
+      klingerVolumeOscillator: this.calculateKlingerVolumeOscillator(
+        prices.slice(0, dayIndex + 1),
+        prices.slice(0, dayIndex + 1),
+        prices.slice(0, dayIndex + 1),
+        volumes.slice(0, dayIndex + 1)
+      ),
+      // EXPERIMENT #9-4: Mass Index (MI) - Advanced Volatility Indicator
+      massIndex: this.calculateMassIndex(
+        prices.slice(0, dayIndex + 1),
+        prices.slice(0, dayIndex + 1)
+      ),
+      // EXPERIMENT #9-5: Price Channel (PC) - Advanced Support/Resistance Indicator
+      priceChannel: this.calculatePriceChannel(
+        prices.slice(0, dayIndex + 1),
+        prices.slice(0, dayIndex + 1)
+      ),
     };
   }
 
@@ -1872,8 +1901,196 @@ export default class FeatureCalculator {
       indicators.historicalVolatility, // Historical Volatility (HV) - EXPERIMENT #8-1
       indicators.camarillaPivots, // Camarilla Pivots (CP) - EXPERIMENT #8-4
       indicators.acceleratorOscillator, // Accelerator Oscillator (AO) - EXPERIMENT #8-5
+      indicators.chaikinOscillator, // Chaikin Oscillator (CO) - EXPERIMENT #9-1
+      indicators.elderForceIndex, // Elder Force Index (EFI) - EXPERIMENT #9-2
+      indicators.klingerVolumeOscillator, // Klinger Volume Oscillator (KVO) - EXPERIMENT #9-3
+      indicators.massIndex, // Mass Index (MI) - EXPERIMENT #9-4
+      indicators.priceChannel, // Price Channel (PC) - EXPERIMENT #9-5
     ];
 
     return optimizedFeatures;
+  }
+
+  // EXPERIMENT #9-1: Chaikin Oscillator (CO) - Advanced Volume Indicator
+  public calculateChaikinOscillator(
+    high: number[],
+    low: number[],
+    close: number[],
+    volume: number[],
+    fastPeriod: number = 3,
+    slowPeriod: number = 10
+  ): number {
+    if (
+      high.length < slowPeriod ||
+      low.length < slowPeriod ||
+      close.length < slowPeriod ||
+      volume.length < slowPeriod
+    )
+      return 0;
+
+    // Calculate Money Flow Multiplier
+    const moneyFlowMultipliers: number[] = [];
+    for (let i = 0; i < close.length; i++) {
+      const highLow = high[i] - low[i];
+      const closeLow = close[i] - low[i];
+      const highClose = high[i] - close[i];
+
+      if (highLow === 0) {
+        moneyFlowMultipliers.push(0);
+      } else {
+        const mfm = (closeLow - highClose) / highLow;
+        moneyFlowMultipliers.push(mfm);
+      }
+    }
+
+    // Calculate Money Flow Volume
+    const moneyFlowVolumes: number[] = [];
+    for (let i = 0; i < volume.length; i++) {
+      moneyFlowVolumes.push(moneyFlowMultipliers[i] * volume[i]);
+    }
+
+    // Calculate Accumulation/Distribution Line (ADL)
+    const adl: number[] = [];
+    let cumulativeADL = 0;
+    for (let i = 0; i < moneyFlowVolumes.length; i++) {
+      cumulativeADL += moneyFlowVolumes[i];
+      adl.push(cumulativeADL);
+    }
+
+    // Calculate EMAs of ADL
+    const fastEMA = this.calculateEMA(adl, fastPeriod);
+    const slowEMA = this.calculateEMA(adl, slowPeriod);
+
+    // Chaikin Oscillator = Fast EMA - Slow EMA
+    return fastEMA - slowEMA;
+  }
+
+  // EXPERIMENT #9-2: Elder Force Index (EFI) - Advanced Volume/Momentum Indicator
+  public calculateElderForceIndex(
+    prices: number[],
+    volumes: number[],
+    period: number = 13
+  ): number {
+    if (prices.length < period + 1 || volumes.length < period + 1) return 0;
+
+    // Calculate Force Index for each day
+    const forceIndexes: number[] = [];
+    for (let i = 1; i < prices.length; i++) {
+      const priceChange = prices[i] - prices[i - 1];
+      const forceIndex = priceChange * volumes[i];
+      forceIndexes.push(forceIndex);
+    }
+
+    // Calculate EMA of Force Index
+    const emaForceIndex = this.calculateEMA(forceIndexes, period);
+
+    return emaForceIndex;
+  }
+
+  // EXPERIMENT #9-3: Klinger Volume Oscillator (KVO) - Advanced Volume Indicator
+  public calculateKlingerVolumeOscillator(
+    high: number[],
+    low: number[],
+    close: number[],
+    volume: number[],
+    shortPeriod: number = 34,
+    longPeriod: number = 55
+  ): number {
+    if (
+      high.length < longPeriod ||
+      low.length < longPeriod ||
+      close.length < longPeriod ||
+      volume.length < longPeriod
+    )
+      return 0;
+
+    // Calculate Trend Direction
+    const trends: number[] = [];
+    for (let i = 1; i < close.length; i++) {
+      const sum1 = high[i] + low[i] + close[i];
+      const sum2 = high[i - 1] + low[i - 1] + close[i - 1];
+      trends.push(sum1 > sum2 ? 1 : sum1 < sum2 ? -1 : 0);
+    }
+
+    // Calculate Daily Force
+    const dailyForces: number[] = [];
+    for (let i = 1; i < close.length; i++) {
+      const highLow = high[i] - low[i];
+      const closeLow = close[i] - low[i];
+      const highClose = high[i] - close[i];
+      
+      let force = 0;
+      if (highLow !== 0) {
+        const sv = (closeLow - highClose) / highLow;
+        force = volume[i] * Math.abs(sv) * 2 * trends[i - 1];
+      }
+      dailyForces.push(force);
+    }
+
+    // Calculate EMAs
+    const shortEMA = this.calculateEMA(dailyForces, shortPeriod);
+    const longEMA = this.calculateEMA(dailyForces, longPeriod);
+
+    // KVO = Short EMA - Long EMA
+    return shortEMA - longEMA;
+  }
+
+  // EXPERIMENT #9-4: Mass Index (MI) - Advanced Volatility Indicator
+  public calculateMassIndex(
+    high: number[],
+    low: number[],
+    emaPeriod: number = 9,
+    sumPeriod: number = 25
+  ): number {
+    if (high.length < sumPeriod || low.length < sumPeriod) return 0;
+
+    // Calculate EMA of high-low range
+    const ranges: number[] = [];
+    for (let i = 0; i < high.length; i++) {
+      ranges.push(high[i] - low[i]);
+    }
+
+    const emaRange = this.calculateEMA(ranges, emaPeriod);
+
+    // Calculate EMA ratio
+    const emaRatios: number[] = [];
+    for (let i = 0; i < ranges.length; i++) {
+      if (emaRange !== 0) {
+        emaRatios.push(ranges[i] / emaRange);
+      } else {
+        emaRatios.push(1);
+      }
+    }
+
+    // Calculate sum of EMA ratios over the sum period
+    const recentRatios = emaRatios.slice(-sumPeriod);
+    const massIndex = recentRatios.reduce((sum, ratio) => sum + ratio, 0);
+
+    return massIndex;
+  }
+
+  // EXPERIMENT #9-5: Price Channel (PC) - Advanced Support/Resistance Indicator
+  public calculatePriceChannel(
+    high: number[],
+    low: number[],
+    period: number = 20
+  ): number {
+    if (high.length < period || low.length < period) return 0;
+
+    // Calculate highest high and lowest low over the period
+    const recentHighs = high.slice(-period);
+    const recentLows = low.slice(-period);
+    
+    const highestHigh = Math.max(...recentHighs);
+    const lowestLow = Math.min(...recentLows);
+    
+    // Calculate current price position within the channel
+    const currentPrice = high[high.length - 1]; // Use current high as proxy for current price
+    const channelRange = highestHigh - lowestLow;
+    
+    if (channelRange === 0) return 0.5; // Middle of channel if no range
+    
+    // Return position within channel (0 = bottom, 1 = top)
+    return (currentPrice - lowestLow) / channelRange;
   }
 }

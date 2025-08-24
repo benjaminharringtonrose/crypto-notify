@@ -68,6 +68,16 @@ export interface Indicators {
   historicalVolatility: number;
   camarillaPivots: number;
   acceleratorOscillator: number;
+  // EXPERIMENT #9-1: Chaikin Oscillator (CO) - Advanced Volume Indicator
+  chaikinOscillator: number;
+  // EXPERIMENT #9-2: Elder Force Index (EFI) - Advanced Volume/Momentum Indicator
+  elderForceIndex: number;
+  // EXPERIMENT #9-3: Klinger Volume Oscillator (KVO) - Advanced Volume Indicator
+  klingerVolumeOscillator: number;
+  // EXPERIMENT #9-4: Mass Index (MI) - Advanced Volatility Indicator
+  massIndex: number;
+  // EXPERIMENT #9-5: Price Channel (PC) - Advanced Support/Resistance Indicator
+  priceChannel: number;
 }
 
 export interface Probabilities {

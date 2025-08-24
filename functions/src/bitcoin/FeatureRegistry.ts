@@ -324,6 +324,46 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
     experimentAdded: "Experiment #8-5",
     importance: "medium",
   },
+  {
+    name: "chaikinOscillator",
+    description:
+      "Chaikin Oscillator - volume-based momentum indicator using ADL EMAs",
+    category: "technical",
+    experimentAdded: "Experiment #9-1",
+    importance: "medium",
+  },
+  {
+    name: "elderForceIndex",
+    description:
+      "Elder Force Index - volume-weighted momentum indicator",
+    category: "technical",
+    experimentAdded: "Experiment #9-2",
+    importance: "medium",
+  },
+  {
+    name: "klingerVolumeOscillator",
+    description:
+      "Klinger Volume Oscillator - trend-following volume indicator",
+    category: "technical",
+    experimentAdded: "Experiment #9-3",
+    importance: "medium",
+  },
+  {
+    name: "massIndex",
+    description:
+      "Mass Index - volatility indicator measuring range expansion/contraction",
+    category: "technical",
+    experimentAdded: "Experiment #9-4",
+    importance: "medium",
+  },
+  {
+    name: "priceChannel",
+    description:
+      "Price Channel - support/resistance indicator measuring position within channel",
+    category: "technical",
+    experimentAdded: "Experiment #9-5",
+    importance: "medium",
+  },
 ];
 
 /**

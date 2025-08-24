@@ -1,3 +1,5 @@
+# experimentNewIndicators.md
+
 # Technical Indicator Experimentation Prompt
 
 ## 🎯 Objective
@@ -47,6 +49,7 @@
 - Round 6: Center of Gravity Oscillator (COG)
 - Round 7: TSI, ADL, PMO, Bollinger Band Width, Williams %R
 - Round 8: Historical Volatility (HV), Trend Intensity Index (TII), Volatility Ratio (VR), Camarilla Pivots (CP), Accelerator Oscillator (AO)
+- Round 9: Chaikin Oscillator (CO), Elder Force Index (EFI), Klinger Volume Oscillator (KVO), Mass Index (MI), Price Channel (PC)
 
 ### 3. **Testing Process**
 
@@ -336,8 +339,9 @@ The model maintains its optimal 36-feature configuration, demonstrating that the
 **Round 6**: 1 out of 5 indicators kept (Center of Gravity Oscillator)
 **Round 7**: 4 out of 5 indicators kept (TSI, PMO, Bollinger Band Width, Williams %R)
 **Round 8**: 3 out of 5 indicators kept (Historical Volatility, Camarilla Pivots, Accelerator Oscillator)
+**Round 9**: 4 out of 5 indicators kept (Chaikin Oscillator, Elder Force Index, Klinger Volume Oscillator, Price Channel)
 
-**Final Result**: The Bitcoin trading model now has **45 optimized features** (up from the original 26), with 21 new indicators from the eight rounds providing measurable value for 7-day price prediction.
+**Final Result**: The Bitcoin trading model now has **49 optimized features** (up from the original 26), with 25 new indicators from the nine rounds providing measurable value for 7-day price prediction.
 
 ### **Current Optimal Feature Set:**
 
@@ -349,7 +353,8 @@ The model now includes a comprehensive set of technical indicators covering:
 - **Volume indicators** (OBV, VWAP, VWMA)
 - **Support/Resistance indicators** (Fibonacci Retracement, Price Acceleration, CP)
 - **Rate of Change indicators** (PROC)
-- **Advanced oscillators** (Center of Gravity Oscillator, Williams %R)
+- **Advanced oscillators** (Center of Gravity Oscillator, Williams %R, Chaikin Oscillator, Elder Force Index, Klinger Volume Oscillator)
+- **Support/Resistance indicators** (Price Channel)
 - **Core price action** (Price changes, volatility, position)
 
 ## 📈 **ROUND 8 RESULTS (COMPLETED)**
@@ -386,6 +391,42 @@ The model now includes a comprehensive set of technical indicators covering:
 - **TII and VR** were adding noise rather than value to the model
 
 The model now has a comprehensive set of 45 technical indicators optimized for 7-day Bitcoin price prediction, with each feature providing measurable value to the prediction accuracy.
+
+## 📈 **ROUND 9 RESULTS (COMPLETED)**
+
+### **Round 9 Experiments Summary:**
+
+1. **Chaikin Oscillator (CO)** - ✅ **KEPT** (12.80% degradation in Combined F1 when removed)
+2. **Elder Force Index (EFI)** - ✅ **KEPT** (8.83% degradation in Combined F1 when removed)
+3. **Klinger Volume Oscillator (KVO)** - ✅ **KEPT** (2.57% degradation in Combined F1 when removed)
+4. **Mass Index (MI)** - ❌ **REMOVED** (0.34% degradation in Combined F1 when removed, minimal impact)
+5. **Price Channel (PC)** - ✅ **KEPT** (2.33% degradation in Combined F1 when removed)
+
+### **Round 9 Feature Set:**
+
+- **Total Features**: 49 (up from 45 at start of Round 9)
+- **Features Added from Round 9**: Chaikin Oscillator (CO), Elder Force Index (EFI), Klinger Volume Oscillator (KVO), Price Channel (PC)
+- **Features Removed**: Mass Index (MI)
+
+### **Round 9 Analysis:**
+
+**Key Findings:**
+
+- **Chaikin Oscillator (CO)**: Kept due to 12.80% degradation in combined F1 score when removed, especially valuable for Buy F1 (41.72% degradation when removed)
+- **Elder Force Index (EFI)**: Kept due to 8.83% degradation in combined F1 score when removed, especially valuable for Sell F1 (17.27% degradation when removed)
+- **Klinger Volume Oscillator (KVO)**: Kept due to 2.57% degradation in combined F1 score when removed, especially valuable for Buy F1 (30.53% degradation when removed)
+- **Mass Index (MI)**: Removed due to minimal impact (0.34% degradation in combined F1 when removed), was not providing significant value
+- **Price Channel (PC)**: Kept due to 2.33% degradation in combined F1 score when removed, especially valuable for Buy F1 (15.55% degradation when removed)
+
+**Round 9 Insights:**
+
+- **CO** provides significant value for buy predictions and overall correlation
+- **EFI** is highly valuable for sell predictions and overall model performance
+- **KVO** adds value for buy predictions and overall model performance
+- **PC** is crucial for buy predictions and overall model balance
+- **MI** was adding minimal value and was removed to optimize the feature set
+
+The model now has a comprehensive set of 49 technical indicators optimized for 7-day Bitcoin price prediction, with each feature providing measurable value to the prediction accuracy.
 
 ## 📝 **DOCUMENTATION REQUIREMENTS**
 

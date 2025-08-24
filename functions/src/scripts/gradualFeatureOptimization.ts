@@ -93,6 +93,11 @@ class GradualFeatureOptimizer {
     "historicalVolatility",
     "camarillaPivots",
     "acceleratorOscillator",
+    "chaikinOscillator",
+    "elderForceIndex",
+    "klingerVolumeOscillator",
+    "massIndex",
+    "priceChannel",
   ];
 
   public async runOptimization(): Promise<void> {

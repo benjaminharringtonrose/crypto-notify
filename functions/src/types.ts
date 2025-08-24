@@ -70,12 +70,7 @@ export interface TradeRecommendation {
   timestamp: string;
 }
 
-export interface MarketData {
-  prices: number[];
-  volumes: number[];
-  dayIndex: number;
-  currentPrice: number;
-}
+
 
 export enum Recommendation {
   Buy = "BUY",
@@ -98,10 +93,6 @@ export enum CryptoIds {
   Bitcoin = "bitcoin",
 }
 
-export enum Currencies {
-  USD = "usd",
-}
-
 export enum Collections {
   Config = "config",
   TradeRecommendations = "tradeRecommendations",
@@ -112,11 +103,7 @@ export enum Docs {
   Bitcoin = "bitcoin",
 }
 
-export enum TradingStrategy {
-  TrendFollowing = "TrendFollowing",
-  MeanReversion = "MeanReversion",
-  Breakout = "Breakout",
-}
+
 
 export interface HistoricalData {
   prices: number[];
@@ -128,10 +115,7 @@ export interface ModelConfig {
   batchSize: number;
   initialLearningRate: number;
 }
-export interface FeatureStats {
-  mean: number;
-  std: number;
-}
+
 
 export interface Trade {
   type: Recommendation;

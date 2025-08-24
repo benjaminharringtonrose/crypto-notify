@@ -134,6 +134,189 @@ export default class FeatureCalculator {
     return ((highest - currentPrice) / (highest - lowest)) * -100;
   }
 
+  public calculateCCI(
+    high: number[],
+    low: number[],
+    close: number[],
+    period: number = 20
+  ): number {
+    if (high.length < period || low.length < period || close.length < period) {
+      return 0;
+    }
+
+    // Calculate typical prices
+    const typicalPrices: number[] = [];
+    for (let i = 0; i < close.length; i++) {
+      typicalPrices.push((high[i] + low[i] + close[i]) / 3);
+    }
+
+    // Get recent typical prices for the period
+    const recentTypicalPrices = typicalPrices.slice(-period);
+    const currentTypicalPrice =
+      recentTypicalPrices[recentTypicalPrices.length - 1];
+
+    // Calculate SMA of typical prices
+    const smaTypicalPrice =
+      recentTypicalPrices.reduce((sum, price) => sum + price, 0) / period;
+
+    // Calculate mean deviation
+    const deviations = recentTypicalPrices.map((price) =>
+      Math.abs(price - smaTypicalPrice)
+    );
+    const meanDeviation =
+      deviations.reduce((sum, dev) => sum + dev, 0) / period;
+
+    // Calculate CCI
+    if (meanDeviation === 0) return 0;
+    return (currentTypicalPrice - smaTypicalPrice) / (0.015 * meanDeviation);
+  }
+
+  public calculateMFI(
+    high: number[],
+    low: number[],
+    close: number[],
+    volume: number[],
+    period: number = 14
+  ): number {
+    if (
+      high.length < period + 1 ||
+      low.length < period + 1 ||
+      close.length < period + 1 ||
+      volume.length < period + 1
+    ) {
+      return 50;
+    }
+
+    // Calculate typical prices
+    const typicalPrices: number[] = [];
+    for (let i = 0; i < close.length; i++) {
+      typicalPrices.push((high[i] + low[i] + close[i]) / 3);
+    }
+
+    // Calculate raw money flow (typical price * volume)
+    const moneyFlow: number[] = [];
+    for (let i = 0; i < typicalPrices.length; i++) {
+      moneyFlow.push(typicalPrices[i] * volume[i]);
+    }
+
+    // Calculate positive and negative money flow
+    let positiveMoneyFlow = 0;
+    let negativeMoneyFlow = 0;
+
+    for (let i = 1; i <= period; i++) {
+      const currentTypicalPrice = typicalPrices[typicalPrices.length - i];
+      const previousTypicalPrice = typicalPrices[typicalPrices.length - i - 1];
+      const currentVolume = volume[volume.length - i];
+
+      if (currentTypicalPrice > previousTypicalPrice) {
+        positiveMoneyFlow += currentTypicalPrice * currentVolume;
+      } else if (currentTypicalPrice < previousTypicalPrice) {
+        negativeMoneyFlow += currentTypicalPrice * currentVolume;
+      }
+    }
+
+    // Calculate Money Flow Index
+    if (negativeMoneyFlow === 0) return 100;
+    const moneyRatio = positiveMoneyFlow / negativeMoneyFlow;
+    return 100 - 100 / (1 + moneyRatio);
+  }
+
+  public calculateKeltnerChannels(
+    high: number[],
+    low: number[],
+    close: number[],
+    period: number = 20,
+    multiplier: number = 2
+  ): { upper: number; middle: number; lower: number; position: number } {
+    if (high.length < period || low.length < period || close.length < period) {
+      return { upper: 0, middle: 0, lower: 0, position: 0.5 };
+    }
+
+    // Calculate typical prices
+    const typicalPrices: number[] = [];
+    for (let i = 0; i < close.length; i++) {
+      typicalPrices.push((high[i] + low[i] + close[i]) / 3);
+    }
+
+    // Get recent data for the period
+    const recentTypicalPrices = typicalPrices.slice(-period);
+    const recentHighs = high.slice(-period);
+    const recentLows = low.slice(-period);
+    const currentPrice = close[close.length - 1];
+
+    // Calculate middle line (EMA of typical prices)
+    const middle = this.calculateEMA(recentTypicalPrices, period);
+
+    // Calculate True Range
+    const trueRanges: number[] = [];
+    for (let i = 1; i < recentHighs.length; i++) {
+      const tr = Math.max(
+        recentHighs[i] - recentLows[i],
+        Math.abs(recentHighs[i] - recentTypicalPrices[i - 1]),
+        Math.abs(recentLows[i] - recentTypicalPrices[i - 1])
+      );
+      trueRanges.push(tr);
+    }
+
+    // Calculate ATR (Average True Range)
+    const atr = trueRanges.reduce((sum, tr) => sum + tr, 0) / trueRanges.length;
+
+    // Calculate upper and lower bands
+    const upper = middle + multiplier * atr;
+    const lower = middle - multiplier * atr;
+
+    // Calculate position within the channel (0 = at lower band, 1 = at upper band)
+    const position =
+      upper === lower ? 0.5 : (currentPrice - lower) / (upper - lower);
+
+    return { upper, middle, lower, position };
+  }
+
+  public calculateAroon(
+    high: number[],
+    low: number[],
+    period: number = 25
+  ): { aroonUp: number; aroonDown: number; aroonOscillator: number } {
+    if (high.length < period || low.length < period) {
+      return { aroonUp: 50, aroonDown: 50, aroonOscillator: 0 };
+    }
+
+    // Get recent data for the period
+    const recentHighs = high.slice(-period);
+    const recentLows = low.slice(-period);
+
+    // Find the highest high and lowest low in the period
+    const highestHigh = Math.max(...recentHighs);
+    const lowestLow = Math.min(...recentLows);
+
+    // Find the days since the highest high and lowest low
+    let daysSinceHighest = period;
+    let daysSinceLowest = period;
+
+    for (let i = recentHighs.length - 1; i >= 0; i--) {
+      if (recentHighs[i] === highestHigh) {
+        daysSinceHighest = recentHighs.length - 1 - i;
+        break;
+      }
+    }
+
+    for (let i = recentLows.length - 1; i >= 0; i--) {
+      if (recentLows[i] === lowestLow) {
+        daysSinceLowest = recentLows.length - 1 - i;
+        break;
+      }
+    }
+
+    // Calculate Aroon Up and Down
+    const aroonUp = ((period - daysSinceHighest) / period) * 100;
+    const aroonDown = ((period - daysSinceLowest) / period) * 100;
+
+    // Calculate Aroon Oscillator
+    const aroonOscillator = aroonUp - aroonDown;
+
+    return { aroonUp, aroonDown, aroonOscillator };
+  }
+
   public calculateStochasticK(prices: number[], period: number = 14): number {
     if (prices.length < period) return 50;
     const recentPrices = prices.slice(-period);
@@ -994,6 +1177,21 @@ export default class FeatureCalculator {
         prices.slice(0, dayIndex + 1),
         volumes.slice(0, dayIndex + 1)
       ),
+      cci: this.calculateCCI(
+        prices.slice(0, dayIndex + 1),
+        prices.slice(0, dayIndex + 1),
+        prices.slice(0, dayIndex + 1)
+      ),
+      mfi: this.calculateMFI(
+        prices.slice(0, dayIndex + 1),
+        prices.slice(0, dayIndex + 1),
+        prices.slice(0, dayIndex + 1),
+        volumes.slice(0, dayIndex + 1)
+      ),
+      aroonOscillator: this.calculateAroon(
+        prices.slice(0, dayIndex + 1),
+        prices.slice(0, dayIndex + 1)
+      ).aroonOscillator,
     };
   }
 
@@ -1064,7 +1262,7 @@ export default class FeatureCalculator {
       indicators.ichimokuKijunSen, // Ichimoku Kijun-sen (26-period)
       indicators.ichimokuCloudPosition, // Position relative to Ichimoku cloud
 
-      // 21-26: Advanced Microstructure Features (6 features)
+      // 21-27: Advanced Microstructure Features (7 features)
       indicators.williamsR, // Williams %R momentum oscillator
       indicators.vpt, // Volume-Price Trend (VPT)
       volumes
@@ -1079,6 +1277,9 @@ export default class FeatureCalculator {
         ? Math.sign(indicators.currentPrice - prices[dayIndex - 1]) *
           Math.sign(indicators.rsi - indicators.prevRsi)
         : 0, // rsiDivergence
+      indicators.cci, // Commodity Channel Index (CCI)
+      indicators.mfi, // Money Flow Index (MFI)
+      indicators.aroonOscillator, // Aroon Oscillator
     ];
 
     return optimizedFeatures;

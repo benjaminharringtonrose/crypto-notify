@@ -187,6 +187,27 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
     category: "enhanced",
     importance: "low",
   },
+  {
+    name: "cci",
+    description: "Commodity Channel Index (CCI)",
+    category: "microstructure",
+    experimentAdded: "Experiment #2 - CCI",
+    importance: "medium",
+  },
+  {
+    name: "mfi",
+    description: "Money Flow Index (MFI)",
+    category: "microstructure",
+    experimentAdded: "Experiment #3 - MFI",
+    importance: "medium",
+  },
+  {
+    name: "aroonOscillator",
+    description: "Aroon Oscillator",
+    category: "microstructure",
+    experimentAdded: "Experiment #5 - Aroon",
+    importance: "medium",
+  },
 ];
 
 /**

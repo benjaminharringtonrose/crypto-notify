@@ -1,649 +1,620 @@
 #!/usr/bin/env ts-node
 /**
- * Gradual Feature Optimization - Systematic feature reduction with production model testing
+ * Gradual Feature Optimization - Test individual feature removal
  *
- * This script performs careful, one-at-a-time feature removal testing to identify
- * truly redundant features without hurting model performance.
+ * This script tests the removal of features to see if they hurt model performance.
+ *
+ * Usage:
+ *   npm run features:gradual                    # Test all features sequentially
+ *   npm run features:gradual -- --feature "featureName"  # Test specific feature
+ *
+ * Examples:
+ *   npm run features:gradual
+ *   npm run features:gradual -- --feature "priceChangePct"
+ *   npm run features:gradual -- --feature "rsi"
  */
 
-import * as tf from "@tensorflow/tfjs-node";
 import { DataProcessor } from "../bitcoin/DataProcessor";
 import { FeatureDetector } from "../bitcoin/FeatureDetector";
-import TradeModelFactory from "../bitcoin/TradeModelFactory";
-import { Metrics } from "../bitcoin/Metrics";
+import { TradeModelTrainer } from "../bitcoin/TradeModelTrainer";
 import { MODEL_CONFIG, TRAINING_CONFIG } from "../constants";
 
-interface OptimizationStep {
-  step: number;
-  featureRemoved: string;
-  featureIndex: number;
-  category: string;
-
-  // Performance metrics
-  baselineAccuracy: number;
-  testAccuracy: number;
-  accuracyDelta: number;
-
-  baselineF1Buy: number;
-  testF1Buy: number;
-  f1BuyDelta: number;
-
-  baselineF1Sell: number;
-  testF1Sell: number;
-  f1SellDelta: number;
-
-  baselineCombinedF1: number;
-  testCombinedF1: number;
-  combinedF1Delta: number;
-
-  // Decision
-  decision: "keep" | "remove" | "investigate";
-  reasoning: string;
-
-  // Training info
-  trainingTimeMs: number;
+interface PerformanceMetrics {
+  validationAccuracy: number;
+  buyF1: number;
+  sellF1: number;
+  combinedF1: number;
+  balancedAccuracy: number;
+  matthewsCorrelation: number;
   epochsTrained: number;
 }
 
-interface OptimizationResult {
-  originalFeatureCount: number;
-  finalFeatureCount: number;
-  removedFeatures: string[];
-  keptFeatures: string[];
-
-  // Performance tracking
-  baselinePerformance: {
-    accuracy: number;
-    f1Buy: number;
-    f1Sell: number;
-    combinedF1: number;
-  };
-
-  finalPerformance: {
-    accuracy: number;
-    f1Buy: number;
-    f1Sell: number;
-    combinedF1: number;
-  };
-
-  // Optimization steps
-  steps: OptimizationStep[];
-
-  // Summary
-  totalTimeMs: number;
-  featuresRemoved: number;
-  performanceChange: number;
+interface OptimizationStep {
+  step: number;
+  featureName: string;
+  featureIndex: number;
+  originalPerformance: PerformanceMetrics;
+  modifiedPerformance: PerformanceMetrics;
+  decision: "REMOVE" | "KEEP" | "MINIMAL_IMPACT";
+  reason: string;
 }
 
 class GradualFeatureOptimizer {
-  private dataProcessor: DataProcessor;
-  private baselinePerformance: any = null;
-  private originalFeatureCount: number = 0;
-  private currentFeatureIndices: number[] = [];
-  private steps: OptimizationStep[] = [];
+  private tolerance = 0.02; // 2% performance tolerance
+  private optimizationSteps: OptimizationStep[] = [];
 
-  constructor() {
-    this.dataProcessor = new DataProcessor(
+  // Exact feature names from FeatureCalculator.ts optimizedFeatures array
+  private readonly featureNames = [
+    // 1-5: Core Price Action & Volatility (5 features)
+    "priceChangePct",
+    "highLowRange",
+    "priceVolatility",
+    "pricePosition",
+    "relativeVolume",
+
+    // 6-10: Technical Indicators (5 features)
+    "rsi",
+    "signalLine",
+    "vwapRatio",
+    "atr",
+    "obv",
+
+    // 11-15: Enhanced Indicators (5 features)
+    "momentum",
+    "macdHistogram",
+    "priceSMA7Ratio",
+    "priceSMA21Ratio",
+    "priceSMA50Ratio",
+
+    // 16-20: Market Regime Features (5 features)
+    "trendRegime",
+    "volatilityRegime",
+    "ichimokuTenkanSen",
+    "ichimokuKijunSen",
+    "ichimokuCloudPosition",
+
+    // 21-27: Advanced Microstructure Features (7 features)
+    "williamsR",
+    "vpt",
+    "volumeMA20",
+    "volumeOscillator",
+    "bollingerSqueeze",
+    "rsiDivergence",
+    "cci",
+    "mfi",
+    "aroonOscillator",
+  ];
+
+  public async runOptimization(): Promise<void> {
+    console.log("🚀 Starting Gradual Feature Optimization");
+    console.log(
+      `📊 Testing ${this.featureNames.length} features one at a time`
+    );
+    console.log(`🎯 Performance tolerance: ${this.tolerance * 100}%`);
+    console.log("=".repeat(80));
+
+    // Initialize feature detection
+    console.log("\n🔧 Initializing feature detection...");
+    await FeatureDetector.detectFeatureCount();
+
+    // Establish baseline performance
+    console.log(
+      "\n📈 Step 0: Establishing Baseline Performance (All Features)"
+    );
+    const baselinePerformance = await this.trainAndEvaluateModel(
+      this.featureNames
+    );
+    console.log(
+      `✅ Baseline: ${baselinePerformance.validationAccuracy.toFixed(
+        4
+      )} accuracy, ${baselinePerformance.combinedF1.toFixed(4)} combined F1`
+    );
+
+    // Test each feature individually
+    for (let i = 0; i < this.featureNames.length; i++) {
+      const featureName = this.featureNames[i];
+      console.log(
+        `\n🔍 Step ${i + 1}: Testing removal of "${featureName}" (index ${i})`
+      );
+
+      // Create feature set without this feature
+      const modifiedFeatures = this.featureNames.filter(
+        (_, index) => index !== i
+      );
+
+      // Train and evaluate model without this feature
+      const modifiedPerformance = await this.trainAndEvaluateModel(
+        modifiedFeatures
+      );
+
+      // Compare performance
+      const performanceChange = this.calculatePerformanceChange(
+        baselinePerformance,
+        modifiedPerformance
+      );
+      const decision = this.makeDecision(performanceChange);
+
+      // Record step
+      const step: OptimizationStep = {
+        step: i + 1,
+        featureName,
+        featureIndex: i,
+        originalPerformance: baselinePerformance,
+        modifiedPerformance,
+        decision,
+        reason: this.getDecisionReason(performanceChange, decision),
+      };
+
+      this.optimizationSteps.push(step);
+
+      // Log results
+      this.logStepResults(step, performanceChange);
+
+      // If performance improved significantly, update baseline
+      if (performanceChange.combinedF1 > this.tolerance) {
+        console.log(
+          `🔄 Updating baseline - performance improved by ${performanceChange.combinedF1.toFixed(
+            4
+          )}`
+        );
+        baselinePerformance.validationAccuracy =
+          modifiedPerformance.validationAccuracy;
+        baselinePerformance.buyF1 = modifiedPerformance.buyF1;
+        baselinePerformance.sellF1 = modifiedPerformance.sellF1;
+        baselinePerformance.combinedF1 = modifiedPerformance.combinedF1;
+        baselinePerformance.balancedAccuracy =
+          modifiedPerformance.balancedAccuracy;
+        baselinePerformance.matthewsCorrelation =
+          modifiedPerformance.matthewsCorrelation;
+      }
+    }
+
+    // Generate final report
+    this.generateFinalReport();
+  }
+
+  public async testFeatureRemoval(featureName: string): Promise<void> {
+    console.log("🚀 Testing Individual Feature Removal");
+    console.log(`🎯 Testing removal of: "${featureName}"`);
+    console.log(`🎯 Performance tolerance: ${this.tolerance * 100}%`);
+    console.log("=".repeat(80));
+
+    // Validate feature name
+    if (!this.featureNames.includes(featureName)) {
+      console.error(
+        `❌ Error: Feature "${featureName}" not found in feature list`
+      );
+      console.log("\n📋 Available features:");
+      this.featureNames.forEach((name, index) => {
+        console.log(`   ${index + 1}. ${name}`);
+      });
+      process.exit(1);
+    }
+
+    // Initialize feature detection
+    console.log("\n🔧 Initializing feature detection...");
+    await FeatureDetector.detectFeatureCount();
+
+    // Establish baseline performance
+    console.log(
+      "\n📈 Step 1: Establishing Baseline Performance (All Features)"
+    );
+    const baselinePerformance = await this.trainAndEvaluateModel(
+      this.featureNames
+    );
+    console.log(
+      `✅ Baseline: ${baselinePerformance.validationAccuracy.toFixed(
+        4
+      )} accuracy, ${baselinePerformance.combinedF1.toFixed(4)} combined F1`
+    );
+
+    // Test without the specified feature
+    console.log(`\n🔍 Step 2: Testing Performance Without "${featureName}"`);
+    const modifiedFeatures = this.featureNames.filter(
+      (name) => name !== featureName
+    );
+    const modifiedPerformance = await this.trainAndEvaluateModel(
+      modifiedFeatures
+    );
+
+    // Compare performance
+    const performanceChange = this.calculatePerformanceChange(
+      baselinePerformance,
+      modifiedPerformance
+    );
+    const decision = this.makeDecision(performanceChange);
+
+    // Log results
+    this.logResults(
+      featureName,
+      baselinePerformance,
+      modifiedPerformance,
+      performanceChange,
+      decision
+    );
+  }
+
+  private async trainAndEvaluateModel(
+    featureArray: string[]
+  ): Promise<PerformanceMetrics> {
+    // Create a custom data processor that uses only specified features
+    const dataProcessor = new DataProcessor(
       {
         timesteps: MODEL_CONFIG.TIMESTEPS,
         epochs: TRAINING_CONFIG.EPOCHS,
         batchSize: TRAINING_CONFIG.BATCH_SIZE,
         initialLearningRate: TRAINING_CONFIG.INITIAL_LEARNING_RATE,
       },
-      600 // Use full dataset for accurate testing
-    );
-  }
-
-  /**
-   * Run complete gradual optimization
-   */
-  public async optimizeFeatures(): Promise<OptimizationResult> {
-    console.log("🎯 Starting Gradual Feature Optimization...");
-    console.log("=".repeat(70));
-
-    // Step 0: Initialize feature detection
-    console.log("🔧 Initializing feature detection...");
-    await FeatureDetector.detectFeatureCount();
-    this.originalFeatureCount = FeatureDetector.getFeatureCount();
-    this.currentFeatureIndices = Array.from(
-      { length: this.originalFeatureCount },
-      (_, i) => i
+      600
     );
 
-    console.log(`📊 Original feature count: ${this.originalFeatureCount}`);
+    const { X, y } = await dataProcessor.prepareData();
 
-    // Step 1: Establish baseline performance
-    console.log("📈 Establishing baseline performance...");
-    this.baselinePerformance = await this.trainBaselineModel();
-
-    console.log("✅ Baseline established:");
-    console.log(
-      `  Accuracy: ${(this.baselinePerformance.accuracy * 100).toFixed(2)}%`
-    );
-    console.log(`  F1 Buy: ${this.baselinePerformance.f1Buy.toFixed(4)}`);
-    console.log(`  F1 Sell: ${this.baselinePerformance.f1Sell.toFixed(4)}`);
-    console.log(
-      `  Combined F1: ${this.baselinePerformance.combinedF1.toFixed(4)}`
-    );
-
-    // Step 2: Analyze feature correlations
-    console.log("🔍 Analyzing feature correlations...");
-    const correlationAnalysis = await this.analyzeFeatureCorrelations();
-
-    // Step 3: Test feature removals systematically
-    console.log("🧪 Testing feature removals systematically...");
-    await this.testFeatureRemovals(correlationAnalysis);
-
-    // Step 4: Generate final result
-    const result = this.generateOptimizationResult();
-    this.presentResults(result);
-
-    return result;
-  }
-
-  /**
-   * Train baseline model with all features
-   */
-  private async trainBaselineModel(): Promise<any> {
-    const { X, y } = await this.dataProcessor.prepareData();
-
-    const factory = new TradeModelFactory(
-      MODEL_CONFIG.TIMESTEPS,
-      this.originalFeatureCount
-    );
-    const model = factory.createModel();
-
-    // Compile the model
-    model.compile({
-      optimizer: tf.train.adam(TRAINING_CONFIG.INITIAL_LEARNING_RATE),
-      loss: (yTrue: tf.Tensor, yPred: tf.Tensor) => {
-        return Metrics.focalLoss(
-          yTrue,
-          yPred,
-          TRAINING_CONFIG.GAMMA,
-          TRAINING_CONFIG.ALPHA
-        );
-      },
-      metrics: ["accuracy"],
-    });
-
-    const splitIndex = Math.floor(X.length * 0.8);
-
-    const XTrain = X.slice(0, splitIndex);
-    const yTrain = y.slice(0, splitIndex);
-    const XVal = X.slice(splitIndex);
-    const yVal = y.slice(splitIndex);
-
-    const XTrainTensor = tf.tensor3d(XTrain);
-    const yTrainTensor = tf.tensor2d(
-      yTrain.map((label) => [label === 0 ? 1 : 0, label === 1 ? 1 : 0])
-    );
-    const XValTensor = tf.tensor3d(XVal);
-    const yValTensor = tf.tensor2d(
-      yVal.map((label) => [label === 0 ? 1 : 0, label === 1 ? 1 : 0])
+    // Filter features to only include the specified ones
+    const filteredX = X.map((sequence) =>
+      sequence.map((timestep) => {
+        const filteredTimestep: number[] = [];
+        featureArray.forEach((featureName) => {
+          const index = this.featureNames.indexOf(featureName);
+          if (index >= 0 && index < timestep.length) {
+            filteredTimestep.push(timestep[index]);
+          }
+        });
+        return filteredTimestep;
+      })
     );
 
     try {
-      // Train with deterministic seeding for reproducibility
-      tf.setBackend("tensorflow");
-      tf.engine().startScope();
+      // Create a custom trainer with the filtered data
+      const trainer = new TradeModelTrainer();
 
-      await model.fit(XTrainTensor, yTrainTensor, {
-        epochs: 30,
-        batchSize: 16,
-        validationData: [XValTensor, yValTensor],
-        verbose: 0,
-      });
-
-      // Evaluate with comprehensive metrics
-      const evaluation = await Metrics.evaluateModel(
-        model,
-        XValTensor,
-        yValTensor
-      );
-
-      return {
-        accuracy: evaluation.balancedAccuracy,
-        f1Buy: evaluation.buyF1,
-        f1Sell: evaluation.sellF1,
-        combinedF1: evaluation.combinedF1,
-        matthewsCorrelation: evaluation.matthewsCorrelation,
+      // Override the data processor to use filtered features
+      trainer["dataProcessor"].prepareData = async () => {
+        return { X: filteredX, y };
       };
-    } finally {
-      XTrainTensor.dispose();
-      yTrainTensor.dispose();
-      XValTensor.dispose();
-      yValTensor.dispose();
-      model.dispose();
-      tf.engine().endScope();
-    }
-  }
 
-  /**
-   * Analyze correlations between features
-   */
-  private async analyzeFeatureCorrelations(): Promise<
-    Array<{
-      featureIndex: number;
-      featureName: string;
-      category: string;
-      avgCorrelation: number;
-      maxCorrelation: number;
-      highlyCorrelatedFeatures: number[];
-    }>
-  > {
-    const { X } = await this.dataProcessor.prepareData();
+      // Override the feature detection to match our filtered feature count
+      const originalDetectFeatureCount = FeatureDetector.detectFeatureCount;
+      const originalGetFeatureCount = FeatureDetector.getFeatureCount;
 
-    // Flatten sequences to get feature values across all timesteps
-    const featureValues: number[][] = [];
-    for (
-      let featureIdx = 0;
-      featureIdx < this.originalFeatureCount;
-      featureIdx++
-    ) {
-      const values: number[] = [];
-      for (let sampleIdx = 0; sampleIdx < X.length; sampleIdx++) {
-        for (let timestep = 0; timestep < X[sampleIdx].length; timestep++) {
-          values.push(X[sampleIdx][timestep][featureIdx]);
-        }
-      }
-      featureValues.push(values);
-    }
-
-    // Calculate correlations
-    const correlations: Array<{
-      featureIndex: number;
-      featureName: string;
-      category: string;
-      avgCorrelation: number;
-      maxCorrelation: number;
-      highlyCorrelatedFeatures: number[];
-    }> = [];
-
-    for (let i = 0; i < this.originalFeatureCount; i++) {
-      const correlationsWithOthers: number[] = [];
-      const highlyCorrelated: number[] = [];
-
-      for (let j = 0; j < this.originalFeatureCount; j++) {
-        if (i !== j) {
-          const correlation = this.calculateCorrelation(
-            featureValues[i],
-            featureValues[j]
-          );
-          correlationsWithOthers.push(Math.abs(correlation));
-
-          if (Math.abs(correlation) > 0.8) {
-            highlyCorrelated.push(j);
-          }
-        }
-      }
-
-      const avgCorrelation =
-        correlationsWithOthers.reduce((a, b) => a + b, 0) /
-        correlationsWithOthers.length;
-      const maxCorrelation = Math.max(...correlationsWithOthers);
-
-      correlations.push({
-        featureIndex: i,
-        featureName: `feature_${i}`,
-        category: "unknown",
-        avgCorrelation,
-        maxCorrelation,
-        highlyCorrelatedFeatures: highlyCorrelated,
-      });
-    }
-
-    // Sort by average correlation (highest first - most redundant)
-    return correlations.sort((a, b) => b.avgCorrelation - a.avgCorrelation);
-  }
-
-  /**
-   * Calculate Pearson correlation between two arrays
-   */
-  private calculateCorrelation(x: number[], y: number[]): number {
-    const n = Math.min(x.length, y.length);
-    if (n === 0) return 0;
-
-    const sumX = x.slice(0, n).reduce((a, b) => a + b, 0);
-    const sumY = y.slice(0, n).reduce((a, b) => a + b, 0);
-    const sumXY = x.slice(0, n).reduce((sum, xi, i) => sum + xi * y[i], 0);
-    const sumX2 = x.slice(0, n).reduce((sum, xi) => sum + xi * xi, 0);
-    const sumY2 = y.slice(0, n).reduce((sum, yi) => sum + yi * yi, 0);
-
-    const numerator = n * sumXY - sumX * sumY;
-    const denominator = Math.sqrt(
-      (n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY)
-    );
-
-    return denominator === 0 ? 0 : numerator / denominator;
-  }
-
-  /**
-   * Test feature removals systematically
-   */
-  private async testFeatureRemovals(correlationAnalysis: any[]): Promise<void> {
-    console.log(
-      `\n🧪 Testing ${this.originalFeatureCount} features for removal...`
-    );
-
-    // Start with most correlated features (potential redundancies)
-    const testOrder = correlationAnalysis.map((c) => c.featureIndex);
-
-    for (let i = 0; i < testOrder.length; i++) {
-      const featureIndex = testOrder[i];
-      const correlation = correlationAnalysis.find(
-        (c) => c.featureIndex === featureIndex
-      );
-
-      console.log(
-        `\n📊 Step ${i + 1}/${
-          this.originalFeatureCount
-        }: Testing feature ${featureIndex}`
-      );
-      console.log(
-        `   Avg correlation: ${correlation?.avgCorrelation.toFixed(3)}`
-      );
-      console.log(
-        `   Max correlation: ${correlation?.maxCorrelation.toFixed(3)}`
-      );
-
-      const step = await this.testSingleFeatureRemoval(featureIndex, i + 1);
-      this.steps.push(step);
-
-      // Update current feature indices if feature was removed
-      if (step.decision === "remove") {
-        this.currentFeatureIndices = this.currentFeatureIndices.filter(
-          (idx) => idx !== featureIndex
-        );
-        console.log(
-          `   ✅ REMOVED: Feature ${featureIndex} (${step.reasoning})`
-        );
-      } else {
-        console.log(`   ❌ KEPT: Feature ${featureIndex} (${step.reasoning})`);
-      }
-
-      // Early stopping if we've removed too many features
-      if (this.currentFeatureIndices.length < this.originalFeatureCount * 0.7) {
-        console.log(
-          `   ⚠️  Stopping early: Too many features removed (${this.currentFeatureIndices.length}/${this.originalFeatureCount})`
-        );
-        break;
-      }
-    }
-  }
-
-  /**
-   * Test removal of a single feature
-   */
-  private async testSingleFeatureRemoval(
-    featureIndex: number,
-    stepNumber: number
-  ): Promise<OptimizationStep> {
-    const startTime = Date.now();
-
-    // Create modified data with feature removed
-    const { X, y } = await this.dataProcessor.prepareData();
-    const XModified = X.map((sequence) =>
-      sequence.map((timestep) =>
-        timestep.filter((_, idx) => idx !== featureIndex)
-      )
-    );
-
-    // Train model with modified features
-    const factory = new TradeModelFactory(
-      MODEL_CONFIG.TIMESTEPS,
-      this.originalFeatureCount - 1
-    );
-    const model = factory.createModel();
-
-    // Compile the model
-    model.compile({
-      optimizer: tf.train.adam(TRAINING_CONFIG.INITIAL_LEARNING_RATE),
-      loss: (yTrue: tf.Tensor, yPred: tf.Tensor) => {
-        return Metrics.focalLoss(
-          yTrue,
-          yPred,
-          TRAINING_CONFIG.GAMMA,
-          TRAINING_CONFIG.ALPHA
-        );
-      },
-      metrics: ["accuracy"],
-    });
-
-    const splitIndex = Math.floor(XModified.length * 0.8);
-
-    const XTrain = XModified.slice(0, splitIndex);
-    const yTrain = y.slice(0, splitIndex);
-    const XVal = XModified.slice(splitIndex);
-    const yVal = y.slice(splitIndex);
-
-    const XTrainTensor = tf.tensor3d(XTrain);
-    const yTrainTensor = tf.tensor2d(
-      yTrain.map((label) => [label === 0 ? 1 : 0, label === 1 ? 1 : 0])
-    );
-    const XValTensor = tf.tensor3d(XVal);
-    const yValTensor = tf.tensor2d(
-      yVal.map((label) => [label === 0 ? 1 : 0, label === 1 ? 1 : 0])
-    );
-
-    try {
-      tf.setBackend("tensorflow");
-      tf.engine().startScope();
-
-      await model.fit(XTrainTensor, yTrainTensor, {
-        epochs: 30,
-        batchSize: 16,
-        validationData: [XValTensor, yValTensor],
-        verbose: 0,
-      });
-
-      const evaluation = await Metrics.evaluateModel(
-        model,
-        XValTensor,
-        yValTensor
-      );
-      const trainingTimeMs = Date.now() - startTime;
-
-      // Calculate deltas
-      const accuracyDelta =
-        evaluation.balancedAccuracy - this.baselinePerformance.accuracy;
-      const f1BuyDelta = evaluation.buyF1 - this.baselinePerformance.f1Buy;
-      const f1SellDelta = evaluation.sellF1 - this.baselinePerformance.f1Sell;
-      const combinedF1Delta =
-        evaluation.combinedF1 - this.baselinePerformance.combinedF1;
-
-      // Decision logic
-      let decision: "keep" | "remove" | "investigate";
-      let reasoning: string;
-
-      if (accuracyDelta >= 0 && combinedF1Delta >= 0) {
-        decision = "remove";
-        reasoning = "Performance improved or maintained";
-      } else if (accuracyDelta >= -0.01 && combinedF1Delta >= -0.02) {
-        decision = "remove";
-        reasoning = "Minimal performance impact (within tolerance)";
-      } else if (accuracyDelta >= -0.02 && combinedF1Delta >= -0.05) {
-        decision = "investigate";
-        reasoning = "Moderate performance impact - needs manual review";
-      } else {
-        decision = "keep";
-        reasoning = "Significant performance degradation";
-      }
-
-      return {
-        step: stepNumber,
-        featureRemoved: `feature_${featureIndex}`,
-        featureIndex,
-        category: "unknown",
-        baselineAccuracy: this.baselinePerformance.accuracy,
-        testAccuracy: evaluation.balancedAccuracy,
-        accuracyDelta,
-        baselineF1Buy: this.baselinePerformance.f1Buy,
-        testF1Buy: evaluation.buyF1,
-        f1BuyDelta,
-        baselineF1Sell: this.baselinePerformance.f1Sell,
-        testF1Sell: evaluation.sellF1,
-        f1SellDelta,
-        baselineCombinedF1: this.baselinePerformance.combinedF1,
-        testCombinedF1: evaluation.combinedF1,
-        combinedF1Delta,
-        decision,
-        reasoning,
-        trainingTimeMs,
-        epochsTrained: 30, // Fixed epochs since we're not using history
+      FeatureDetector.detectFeatureCount = async () => {
+        return featureArray.length;
       };
-    } finally {
-      XTrainTensor.dispose();
-      yTrainTensor.dispose();
-      XValTensor.dispose();
-      yValTensor.dispose();
-      model.dispose();
-      tf.engine().endScope();
+      FeatureDetector.getFeatureCount = () => {
+        return featureArray.length;
+      };
+
+      // Train the model using the same process as the main trainer
+      await trainer.train();
+
+      // Restore original feature detection
+      FeatureDetector.detectFeatureCount = originalDetectFeatureCount;
+      FeatureDetector.getFeatureCount = originalGetFeatureCount;
+
+      // Get the final metrics from the trainer
+      return {
+        validationAccuracy: trainer.getBalancedAccuracy(),
+        buyF1: trainer.getBuyF1(),
+        sellF1: trainer.getSellF1(),
+        combinedF1: trainer.getCombinedF1(),
+        balancedAccuracy: trainer.getBalancedAccuracy(),
+        matthewsCorrelation: trainer.getMatthewsCorrelation(),
+        epochsTrained: trainer.getFinalMetrics().finalEpoch,
+      };
+    } catch (error) {
+      console.error(
+        `❌ Error training model with ${featureArray.length} features:`,
+        error
+      );
+      throw error;
     }
   }
 
-  /**
-   * Generate final optimization result
-   */
-  private generateOptimizationResult(): OptimizationResult {
-    const removedFeatures = this.steps
-      .filter((step) => step.decision === "remove")
-      .map((step) => step.featureRemoved);
-
-    const keptFeatures = this.steps
-      .filter(
-        (step) => step.decision === "keep" || step.decision === "investigate"
-      )
-      .map((step) => step.featureRemoved);
-
-    const finalPerformance =
-      this.steps.length > 0
-        ? {
-            accuracy: this.steps[this.steps.length - 1].testAccuracy,
-            f1Buy: this.steps[this.steps.length - 1].testF1Buy,
-            f1Sell: this.steps[this.steps.length - 1].testF1Sell,
-            combinedF1: this.steps[this.steps.length - 1].testCombinedF1,
-          }
-        : this.baselinePerformance;
-
-    const totalTimeMs = this.steps.reduce(
-      (sum, step) => sum + step.trainingTimeMs,
-      0
-    );
-    const performanceChange =
-      finalPerformance.combinedF1 - this.baselinePerformance.combinedF1;
-
+  private calculatePerformanceChange(
+    original: PerformanceMetrics,
+    modified: PerformanceMetrics
+  ) {
     return {
-      originalFeatureCount: this.originalFeatureCount,
-      finalFeatureCount: this.currentFeatureIndices.length,
-      removedFeatures,
-      keptFeatures,
-      baselinePerformance: this.baselinePerformance,
-      finalPerformance,
-      steps: this.steps,
-      totalTimeMs,
-      featuresRemoved: removedFeatures.length,
-      performanceChange,
+      validationAccuracy:
+        (modified.validationAccuracy - original.validationAccuracy) /
+        original.validationAccuracy,
+      buyF1: (modified.buyF1 - original.buyF1) / original.buyF1,
+      sellF1: (modified.sellF1 - original.sellF1) / original.sellF1,
+      combinedF1:
+        (modified.combinedF1 - original.combinedF1) / original.combinedF1,
+      balancedAccuracy:
+        (modified.balancedAccuracy - original.balancedAccuracy) /
+        original.balancedAccuracy,
+      matthewsCorrelation:
+        (modified.matthewsCorrelation - original.matthewsCorrelation) /
+        original.matthewsCorrelation,
     };
   }
 
-  /**
-   * Present optimization results
-   */
-  private presentResults(result: OptimizationResult): void {
-    console.log("\n" + "=".repeat(70));
-    console.log("🎯 GRADUAL FEATURE OPTIMIZATION RESULTS");
-    console.log("=".repeat(70));
+  private makeDecision(
+    performanceChange: any
+  ): "REMOVE" | "KEEP" | "MINIMAL_IMPACT" {
+    const combinedF1Change = performanceChange.combinedF1;
 
-    console.log(`\n📊 OPTIMIZATION SUMMARY:`);
-    console.log(`Original features: ${result.originalFeatureCount}`);
-    console.log(`Final features: ${result.finalFeatureCount}`);
-    console.log(`Features removed: ${result.featuresRemoved}`);
+    if (combinedF1Change > this.tolerance) {
+      return "REMOVE"; // Performance improved
+    } else if (combinedF1Change > -this.tolerance) {
+      return "MINIMAL_IMPACT"; // Within tolerance
+    } else {
+      return "KEEP"; // Performance degraded
+    }
+  }
+
+  private getDecisionReason(performanceChange: any, decision: string): string {
+    const combinedF1Change = performanceChange.combinedF1;
+
+    switch (decision) {
+      case "REMOVE":
+        return `Performance improved by ${(combinedF1Change * 100).toFixed(
+          2
+        )}%`;
+      case "KEEP":
+        return `Performance degraded by ${(
+          Math.abs(combinedF1Change) * 100
+        ).toFixed(2)}%`;
+      case "MINIMAL_IMPACT":
+        return `Performance change within ${(this.tolerance * 100).toFixed(
+          1
+        )}% tolerance`;
+      default:
+        return "Unknown";
+    }
+  }
+
+  private logStepResults(step: OptimizationStep, performanceChange: any): void {
+    const { decision, modifiedPerformance } = step;
+    const { combinedF1 } = performanceChange;
+
+    console.log(`   📊 Modified Performance:`);
     console.log(
-      `Performance change: ${(result.performanceChange * 100).toFixed(2)}%`
+      `      Accuracy: ${modifiedPerformance.validationAccuracy.toFixed(4)}`
+    );
+    console.log(`      Buy F1: ${modifiedPerformance.buyF1.toFixed(4)}`);
+    console.log(`      Sell F1: ${modifiedPerformance.sellF1.toFixed(4)}`);
+    console.log(
+      `      Combined F1: ${modifiedPerformance.combinedF1.toFixed(4)}`
+    );
+    console.log(`   📈 Performance Change: ${(combinedF1 * 100).toFixed(2)}%`);
+    console.log(`   🎯 Decision: ${decision}`);
+    console.log(`   💡 Reason: ${step.reason}`);
+  }
+
+  private generateFinalReport(): void {
+    console.log("\n" + "=".repeat(80));
+    console.log("📋 GRADUAL FEATURE OPTIMIZATION FINAL REPORT");
+    console.log("=".repeat(80));
+
+    const removedFeatures = this.optimizationSteps.filter(
+      (s) => s.decision === "REMOVE"
+    );
+    const keptFeatures = this.optimizationSteps.filter(
+      (s) => s.decision === "KEEP"
+    );
+    const minimalImpactFeatures = this.optimizationSteps.filter(
+      (s) => s.decision === "MINIMAL_IMPACT"
+    );
+
+    console.log(`\n📊 SUMMARY:`);
+    console.log(`   Original Features: ${this.featureNames.length}`);
+    console.log(`   Features to Remove: ${removedFeatures.length}`);
+    console.log(`   Features to Keep: ${keptFeatures.length}`);
+    console.log(`   Minimal Impact: ${minimalImpactFeatures.length}`);
+    console.log(
+      `   Final Feature Count: ${
+        this.featureNames.length - removedFeatures.length
+      }`
+    );
+
+    if (removedFeatures.length > 0) {
+      console.log(`\n✅ FEATURES TO REMOVE (${removedFeatures.length}):`);
+      removedFeatures.forEach((step) => {
+        console.log(
+          `   - ${step.featureName} (index ${step.featureIndex}): ${step.reason}`
+        );
+      });
+    }
+
+    if (keptFeatures.length > 0) {
+      console.log(`\n🔒 FEATURES TO KEEP (${keptFeatures.length}):`);
+      keptFeatures.forEach((step) => {
+        console.log(
+          `   - ${step.featureName} (index ${step.featureIndex}): ${step.reason}`
+        );
+      });
+    }
+
+    if (minimalImpactFeatures.length > 0) {
+      console.log(
+        `\n⚠️  MINIMAL IMPACT FEATURES (${minimalImpactFeatures.length}):`
+      );
+      minimalImpactFeatures.forEach((step) => {
+        console.log(
+          `   - ${step.featureName} (index ${step.featureIndex}): ${step.reason}`
+        );
+      });
+    }
+
+    // Generate optimized feature array
+    const optimizedFeatureNames = this.featureNames.filter((_, index) => {
+      const step = this.optimizationSteps.find((s) => s.featureIndex === index);
+      return step && step.decision !== "REMOVE";
+    });
+
+    console.log(`\n🎯 OPTIMIZED FEATURE ARRAY:`);
+    console.log(`const optimizedFeatures = [`);
+    optimizedFeatureNames.forEach((name, index) => {
+      console.log(`  "${name}", // ${index + 1}`);
+    });
+    console.log(`];`);
+
+    console.log(`\n📈 PERFORMANCE IMPACT:`);
+    const baselineStep = this.optimizationSteps[0];
+    const finalStep = this.optimizationSteps[this.optimizationSteps.length - 1];
+    if (baselineStep && finalStep) {
+      const improvement =
+        finalStep.modifiedPerformance.combinedF1 -
+        baselineStep.originalPerformance.combinedF1;
+      console.log(
+        `   Combined F1 Improvement: ${(improvement * 100).toFixed(2)}%`
+      );
+      console.log(
+        `   Final Combined F1: ${finalStep.modifiedPerformance.combinedF1.toFixed(
+          4
+        )}`
+      );
+    }
+  }
+
+  private logResults(
+    featureName: string,
+    baselinePerformance: PerformanceMetrics,
+    modifiedPerformance: PerformanceMetrics,
+    performanceChange: any,
+    decision: string
+  ): void {
+    console.log("\n" + "=".repeat(80));
+    console.log("📋 FEATURE REMOVAL TEST RESULTS");
+    console.log("=".repeat(80));
+
+    console.log(`\n🎯 Feature Tested: "${featureName}"`);
+    console.log(
+      `📊 Feature Index: ${this.featureNames.indexOf(featureName) + 1}/${
+        this.featureNames.length
+      }`
     );
 
     console.log(`\n📈 PERFORMANCE COMPARISON:`);
+    console.log(`   Metric              | Baseline | Modified | Change`);
+    console.log(`   --------------------|----------|----------|--------`);
     console.log(
-      `Accuracy: ${(result.baselinePerformance.accuracy * 100).toFixed(
-        2
-      )}% → ${(result.finalPerformance.accuracy * 100).toFixed(2)}%`
-    );
-    console.log(
-      `F1 Buy: ${result.baselinePerformance.f1Buy.toFixed(
+      `   Validation Accuracy | ${baselinePerformance.validationAccuracy.toFixed(
         4
-      )} → ${result.finalPerformance.f1Buy.toFixed(4)}`
+      )} | ${modifiedPerformance.validationAccuracy.toFixed(4)} | ${(
+        performanceChange.validationAccuracy * 100
+      ).toFixed(2)}%`
     );
     console.log(
-      `F1 Sell: ${result.baselinePerformance.f1Sell.toFixed(
+      `   Buy F1 Score        | ${baselinePerformance.buyF1.toFixed(
         4
-      )} → ${result.finalPerformance.f1Sell.toFixed(4)}`
+      )} | ${modifiedPerformance.buyF1.toFixed(4)} | ${(
+        performanceChange.buyF1 * 100
+      ).toFixed(2)}%`
     );
     console.log(
-      `Combined F1: ${result.baselinePerformance.combinedF1.toFixed(
+      `   Sell F1 Score       | ${baselinePerformance.sellF1.toFixed(
         4
-      )} → ${result.finalPerformance.combinedF1.toFixed(4)}`
-    );
-
-    console.log(`\n✅ FEATURES REMOVED (${result.removedFeatures.length}):`);
-    result.removedFeatures.forEach((feature, idx) => {
-      const step = this.steps.find((s) => s.featureRemoved === feature);
-      console.log(`  ${idx + 1}. ${feature} (${step?.reasoning})`);
-    });
-
-    console.log(`\n❌ FEATURES KEPT (${result.keptFeatures.length}):`);
-    result.keptFeatures.forEach((feature, idx) => {
-      const step = this.steps.find((s) => s.featureRemoved === feature);
-      console.log(`  ${idx + 1}. ${feature} (${step?.reasoning})`);
-    });
-
-    console.log(`\n⏱️  OPTIMIZATION DETAILS:`);
-    console.log(
-      `Total time: ${(result.totalTimeMs / 1000 / 60).toFixed(1)} minutes`
+      )} | ${modifiedPerformance.sellF1.toFixed(4)} | ${(
+        performanceChange.sellF1 * 100
+      ).toFixed(2)}%`
     );
     console.log(
-      `Average time per test: ${(
-        result.totalTimeMs /
-        this.steps.length /
-        1000
-      ).toFixed(1)} seconds`
+      `   Combined F1 Score   | ${baselinePerformance.combinedF1.toFixed(
+        4
+      )} | ${modifiedPerformance.combinedF1.toFixed(4)} | ${(
+        performanceChange.combinedF1 * 100
+      ).toFixed(2)}%`
+    );
+    console.log(
+      `   Balanced Accuracy   | ${baselinePerformance.balancedAccuracy.toFixed(
+        4
+      )} | ${modifiedPerformance.balancedAccuracy.toFixed(4)} | ${(
+        performanceChange.balancedAccuracy * 100
+      ).toFixed(2)}%`
+    );
+    console.log(
+      `   Matthews Correlation| ${baselinePerformance.matthewsCorrelation.toFixed(
+        4
+      )} | ${modifiedPerformance.matthewsCorrelation.toFixed(4)} | ${(
+        performanceChange.matthewsCorrelation * 100
+      ).toFixed(2)}%`
     );
 
-    console.log("\n" + "=".repeat(70));
-    console.log("💡 Next steps:");
-    console.log("1. Review 'investigate' features manually");
-    console.log("2. Update FeatureCalculator with removed features");
-    console.log("3. Retrain model with optimized feature set");
-    console.log("4. Run full backtests to validate performance");
-    console.log("=".repeat(70));
+    console.log(`\n🎯 DECISION: ${decision}`);
+
+    const combinedF1Change = performanceChange.combinedF1;
+    if (decision === "REMOVE") {
+      console.log(
+        `✅ RECOMMENDATION: Remove "${featureName}" - Performance improved by ${(
+          combinedF1Change * 100
+        ).toFixed(2)}%`
+      );
+    } else if (decision === "KEEP") {
+      console.log(
+        `🔒 RECOMMENDATION: Keep "${featureName}" - Performance degraded by ${(
+          Math.abs(combinedF1Change) * 100
+        ).toFixed(2)}%`
+      );
+    } else {
+      console.log(
+        `⚠️  RECOMMENDATION: "${featureName}" has minimal impact (within ${(
+          this.tolerance * 100
+        ).toFixed(1)}% tolerance)`
+      );
+    }
+
+    console.log(`\n📊 FEATURE COUNT:`);
+    console.log(`   Original: ${this.featureNames.length} features`);
+    console.log(`   Modified: ${this.featureNames.length - 1} features`);
+    console.log(
+      `   Reduction: 1 feature (${(
+        (1 / this.featureNames.length) *
+        100
+      ).toFixed(1)}%)`
+    );
   }
 }
 
-/**
- * Main execution function
- */
+// Parse command line arguments
+function parseArguments(): { feature?: string } {
+  const args = process.argv.slice(2);
+  const featureIndex = args.indexOf("--feature");
+
+  if (featureIndex !== -1) {
+    if (featureIndex + 1 >= args.length) {
+      console.error("❌ Error: Please specify a feature name after --feature");
+      console.log("\n📋 Usage:");
+      console.log(
+        "   npm run features:gradual                    # Test all features"
+      );
+      console.log(
+        '   npm run features:gradual -- --feature "featureName"  # Test specific feature'
+      );
+      console.log("\n📋 Examples:");
+      console.log('   npm run features:gradual -- --feature "priceChangePct"');
+      console.log('   npm run features:gradual -- --feature "rsi"');
+      console.log('   npm run features:gradual -- --feature "macdHistogram"');
+      process.exit(1);
+    }
+    return { feature: args[featureIndex + 1] };
+  }
+
+  return {}; // No feature specified, will test all features
+}
+
+// Run optimization
 async function main() {
   try {
-    console.log("🎯 Gradual Feature Optimization for Bitcoin Trading Model");
-    console.log("=".repeat(60));
-
+    const args = parseArguments();
     const optimizer = new GradualFeatureOptimizer();
-    const result = await optimizer.optimizeFeatures();
 
-    console.log("\n✅ Gradual optimization completed successfully!");
-    console.log(`Removed ${result.featuresRemoved} features safely`);
-    console.log(
-      `Performance change: ${(result.performanceChange * 100).toFixed(2)}%`
-    );
+    if (args.feature) {
+      // Test specific feature
+      await optimizer.testFeatureRemoval(args.feature);
+    } else {
+      // Test all features sequentially
+      await optimizer.runOptimization();
+    }
   } catch (error) {
-    console.error("❌ Gradual optimization failed:", error);
+    console.error("❌ Optimization failed:", error);
     process.exit(1);
   }
 }
 
-// Execute if called directly
 if (require.main === module) {
-  main().catch(console.error);
+  main();
 }
-
-export { GradualFeatureOptimizer, OptimizationResult };

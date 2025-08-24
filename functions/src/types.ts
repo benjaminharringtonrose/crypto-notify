@@ -50,6 +50,9 @@ export interface Indicators {
   williamsR: number;
   stochasticK: number;
   vpt: number;
+  cci: number;
+  mfi: number;
+  aroonOscillator: number;
 }
 
 export interface Probabilities {

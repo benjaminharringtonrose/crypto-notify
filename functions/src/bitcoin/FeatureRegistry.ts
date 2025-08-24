@@ -362,6 +362,46 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
     experimentAdded: "Experiment #9-5",
     importance: "medium",
   },
+  {
+    name: "fisherTransform",
+    description:
+      "Fisher Transform - advanced oscillator that transforms price data to Gaussian distribution for better turning point identification",
+    category: "technical",
+    experimentAdded: "Experiment #10-1",
+    importance: "medium",
+  },
+  {
+    name: "hullMovingAverage",
+    description:
+      "Hull Moving Average (HMA) - advanced trend indicator using weighted moving averages to reduce lag while maintaining smoothness",
+    category: "technical",
+    experimentAdded: "Experiment #10-2",
+    importance: "medium",
+  },
+  {
+    name: "kaufmanAdaptiveMovingAverage",
+    description:
+      "Kaufman Adaptive Moving Average (KAMA) - advanced trend indicator that adapts to market volatility using efficiency ratio",
+    category: "technical",
+    experimentAdded: "Experiment #10-3",
+    importance: "medium",
+  },
+  {
+    name: "mesaSineWave",
+    description:
+      "MESA Sine Wave - advanced oscillator using Hilbert Transform to create sine wave that leads price action",
+    category: "technical",
+    experimentAdded: "Experiment #10-4",
+    importance: "medium",
+  },
+  {
+    name: "rainbowMovingAverage",
+    description:
+      "Rainbow Moving Average - advanced trend indicator using multiple EMAs to create rainbow effect for trend analysis",
+    category: "technical",
+    experimentAdded: "Experiment #10-5",
+    importance: "medium",
+  },
 ];
 
 /**

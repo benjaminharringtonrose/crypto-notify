@@ -19,6 +19,7 @@ import { DataProcessor } from "../bitcoin/DataProcessor";
 import { FeatureDetector } from "../bitcoin/FeatureDetector";
 import { TradeModelTrainer } from "../bitcoin/TradeModelTrainer";
 import { MODEL_CONFIG, TRAINING_CONFIG } from "../constants";
+import { FeatureRegistry } from "../bitcoin/FeatureRegistry";
 
 interface PerformanceMetrics {
   validationAccuracy: number;
@@ -44,61 +45,10 @@ class GradualFeatureOptimizer {
   private tolerance = 0.02; // 2% performance tolerance
   private optimizationSteps: OptimizationStep[] = [];
 
-  // Exact feature names from FeatureCalculator.ts optimizedFeatures array
-  private readonly featureNames = [
-    "priceChangePct",
-    "highLowRange",
-    "priceVolatility",
-    "pricePosition",
-    "relativeVolume",
-    "rsi",
-    "signalLine",
-    "vwapRatio",
-    "atr",
-    "obv",
-    "momentum",
-    "macdHistogram",
-    "priceSMA7Ratio",
-    "priceSMA21Ratio",
-    "priceSMA50Ratio",
-
-    // 16-20: Market Regime Features (5 features)
-    "trendRegime",
-    "volatilityRegime",
-    "ichimokuTenkanSen",
-    "ichimokuKijunSen",
-    "ichimokuCloudPosition",
-    "williamsR",
-    "volumeMA20",
-    "volumeOscillator",
-    "bollingerSqueeze",
-    "rsiDivergence",
-    "cci",
-    "mfi",
-    "aroonOscillator",
-    "donchianPosition",
-    "parabolicSAR",
-    "adx",
-    "ichimokuPosition",
-    "fibonacciPosition",
-    "stochasticK",
-    "priceAcceleration",
-    "proc",
-    "stochRsi",
-    "vwma",
-    "centerOfGravityOscillator",
-    "tsi",
-    "pmo",
-    "bollingerBandWidth",
-    "historicalVolatility",
-    "camarillaPivots",
-    "acceleratorOscillator",
-    "chaikinOscillator",
-    "elderForceIndex",
-    "klingerVolumeOscillator",
-    "massIndex",
-    "priceChannel",
-  ];
+  // Get feature names from FeatureRegistry to ensure consistency
+  private get featureNames(): string[] {
+    return FeatureRegistry.getFeatureNames();
+  }
 
   public async runOptimization(): Promise<void> {
     console.log("🚀 Starting Gradual Feature Optimization");
@@ -107,6 +57,14 @@ class GradualFeatureOptimizer {
     );
     console.log(`🎯 Performance tolerance: ${this.tolerance * 100}%`);
     console.log("=".repeat(80));
+
+    // Validate feature registry consistency
+    const registryFeatureCount = FeatureRegistry.getFeatureCount();
+    if (this.featureNames.length !== registryFeatureCount) {
+      throw new Error(
+        `Feature count mismatch! Script has ${this.featureNames.length} features, registry has ${registryFeatureCount}`
+      );
+    }
 
     // Initialize feature detection
     console.log("\n🔧 Initializing feature detection...");
@@ -206,6 +164,14 @@ class GradualFeatureOptimizer {
       process.exit(1);
     }
 
+    // Validate feature registry consistency
+    const registryFeatureCount = FeatureRegistry.getFeatureCount();
+    if (this.featureNames.length !== registryFeatureCount) {
+      throw new Error(
+        `Feature count mismatch! Script has ${this.featureNames.length} features, registry has ${registryFeatureCount}`
+      );
+    }
+
     // Initialize feature detection
     console.log("\n🔧 Initializing feature detection...");
     await FeatureDetector.detectFeatureCount();
@@ -270,41 +236,65 @@ class GradualFeatureOptimizer {
 
     console.log(`🎲 Using fixed seed: ${FIXED_SEED} for consistent training`);
 
-    // Create a custom data processor that uses only specified features
-    const dataProcessor = new DataProcessor(
-      {
-        timesteps: MODEL_CONFIG.TIMESTEPS,
-        epochs: TRAINING_CONFIG.EPOCHS,
-        batchSize: TRAINING_CONFIG.BATCH_SIZE,
-        initialLearningRate: TRAINING_CONFIG.INITIAL_LEARNING_RATE,
-      },
-      600
-    );
-
-    const { X, y } = await dataProcessor.prepareData();
-
-    // Filter features to only include the specified ones
-    const filteredX = X.map((sequence) =>
-      sequence.map((timestep) => {
-        const filteredTimestep: number[] = [];
-        featureArray.forEach((featureName) => {
-          const index = this.featureNames.indexOf(featureName);
-          if (index >= 0 && index < timestep.length) {
-            filteredTimestep.push(timestep[index]);
-          }
-        });
-        return filteredTimestep;
-      })
-    );
-
     try {
-      // Create a custom trainer with the filtered data and consistent seed
+      // Create a custom trainer with the consistent seed
       const trainer = new TradeModelTrainer(FIXED_SEED);
 
-      // Override the data processor to use filtered features
-      trainer["dataProcessor"].prepareData = async () => {
-        return { X: filteredX, y };
-      };
+      // Get the original data to understand the feature structure
+      const originalDataProcessor = new DataProcessor(
+        {
+          timesteps: MODEL_CONFIG.TIMESTEPS,
+          epochs: TRAINING_CONFIG.EPOCHS,
+          batchSize: TRAINING_CONFIG.BATCH_SIZE,
+          initialLearningRate: TRAINING_CONFIG.INITIAL_LEARNING_RATE,
+        },
+        TRAINING_CONFIG.START_DAYS_AGO
+      );
+
+      const { X: originalX, y } = await originalDataProcessor.prepareData();
+
+      // Get the actual feature names from FeatureRegistry to ensure correct mapping
+      const actualFeatureNames = FeatureRegistry.getFeatureNames();
+
+      console.log(`📊 Original data has ${originalX[0][0].length} features`);
+      console.log(`🎯 Requested ${featureArray.length} features`);
+
+      // Validate that we have the expected number of features
+      if (originalX[0][0].length !== actualFeatureNames.length) {
+        throw new Error(
+          `Feature count mismatch! Expected ${actualFeatureNames.length} features, got ${originalX[0][0].length}`
+        );
+      }
+
+      // Create feature mapping: which indices to keep
+      const featureIndices = featureArray.map((featureName) => {
+        const index = actualFeatureNames.indexOf(featureName);
+        if (index === -1) {
+          throw new Error(
+            `Feature "${featureName}" not found in FeatureRegistry`
+          );
+        }
+        return index;
+      });
+
+      console.log(`🔍 Using feature indices: [${featureIndices.join(", ")}]`);
+
+      // Filter features to only include the specified ones
+      const filteredX = originalX.map((sequence) =>
+        sequence.map((timestep) => {
+          const filteredTimestep: number[] = [];
+          featureIndices.forEach((index) => {
+            if (index >= 0 && index < timestep.length) {
+              filteredTimestep.push(timestep[index]);
+            } else {
+              throw new Error(
+                `Feature index ${index} out of bounds for timestep length ${timestep.length}`
+              );
+            }
+          });
+          return filteredTimestep;
+        })
+      );
 
       // Override the feature detection to match our filtered feature count
       const originalDetectFeatureCount = FeatureDetector.detectFeatureCount;
@@ -317,12 +307,19 @@ class GradualFeatureOptimizer {
         return featureArray.length;
       };
 
+      // Override the trainer's data processor prepareData method
+      const originalPrepareData = trainer["dataProcessor"].prepareData;
+      trainer["dataProcessor"].prepareData = async () => ({ X: filteredX, y });
+
       // Train the model using the same process as the main trainer
       await trainer.train();
 
       // Restore original feature detection
       FeatureDetector.detectFeatureCount = originalDetectFeatureCount;
       FeatureDetector.getFeatureCount = originalGetFeatureCount;
+
+      // Restore original data processor
+      trainer["dataProcessor"].prepareData = originalPrepareData;
 
       // Restore original Math.random function
       Math.random = originalRandom;
@@ -350,20 +347,32 @@ class GradualFeatureOptimizer {
     original: PerformanceMetrics,
     modified: PerformanceMetrics
   ) {
+    const safeDivide = (numerator: number, denominator: number): number => {
+      if (Math.abs(denominator) < 1e-10) {
+        return numerator > 0 ? 1 : numerator < 0 ? -1 : 0;
+      }
+      return numerator / denominator;
+    };
+
     return {
-      validationAccuracy:
-        (modified.validationAccuracy - original.validationAccuracy) /
-        original.validationAccuracy,
-      buyF1: (modified.buyF1 - original.buyF1) / original.buyF1,
-      sellF1: (modified.sellF1 - original.sellF1) / original.sellF1,
-      combinedF1:
-        (modified.combinedF1 - original.combinedF1) / original.combinedF1,
-      balancedAccuracy:
-        (modified.balancedAccuracy - original.balancedAccuracy) /
-        original.balancedAccuracy,
-      matthewsCorrelation:
-        (modified.matthewsCorrelation - original.matthewsCorrelation) /
-        original.matthewsCorrelation,
+      validationAccuracy: safeDivide(
+        modified.validationAccuracy - original.validationAccuracy,
+        original.validationAccuracy
+      ),
+      buyF1: safeDivide(modified.buyF1 - original.buyF1, original.buyF1),
+      sellF1: safeDivide(modified.sellF1 - original.sellF1, original.sellF1),
+      combinedF1: safeDivide(
+        modified.combinedF1 - original.combinedF1,
+        original.combinedF1
+      ),
+      balancedAccuracy: safeDivide(
+        modified.balancedAccuracy - original.balancedAccuracy,
+        original.balancedAccuracy
+      ),
+      matthewsCorrelation: safeDivide(
+        modified.matthewsCorrelation - original.matthewsCorrelation,
+        original.matthewsCorrelation
+      ),
     };
   }
 

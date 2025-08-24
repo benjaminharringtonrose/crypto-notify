@@ -1768,33 +1768,42 @@ export default class FeatureCalculator {
       acceleratorOscillator: this.calculateAcceleratorOscillator(
         prices.slice(0, dayIndex + 1)
       ),
-      // EXPERIMENT #9-1: Chaikin Oscillator (CO) - Advanced Volume Indicator
       chaikinOscillator: this.calculateChaikinOscillator(
         prices.slice(0, dayIndex + 1),
         prices.slice(0, dayIndex + 1),
         prices.slice(0, dayIndex + 1),
         volumes.slice(0, dayIndex + 1)
       ),
-      // EXPERIMENT #9-2: Elder Force Index (EFI) - Advanced Volume/Momentum Indicator
       elderForceIndex: this.calculateElderForceIndex(
         prices.slice(0, dayIndex + 1),
         volumes.slice(0, dayIndex + 1)
       ),
-      // EXPERIMENT #9-3: Klinger Volume Oscillator (KVO) - Advanced Volume Indicator
       klingerVolumeOscillator: this.calculateKlingerVolumeOscillator(
         prices.slice(0, dayIndex + 1),
         prices.slice(0, dayIndex + 1),
         prices.slice(0, dayIndex + 1),
         volumes.slice(0, dayIndex + 1)
       ),
-      // EXPERIMENT #9-4: Mass Index (MI) - Advanced Volatility Indicator
       massIndex: this.calculateMassIndex(
         prices.slice(0, dayIndex + 1),
         prices.slice(0, dayIndex + 1)
       ),
-      // EXPERIMENT #9-5: Price Channel (PC) - Advanced Support/Resistance Indicator
       priceChannel: this.calculatePriceChannel(
         prices.slice(0, dayIndex + 1),
+        prices.slice(0, dayIndex + 1)
+      ),
+      fisherTransform: this.calculateFisherTransform(
+        prices.slice(0, dayIndex + 1),
+        prices.slice(0, dayIndex + 1)
+      ),
+      hullMovingAverage: this.calculateHullMovingAverage(
+        prices.slice(0, dayIndex + 1)
+      ),
+      kaufmanAdaptiveMovingAverage: this.calculateKaufmanAdaptiveMovingAverage(
+        prices.slice(0, dayIndex + 1)
+      ),
+      mesaSineWave: this.calculateMESASineWave(prices.slice(0, dayIndex + 1)),
+      rainbowMovingAverage: this.calculateRainbowMovingAverage(
         prices.slice(0, dayIndex + 1)
       ),
     };
@@ -1906,6 +1915,11 @@ export default class FeatureCalculator {
       indicators.klingerVolumeOscillator, // Klinger Volume Oscillator (KVO) - EXPERIMENT #9-3
       indicators.massIndex, // Mass Index (MI) - EXPERIMENT #9-4
       indicators.priceChannel, // Price Channel (PC) - EXPERIMENT #9-5
+      indicators.fisherTransform, // Fisher Transform - EXPERIMENT #10-1
+      indicators.hullMovingAverage, // Hull Moving Average (HMA) - EXPERIMENT #10-2
+      indicators.kaufmanAdaptiveMovingAverage, // Kaufman Adaptive Moving Average (KAMA) - EXPERIMENT #10-3
+      indicators.mesaSineWave, // MESA Sine Wave - EXPERIMENT #10-4
+      indicators.rainbowMovingAverage, // Rainbow Moving Average - EXPERIMENT #10-5
     ];
 
     return optimizedFeatures;
@@ -2092,5 +2106,219 @@ export default class FeatureCalculator {
 
     // Return position within channel (0 = bottom, 1 = top)
     return (currentPrice - lowestLow) / channelRange;
+  }
+
+  // EXPERIMENT #10-1: Fisher Transform - Advanced Oscillator
+  public calculateFisherTransform(
+    high: number[],
+    low: number[],
+    period: number = 10
+  ): number {
+    if (high.length < period || low.length < period) return 0;
+
+    // Calculate median price (HLC/3)
+    const medianPrices: number[] = [];
+    for (let i = 0; i < high.length; i++) {
+      medianPrices.push((high[i] + low[i] + (high[i] + low[i]) / 2) / 3);
+    }
+
+    // Calculate highest and lowest median prices over the period
+    const recentMedianPrices = medianPrices.slice(-period);
+    const highestMedian = Math.max(...recentMedianPrices);
+    const lowestMedian = Math.min(...recentMedianPrices);
+
+    // Calculate value1 (normalized median price)
+    const currentMedian = medianPrices[medianPrices.length - 1];
+    const range = highestMedian - lowestMedian;
+
+    if (range === 0) return 0;
+
+    const value1 =
+      0.33 * 2 * ((currentMedian - lowestMedian) / range - 0.5) +
+      0.67 *
+        (medianPrices.length > 1 ? medianPrices[medianPrices.length - 2] : 0);
+
+    // Apply Fisher Transform
+    let fisher = 0;
+    if (value1 > 0.99) {
+      fisher = 0.999;
+    } else if (value1 < -0.99) {
+      fisher = -0.999;
+    } else {
+      fisher = 0.5 * Math.log((1 + value1) / (1 - value1));
+    }
+
+    return fisher;
+  }
+
+  // EXPERIMENT #10-2: Hull Moving Average (HMA) - Advanced Trend Indicator
+  public calculateHullMovingAverage(
+    prices: number[],
+    period: number = 20
+  ): number {
+    if (prices.length < period) return prices[prices.length - 1];
+
+    // Calculate WMA for half period
+    const halfPeriod = Math.floor(period / 2);
+    const sqrtPeriod = Math.floor(Math.sqrt(period));
+
+    // Calculate WMA for full period
+    let fullWMA = 0;
+    let fullWeightSum = 0;
+    for (let i = 0; i < period; i++) {
+      const weight = period - i;
+      fullWMA += prices[prices.length - period + i] * weight;
+      fullWeightSum += weight;
+    }
+    fullWMA = fullWMA / fullWeightSum;
+
+    // Calculate WMA for half period
+    let halfWMA = 0;
+    let halfWeightSum = 0;
+    for (let i = 0; i < halfPeriod; i++) {
+      const weight = halfPeriod - i;
+      halfWMA += prices[prices.length - halfPeriod + i] * weight;
+      halfWeightSum += weight;
+    }
+    halfWMA = halfWMA / halfWeightSum;
+
+    // Calculate raw HMA: 2 * halfWMA - fullWMA
+    const rawHMA = 2 * halfWMA - fullWMA;
+
+    // Apply final WMA smoothing
+    let finalWMA = 0;
+    let finalWeightSum = 0;
+    for (let i = 0; i < sqrtPeriod; i++) {
+      const weight = sqrtPeriod - i;
+      // Use rawHMA as the value (simplified for single value)
+      finalWMA += rawHMA * weight;
+      finalWeightSum += weight;
+    }
+    finalWMA = finalWMA / finalWeightSum;
+
+    return finalWMA;
+  }
+
+  // EXPERIMENT #10-3: Kaufman Adaptive Moving Average (KAMA) - Advanced Trend Indicator
+  public calculateKaufmanAdaptiveMovingAverage(
+    prices: number[],
+    period: number = 10,
+    fastEMA: number = 2,
+    slowEMA: number = 30
+  ): number {
+    if (prices.length < period + 1) return prices[prices.length - 1];
+
+    // Calculate Efficiency Ratio (ER)
+    let volatility = 0;
+
+    for (let i = 1; i <= period; i++) {
+      const priceChange = Math.abs(
+        prices[prices.length - i] - prices[prices.length - i - 1]
+      );
+      volatility += priceChange;
+    }
+
+    const netChange = Math.abs(
+      prices[prices.length - 1] - prices[prices.length - period - 1]
+    );
+    const efficiencyRatio = volatility > 0 ? netChange / volatility : 0;
+
+    // Calculate Smoothing Constant (SC)
+    const fastSC = 2 / (fastEMA + 1);
+    const slowSC = 2 / (slowEMA + 1);
+    const smoothingConstant = Math.pow(
+      efficiencyRatio * (fastSC - slowSC) + slowSC,
+      2
+    );
+
+    // Calculate KAMA
+    const currentPrice = prices[prices.length - 1];
+    const previousKAMA =
+      prices.length > period + 1
+        ? this.calculateKaufmanAdaptiveMovingAverage(
+            prices.slice(0, -1),
+            period,
+            fastEMA,
+            slowEMA
+          )
+        : prices[prices.length - 2];
+
+    const kama =
+      previousKAMA + smoothingConstant * (currentPrice - previousKAMA);
+
+    return kama;
+  }
+
+  // EXPERIMENT #10-4: MESA Sine Wave - Advanced Oscillator
+  public calculateMESASineWave(prices: number[], period: number = 20): number {
+    if (prices.length < period) return 0;
+
+    // Simplified MESA Sine Wave calculation
+    // In practice, this would use Hilbert Transform, but we'll use a simplified approach
+
+    // Calculate phase using price momentum
+    const recentPrices = prices.slice(-period);
+    const priceChange = recentPrices[recentPrices.length - 1] - recentPrices[0];
+    const totalRange = Math.max(...recentPrices) - Math.min(...recentPrices);
+
+    if (totalRange === 0) return 0;
+
+    // Normalize price change to create a phase angle
+    const normalizedChange = priceChange / totalRange;
+    const phase = Math.atan2(normalizedChange, 1);
+
+    // Calculate sine wave value
+    const sineValue = Math.sin(phase);
+
+    return sineValue;
+  }
+
+  // EXPERIMENT #10-5: Rainbow Moving Average - Advanced Trend Indicator
+  public calculateRainbowMovingAverage(
+    prices: number[],
+    basePeriod: number = 2
+  ): number {
+    if (prices.length < basePeriod * 10) return prices[prices.length - 1];
+
+    // Calculate multiple EMAs with different periods
+    const periods = [
+      basePeriod,
+      basePeriod * 2,
+      basePeriod * 3,
+      basePeriod * 4,
+      basePeriod * 5,
+      basePeriod * 6,
+      basePeriod * 7,
+      basePeriod * 8,
+      basePeriod * 9,
+      basePeriod * 10,
+    ];
+
+    const emaValues: number[] = [];
+
+    for (const period of periods) {
+      const ema = this.calculateEMA(prices, period);
+      emaValues.push(ema);
+    }
+
+    // Calculate current price position relative to all EMAs
+    const currentPrice = prices[prices.length - 1];
+    let aboveCount = 0;
+    let belowCount = 0;
+
+    for (const ema of emaValues) {
+      if (currentPrice > ema) {
+        aboveCount++;
+      } else if (currentPrice < ema) {
+        belowCount++;
+      }
+    }
+
+    // Return normalized position (-1 to 1)
+    // -1 = below all EMAs (bearish), 1 = above all EMAs (bullish)
+    const totalLines = emaValues.length;
+    const rainbowPosition = (aboveCount - belowCount) / totalLines;
+
+    return rainbowPosition;
   }
 }

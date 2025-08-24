@@ -74,10 +74,13 @@ export interface Indicators {
   elderForceIndex: number;
   // EXPERIMENT #9-3: Klinger Volume Oscillator (KVO) - Advanced Volume Indicator
   klingerVolumeOscillator: number;
-  // EXPERIMENT #9-4: Mass Index (MI) - Advanced Volatility Indicator
   massIndex: number;
-  // EXPERIMENT #9-5: Price Channel (PC) - Advanced Support/Resistance Indicator
   priceChannel: number;
+  fisherTransform: number;
+  hullMovingAverage: number;
+  kaufmanAdaptiveMovingAverage: number;
+  mesaSineWave: number;
+  rainbowMovingAverage: number;
 }
 
 export interface Probabilities {

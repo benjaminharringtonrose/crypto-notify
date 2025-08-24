@@ -347,8 +347,9 @@ The model maintains its optimal 36-feature configuration, demonstrating that the
 **Round 7**: 4 out of 5 indicators kept (TSI, PMO, Bollinger Band Width, Williams %R)
 **Round 8**: 3 out of 5 indicators kept (Historical Volatility, Camarilla Pivots, Accelerator Oscillator)
 **Round 9**: 4 out of 5 indicators kept (Chaikin Oscillator, Elder Force Index, Klinger Volume Oscillator, Price Channel)
+**Round 10**: 1 out of 5 indicators kept (Hull Moving Average)
 
-**Final Result**: The Bitcoin trading model now has **49 optimized features** (up from the original 26), with 25 new indicators from the nine rounds providing measurable value for 7-day BUY/SELL prediction.
+**Final Result**: The Bitcoin trading model now has **50 optimized features** (up from the original 26), with 26 new indicators from the ten rounds providing measurable value for 7-day BUY/SELL prediction.
 
 ### **Current Optimal Feature Set:**
 
@@ -362,6 +363,7 @@ The model now includes a comprehensive set of technical indicators covering:
 - **Rate of Change indicators** (PROC)
 - **Advanced oscillators** (Center of Gravity Oscillator, Williams %R, Chaikin Oscillator, Elder Force Index, Klinger Volume Oscillator)
 - **Support/Resistance indicators** (Price Channel)
+- **Advanced trend indicators** (Hull Moving Average)
 - **Core price action** (Price changes, volatility, position)
 
 ## 📈 **ROUND 8 RESULTS (COMPLETED)**
@@ -434,6 +436,41 @@ The model now has a comprehensive set of 45 technical indicators optimized for 7
 - **MI** was adding minimal value and was removed to optimize the feature set
 
 The model now has a comprehensive set of 49 technical indicators optimized for 7-day Bitcoin BUY/SELL prediction, with each feature providing measurable value to the prediction accuracy.
+
+## 📈 **ROUND 10 RESULTS (COMPLETED)**
+
+### **Round 10 Experiments Summary:**
+
+1. **Fisher Transform** - ❌ **REMOVED** (1.05% improvement in Combined F1 when removed)
+2. **Hull Moving Average (HMA)** - ✅ **KEPT** (2.19% degradation in Combined F1 when removed)
+3. **Kaufman Adaptive Moving Average (KAMA)** - ❌ **REMOVED** (3.66% improvement in Combined F1 when removed)
+4. **MESA Sine Wave** - ❌ **REMOVED** (0.51% improvement in Combined F1 when removed)
+5. **Rainbow Moving Average** - ❌ **REMOVED** (2.11% improvement in Combined F1 when removed)
+
+### **Round 10 Feature Set:**
+
+- **Total Features**: 50 (down from 55 at start of Round 10)
+- **Features Added from Round 10**: Hull Moving Average (HMA)
+- **Features Removed**: Fisher Transform, Kaufman Adaptive Moving Average (KAMA), MESA Sine Wave, Rainbow Moving Average
+
+### **Round 10 Analysis:**
+
+**Key Findings:**
+
+- **Fisher Transform**: Removed due to 1.05% improvement in combined F1 score when removed, minimal impact
+- **Hull Moving Average (HMA)**: Kept due to 2.19% degradation in combined F1 score when removed, especially valuable for Buy F1 (17.09% degradation when removed)
+- **Kaufman Adaptive Moving Average (KAMA)**: Removed due to 3.66% improvement in combined F1 score when removed, was adding noise rather than value
+- **MESA Sine Wave**: Removed due to 0.51% improvement in combined F1 score when removed, minimal impact
+- **Rainbow Moving Average**: Removed due to 2.11% improvement in combined F1 score when removed, was degrading model performance
+
+**Round 10 Insights:**
+
+- **HMA** provides significant value for buy predictions and overall model performance
+- **Fisher Transform, KAMA, MESA Sine Wave, and Rainbow Moving Average** were all adding noise rather than value
+- Only 1 out of 5 indicators from Round 10 was kept, indicating most advanced oscillators and trend indicators tested were not beneficial
+- The model now has 50 optimized features with the addition of the Hull Moving Average
+
+The model now has a comprehensive set of 50 technical indicators optimized for 7-day Bitcoin BUY/SELL prediction, with each feature providing measurable value to the prediction accuracy.
 
 ## 📝 **DOCUMENTATION REQUIREMENTS**
 

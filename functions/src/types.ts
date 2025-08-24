@@ -1,5 +1,3 @@
-
-
 export interface Indicators {
   rsi: number;
   prevRsi: number;
@@ -54,23 +52,17 @@ export interface Indicators {
   vpt: number;
 }
 
-
-
 export interface Probabilities {
   buy: number;
   hold: number;
   sell: number;
 }
 
-
-
 export interface TradeRecommendation {
   probability: number;
   recommendation: Recommendation;
   timestamp: string;
 }
-
-
 
 export enum Recommendation {
   Buy = "BUY",
@@ -103,8 +95,6 @@ export enum Docs {
   Bitcoin = "bitcoin",
 }
 
-
-
 export interface HistoricalData {
   prices: number[];
   volumes: number[];
@@ -116,7 +106,6 @@ export interface ModelConfig {
   initialLearningRate: number;
 }
 
-
 export interface Trade {
   type: Recommendation;
   price: number;
@@ -124,16 +113,6 @@ export interface Trade {
   btcAmount: number;
   usdValue: number;
   buyPrice?: number;
-}
-
-export interface BacktestResult {
-  totalReturn: number;
-  totalTrades: number;
-  winRate: number;
-  sharpeRatio: number;
-  maxDrawdown: number;
-  portfolioHistory: { timestamp: string; value: number }[];
-  trades: Trade[];
 }
 
 export enum StrategyType {

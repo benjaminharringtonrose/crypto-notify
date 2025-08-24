@@ -53,6 +53,7 @@ export interface Indicators {
   cci: number;
   mfi: number;
   aroonOscillator: number;
+  donchianPosition: number;
 }
 
 export interface Probabilities {

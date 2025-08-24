@@ -317,6 +317,33 @@ export default class FeatureCalculator {
     return { aroonUp, aroonDown, aroonOscillator };
   }
 
+  public calculateDonchianChannels(
+    high: number[],
+    low: number[],
+    close: number[],
+    period: number = 20
+  ): { upper: number; middle: number; lower: number; position: number } {
+    if (high.length < period || low.length < period || close.length < period) {
+      return { upper: 0, middle: 0, lower: 0, position: 0.5 };
+    }
+
+    // Get recent data for the period
+    const recentHighs = high.slice(-period);
+    const recentLows = low.slice(-period);
+    const currentPrice = close[close.length - 1];
+
+    // Calculate Donchian Channels
+    const upper = Math.max(...recentHighs);
+    const lower = Math.min(...recentLows);
+    const middle = (upper + lower) / 2;
+
+    // Calculate position within the channel (0 = at lower band, 1 = at upper band)
+    const position =
+      upper === lower ? 0.5 : (currentPrice - lower) / (upper - lower);
+
+    return { upper, middle, lower, position };
+  }
+
   public calculateStochasticK(prices: number[], period: number = 14): number {
     if (prices.length < period) return 50;
     const recentPrices = prices.slice(-period);
@@ -1192,6 +1219,11 @@ export default class FeatureCalculator {
         prices.slice(0, dayIndex + 1),
         prices.slice(0, dayIndex + 1)
       ).aroonOscillator,
+      donchianPosition: this.calculateDonchianChannels(
+        prices.slice(0, dayIndex + 1),
+        prices.slice(0, dayIndex + 1),
+        prices.slice(0, dayIndex + 1)
+      ).position,
     };
   }
 
@@ -1280,6 +1312,7 @@ export default class FeatureCalculator {
       indicators.cci, // Commodity Channel Index (CCI)
       indicators.mfi, // Money Flow Index (MFI)
       indicators.aroonOscillator, // Aroon Oscillator
+      indicators.donchianPosition, // Donchian Channels position
     ];
 
     return optimizedFeatures;

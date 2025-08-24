@@ -208,6 +208,13 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
     experimentAdded: "Experiment #5 - Aroon",
     importance: "medium",
   },
+  {
+    name: "donchianPosition",
+    description: "Donchian Channels position",
+    category: "microstructure",
+    experimentAdded: "Experiment #2 - Donchian",
+    importance: "medium",
+  },
 ];
 
 /**

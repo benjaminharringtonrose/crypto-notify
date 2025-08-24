@@ -83,6 +83,7 @@ class GradualFeatureOptimizer {
     "cci",
     "mfi",
     "aroonOscillator",
+    "donchianPosition",
   ];
 
   public async runOptimization(): Promise<void> {

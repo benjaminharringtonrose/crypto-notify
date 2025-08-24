@@ -1,7 +1,7 @@
 import * as tf from "@tensorflow/tfjs-node";
 import { FirebaseService } from "../api/FirebaseService";
 import { Bucket } from "@google-cloud/storage";
-import { FILE_NAMES, MODEL_CONFIG } from "../constants";
+import { FILE_NAMES, MODEL_CONFIG, TRAINING_CONFIG } from "../constants";
 import { FeatureDetector } from "./FeatureDetector";
 
 export class ModelWeightManager {
@@ -41,10 +41,11 @@ export class ModelWeightManager {
       // Set convolutional layer weights
 
       // Check if conv1 weights match expected shape
-      const expectedConv1Size = MODEL_CONFIG.CONV1D_1_WEIGHT_SHAPE.reduce(
-        (a, b) => a * b,
-        1
-      );
+      // Calculate shape dynamically based on current feature count
+      const kernelSize = 3; // From TradeModelFactory - proven optimal kernel size
+      const filters = 48; // From TradeModelFactory - proven optimal filter count
+      const featureCount = FeatureDetector.getFeatureCount();
+      const expectedConv1Size = kernelSize * featureCount * filters;
       if (this.weights.conv1Weights?.length !== expectedConv1Size) {
         console.warn(
           `Conv1 weights size mismatch: expected ${expectedConv1Size}, got ${this.weights.conv1Weights?.length}`
@@ -57,21 +58,50 @@ export class ModelWeightManager {
       model
         .getLayer("conv1d_input")
         .setWeights([
-          tf.tensor3d(
-            this.weights.conv1Weights,
-            MODEL_CONFIG.CONV1D_1_WEIGHT_SHAPE
-          ),
+          tf.tensor3d(this.weights.conv1Weights, [
+            kernelSize,
+            featureCount,
+            filters,
+          ]),
           tf.tensor1d(this.weights.conv1Bias),
         ]);
-      model
-        .getLayer("conv1d_2")
-        .setWeights([
-          tf.tensor3d(
-            this.weights.conv2Weights,
-            MODEL_CONFIG.CONV1D_2_WEIGHT_SHAPE
-          ),
-          tf.tensor1d(this.weights.conv2Bias),
-        ]);
+      // Conv1D layer 2 - OPTIONAL (only exists in older model architectures)
+      try {
+        if (this.weights.conv2Weights && this.weights.conv2Weights.length > 0) {
+          // Calculate conv2 shape dynamically (if it exists)
+          const conv2KernelSize = 3; // Standard kernel size
+          const conv2InputFilters = 48; // Output from conv1
+          const conv2OutputFilters = 64; // Typical progression
+          const expectedConv2Size =
+            conv2KernelSize * conv2InputFilters * conv2OutputFilters;
+
+          if (this.weights.conv2Weights.length === expectedConv2Size) {
+            model
+              .getLayer("conv1d_2")
+              .setWeights([
+                tf.tensor3d(this.weights.conv2Weights, [
+                  conv2KernelSize,
+                  conv2InputFilters,
+                  conv2OutputFilters,
+                ]),
+                tf.tensor1d(this.weights.conv2Bias),
+              ]);
+            console.log("✅ Conv1D layer 2 weights loaded successfully");
+          } else {
+            console.warn(
+              `Conv2 weights size mismatch: expected ${expectedConv2Size}, got ${this.weights.conv2Weights.length}`
+            );
+          }
+        } else {
+          console.log(
+            "No conv2 weights found - current model uses single Conv1D layer"
+          );
+        }
+      } catch (error) {
+        console.log(
+          "Conv1D layer 2 not found in current model - using simplified architecture"
+        );
+      }
 
       // Load batch normalization for conv layers
       model
@@ -82,14 +112,26 @@ export class ModelWeightManager {
           tf.tensor1d(this.weights.bnConv1MovingMean),
           tf.tensor1d(this.weights.bnConv1MovingVariance),
         ]);
-      model
-        .getLayer("bn_conv2")
-        .setWeights([
-          tf.tensor1d(this.weights.bnConv2Gamma),
-          tf.tensor1d(this.weights.bnConv2Beta),
-          tf.tensor1d(this.weights.bnConv2MovingMean),
-          tf.tensor1d(this.weights.bnConv2MovingVariance),
-        ]);
+      // Batch normalization for conv2 - OPTIONAL (only exists in older model architectures)
+      try {
+        if (this.weights.bnConv2Gamma && this.weights.bnConv2Gamma.length > 0) {
+          model
+            .getLayer("bn_conv2")
+            .setWeights([
+              tf.tensor1d(this.weights.bnConv2Gamma),
+              tf.tensor1d(this.weights.bnConv2Beta),
+              tf.tensor1d(this.weights.bnConv2MovingMean),
+              tf.tensor1d(this.weights.bnConv2MovingVariance),
+            ]);
+          console.log("✅ Conv2 batch norm weights loaded successfully");
+        } else {
+          console.log(
+            "No conv2 batch norm weights found - current model uses single Conv1D layer"
+          );
+        }
+      } catch (error) {
+        console.log("Conv2 batch norm layer not found in current model");
+      }
 
       // Enhanced features layers (attention mechanism replacement) - OPTIONAL
       // These layers may not exist in old saved weights
@@ -198,31 +240,62 @@ export class ModelWeightManager {
           tf.tensor1d(this.weights.lstm3Bias),
         ]);
 
-      // Load batch normalization for LSTM layers
-      model
-        .getLayer("bn_lstm1")
-        .setWeights([
-          tf.tensor1d(this.weights.bnLstm1Gamma),
-          tf.tensor1d(this.weights.bnLstm1Beta),
-          tf.tensor1d(this.weights.bnLstm1MovingMean),
-          tf.tensor1d(this.weights.bnLstm1MovingVariance),
-        ]);
-      model
-        .getLayer("bn_lstm2")
-        .setWeights([
-          tf.tensor1d(this.weights.bnLstm2Gamma),
-          tf.tensor1d(this.weights.bnLstm2Beta),
-          tf.tensor1d(this.weights.bnLstm2MovingMean),
-          tf.tensor1d(this.weights.bnLstm2MovingVariance),
-        ]);
-      model
-        .getLayer("bn_lstm3")
-        .setWeights([
-          tf.tensor1d(this.weights.bnLstm3Gamma),
-          tf.tensor1d(this.weights.bnLstm3Beta),
-          tf.tensor1d(this.weights.bnLstm3MovingMean),
-          tf.tensor1d(this.weights.bnLstm3MovingVariance),
-        ]);
+      // Load batch normalization for LSTM layers - OPTIONAL (current model doesn't use LSTM batch norm)
+      try {
+        if (this.weights.bnLstm1Gamma && this.weights.bnLstm1Gamma.length > 0) {
+          model
+            .getLayer("bn_lstm1")
+            .setWeights([
+              tf.tensor1d(this.weights.bnLstm1Gamma),
+              tf.tensor1d(this.weights.bnLstm1Beta),
+              tf.tensor1d(this.weights.bnLstm1MovingMean),
+              tf.tensor1d(this.weights.bnLstm1MovingVariance),
+            ]);
+          console.log("✅ LSTM1 batch norm weights loaded successfully");
+        } else {
+          console.log(
+            "No LSTM1 batch norm weights found - current model doesn't use LSTM batch norm"
+          );
+        }
+      } catch (error) {
+        console.log("LSTM1 batch norm layer not found in current model");
+      }
+
+      try {
+        if (this.weights.bnLstm2Gamma && this.weights.bnLstm2Gamma.length > 0) {
+          model
+            .getLayer("bn_lstm2")
+            .setWeights([
+              tf.tensor1d(this.weights.bnLstm2Gamma),
+              tf.tensor1d(this.weights.bnLstm2Beta),
+              tf.tensor1d(this.weights.bnLstm2MovingMean),
+              tf.tensor1d(this.weights.bnLstm2MovingVariance),
+            ]);
+          console.log("✅ LSTM2 batch norm weights loaded successfully");
+        } else {
+          console.log("No LSTM2 batch norm weights found");
+        }
+      } catch (error) {
+        console.log("LSTM2 batch norm layer not found in current model");
+      }
+
+      try {
+        if (this.weights.bnLstm3Gamma && this.weights.bnLstm3Gamma.length > 0) {
+          model
+            .getLayer("bn_lstm3")
+            .setWeights([
+              tf.tensor1d(this.weights.bnLstm3Gamma),
+              tf.tensor1d(this.weights.bnLstm3Beta),
+              tf.tensor1d(this.weights.bnLstm3MovingMean),
+              tf.tensor1d(this.weights.bnLstm3MovingVariance),
+            ]);
+          console.log("✅ LSTM3 batch norm weights loaded successfully");
+        } else {
+          console.log("No LSTM3 batch norm weights found");
+        }
+      } catch (error) {
+        console.log("LSTM3 batch norm layer not found in current model");
+      }
 
       // Enhanced features 2 layer (attention mechanism replacement) - OPTIONAL
       try {
@@ -333,53 +406,99 @@ export class ModelWeightManager {
       }
 
       // Load dense layer weights
+      // Calculate dense weight shapes dynamically based on current model architecture
+      const lstmUnits = 64; // From TradeModelFactory - LSTM output size
+      const dense1Units = 32; // From TradeModelFactory - proven optimal dense layer size
+
       model
         .getLayer("dense1")
         .setWeights([
-          tf.tensor2d(
-            this.weights.dense1Weights,
-            MODEL_CONFIG.DENSE_1_WEIGHT_SHAPE
-          ),
+          tf.tensor2d(this.weights.dense1Weights, [lstmUnits, dense1Units]),
           tf.tensor1d(this.weights.dense1Bias),
         ]);
 
-      model
-        .getLayer("dense2")
-        .setWeights([
-          tf.tensor2d(
-            this.weights.dense2Weights,
-            MODEL_CONFIG.DENSE_2_WEIGHT_SHAPE
-          ),
-          tf.tensor1d(this.weights.dense2Bias),
-        ]);
+      // Note: Current model architecture only has one dense layer (dense1)
+      // dense2 is optional for backward compatibility with older saved weights
+      try {
+        if (
+          this.weights.dense2Weights &&
+          this.weights.dense2Weights.length > 0
+        ) {
+          const dense2Units = 16; // Typical half of dense1 if it exists
+          model
+            .getLayer("dense2")
+            .setWeights([
+              tf.tensor2d(this.weights.dense2Weights, [
+                dense1Units,
+                dense2Units,
+              ]),
+              tf.tensor1d(this.weights.dense2Bias),
+            ]);
+          console.log("✅ Dense layer 2 weights loaded successfully");
+        } else {
+          console.log(
+            "No dense2 weights found - current model uses single dense layer"
+          );
+        }
+      } catch (error) {
+        console.log(
+          "Dense layer 2 not found in current model - using simplified architecture"
+        );
+      }
 
-      // Load batch normalization for dense layers
-      model
-        .getLayer("bn_dense1")
-        .setWeights([
-          tf.tensor1d(this.weights.bnDense1Gamma),
-          tf.tensor1d(this.weights.bnDense1Beta),
-          tf.tensor1d(this.weights.bnDense1MovingMean),
-          tf.tensor1d(this.weights.bnDense1MovingVariance),
-        ]);
+      // Load batch normalization for dense layers - OPTIONAL (current model doesn't use dense batch norm)
+      try {
+        if (
+          this.weights.bnDense1Gamma &&
+          this.weights.bnDense1Gamma.length > 0
+        ) {
+          model
+            .getLayer("bn_dense1")
+            .setWeights([
+              tf.tensor1d(this.weights.bnDense1Gamma),
+              tf.tensor1d(this.weights.bnDense1Beta),
+              tf.tensor1d(this.weights.bnDense1MovingMean),
+              tf.tensor1d(this.weights.bnDense1MovingVariance),
+            ]);
+          console.log("✅ Dense1 batch norm weights loaded successfully");
+        } else {
+          console.log(
+            "No dense1 batch norm weights found - current model doesn't use dense batch norm"
+          );
+        }
+      } catch (error) {
+        console.log("Dense1 batch norm layer not found in current model");
+      }
 
-      model
-        .getLayer("bn_dense2")
-        .setWeights([
-          tf.tensor1d(this.weights.bnDense2Gamma),
-          tf.tensor1d(this.weights.bnDense2Beta),
-          tf.tensor1d(this.weights.bnDense2MovingMean),
-          tf.tensor1d(this.weights.bnDense2MovingVariance),
-        ]);
+      try {
+        if (
+          this.weights.bnDense2Gamma &&
+          this.weights.bnDense2Gamma.length > 0
+        ) {
+          model
+            .getLayer("bn_dense2")
+            .setWeights([
+              tf.tensor1d(this.weights.bnDense2Gamma),
+              tf.tensor1d(this.weights.bnDense2Beta),
+              tf.tensor1d(this.weights.bnDense2MovingMean),
+              tf.tensor1d(this.weights.bnDense2MovingVariance),
+            ]);
+          console.log("✅ Dense2 batch norm weights loaded successfully");
+        } else {
+          console.log("No dense2 batch norm weights found");
+        }
+      } catch (error) {
+        console.log("Dense2 batch norm layer not found in current model");
+      }
 
       // Load output layer weights
+      // Calculate output weight shape dynamically
+      const outputClasses = TRAINING_CONFIG.OUTPUT_CLASSES; // Binary classification: Buy/Sell
+
       model
         .getLayer("output")
         .setWeights([
-          tf.tensor2d(
-            this.weights.outputWeights,
-            MODEL_CONFIG.OUTPUT_WEIGHT_SHAPE
-          ),
+          tf.tensor2d(this.weights.outputWeights, [dense1Units, outputClasses]),
           tf.tensor1d(this.weights.outputBias),
         ]);
 

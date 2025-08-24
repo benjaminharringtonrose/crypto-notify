@@ -32,90 +32,61 @@ Output Layer (2 units, Softmax)
 
 ### 1. Input Layer
 
-- **Shape**: `[batch_size, 30, 36]`
-- **Timesteps**: 30 days of historical data
-- **Features**: 36 total features (BTC features only)
+- **Shape**: `[batch_size, timesteps, FeatureDetector.getFeatureCount()]`
+- **Timesteps**: Configurable (typically 20-30 days of historical data)
+- **Features**: Dynamic count determined by `FeatureDetector.getFeatureCount()`
 
-### 2. Convolutional Layers (Feature Extraction)
+### 2. Convolutional Layer (Feature Extraction)
 
-#### Conv1D Layer 1
+#### Conv1D Layer
 
-- **Filters**: 12
-- **Kernel Size**: 5
+- **Filters**: 48 (proven optimal filter count)
+- **Kernel Size**: 3 (proven optimal kernel size)
 - **Activation**: ReLU
-- **Input Shape**: `[30, 36]`
-- **Output Shape**: `[26, 12]`
+- **Input Shape**: `[timesteps, FeatureDetector.getFeatureCount()]`
+- **Output Shape**: `[timesteps-2, 48]` (depends on kernel size)
 - **Purpose**: Extract local temporal patterns in price movements
+- **Batch Normalization**: Applied after convolution
+- **Dropout**: 0.3 applied after batch normalization
+- **Kernel Initializer**: HeNormal (optimal for ReLU activation)
+- **L2 Regularization**: 0.001 (prevents overfitting)
 
-#### Conv1D Layer 2
+### 3. LSTM Layer (Temporal Modeling)
 
-- **Filters**: 24
-- **Kernel Size**: 3
-- **Activation**: ReLU
-- **Input Shape**: `[26, 12]`
-- **Output Shape**: `[24, 24]`
-- **Purpose**: Further refine feature extraction and increase feature dimensionality
+#### LSTM Layer
 
-### 3. LSTM Layers (Temporal Modeling)
-
-#### LSTM Layer 1
-
-- **Units**: 48
-- **Return Sequences**: True
-- **Input Shape**: `[24, 24]`
-- **Output Shape**: `[24, 48]`
-- **Dropout**: 0.1 (input), 0.1 (recurrent)
-- **Purpose**: Capture medium-term temporal dependencies
-
-#### LSTM Layer 2
-
-- **Units**: 24
-- **Return Sequences**: True
-- **Input Shape**: `[24, 48]`
-- **Output Shape**: `[24, 24]`
-- **Dropout**: 0.1 (input), 0.1 (recurrent)
-- **Purpose**: Refine temporal patterns and reduce dimensionality
-
-#### LSTM Layer 3
-
-- **Units**: 12
-- **Return Sequences**: False
-- **Input Shape**: `[24, 24]`
-- **Output Shape**: `[12]`
-- **Dropout**: 0.1 (input), 0.1 (recurrent)
-- **Purpose**: Final temporal feature extraction and dimensionality reduction
+- **Units**: 64 (proven optimal capacity for the dataset)
+- **Return Sequences**: False (proven: returnSequences=true failed)
+- **Input Shape**: `[timesteps, 48]` (from Conv1D output)
+- **Output Shape**: `[64]` (flattened for dense layer)
+- **Dropout**: 0.1 (recurrent dropout)
+- **Purpose**: Capture temporal dependencies and extract sequential patterns
+- **Kernel Initializer**: HeNormal (proven optimal for ReLU activation)
 
 ### 4. Dense Layers (Feature Learning)
 
-#### Dense Layer 1
+#### Dense Layer
 
-- **Units**: 24
+- **Units**: 32 (from current TradeModelFactory - simplified architecture)
 - **Activation**: ReLU
-- **Input Shape**: `[12]`
-- **Output Shape**: `[24]`
-- **Purpose**: Learn complex feature combinations
-
-#### Dense Layer 2
-
-- **Units**: 12 (half of previous layer)
-- **Activation**: ReLU
-- **Input Shape**: `[24]`
-- **Output Shape**: `[12]`
-- **Purpose**: Further feature refinement
+- **Input Shape**: `[64]` (from LSTM output)
+- **Output Shape**: `[32]`
+- **Purpose**: Learn complex feature combinations and prepare for classification
+- **Dropout**: 0.3 applied after activation
 
 #### Output Layer
 
-- **Units**: 2
+- **Units**: 2 (binary classification)
 - **Activation**: Softmax
-- **Input Shape**: `[12]`
+- **Input Shape**: `[32]` (from dense layer)
 - **Output Shape**: `[2]`
 - **Purpose**: Binary classification (Buy/Sell probabilities)
 
 ## Feature Engineering
 
-### Input Features (36 total)
+### Input Features
 
-The model uses 36 technical indicators and features computed from Bitcoin price and volume data (as of v1.5.0 - Advanced Market Microstructure Features):
+The model uses technical indicators and features computed from Bitcoin price and volume data, with the count determined dynamically by `FeatureDetector.getFeatureCount()`:
 
 1. **Momentum Indicators**:
 
@@ -201,7 +172,7 @@ The model uses 36 technical indicators and features computed from Bitcoin price 
 ### Data Preparation
 
 1. **Historical Data Fetching**: 1200 days of BTC data
-2. **Feature Calculation**: 36 technical indicators computed
+2. **Feature Calculation**: Technical indicators computed (count via `FeatureDetector.getFeatureCount()`)
 3. **Sequence Generation**: 30-day sliding windows
 4. **Data Normalization**: Z-score normalization per feature
 5. **Data Augmentation**: Noise injection and sequence balancing

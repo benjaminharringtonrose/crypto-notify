@@ -88,7 +88,7 @@ interface LabelParams {
 ```typescript
 interface ModelConfig {
   timesteps: number; // Number of timesteps in sequences
-  BTC_FEATURE_COUNT: number; // Number of BTC features (36)
+  // Number of BTC features determined dynamically by FeatureDetector.getFeatureCount()
 }
 ```
 
@@ -399,7 +399,7 @@ console.log(`Custom label: ${customLabel}`);
 
 ```typescript
 const FEATURE_CONFIG = {
-  BTC_FEATURE_COUNT: 36, // Number of BTC features
+  // Number of BTC features obtained dynamically via FeatureDetector.getFeatureCount()
   TIMESTEPS: 30, // Sequence length
   LOOKAHEAD_DAYS: 7, // Labeling lookahead
   PRICE_CHANGE_THRESHOLD: 0.02, // 2% price change threshold

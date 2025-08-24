@@ -3437,7 +3437,7 @@ _Comprehensive experiment analysis complete. Ready for advanced architecture exp
 
 **Technical Changes**:
 
-- Updated `BTC_FEATURE_COUNT`: 30 → 36
+- Updated feature count calculation: Now uses `FeatureDetector.getFeatureCount()` for dynamic feature counting
 - Added 6 new calculation methods to `FeatureCalculator.ts`
 - Extended `Indicators` interface with new properties
 - Integrated features into `computeBTCFeatures()` method

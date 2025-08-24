@@ -199,7 +199,7 @@ Implements rule-based trading logic.
 // Model architecture parameters
 const MODEL_CONFIG = {
   TIMESTEPS: 30,
-  BTC_FEATURE_COUNT: 62,
+  // BTC feature count determined dynamically by FeatureDetector.getFeatureCount()
   LSTM_UNITS_1: 48,
   LSTM_UNITS_2: 24,
   DROPOUT_RATE: 0.35,

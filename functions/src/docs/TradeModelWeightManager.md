@@ -175,20 +175,41 @@ private validateWeights(): void {
 
 ```typescript
 // Conv1D Layer 1
+// Calculate shape dynamically based on current feature count
+const kernelSize = 3;
+const filters = 48;
+const featureCount = FeatureDetector.getFeatureCount();
+
 model
   .getLayer("conv1d_input")
   .setWeights([
-    tf.tensor3d(this.weights.conv1Weights, MODEL_CONFIG.CONV1D_1_WEIGHT_SHAPE),
+    tf.tensor3d(this.weights.conv1Weights, [kernelSize, featureCount, filters]),
     tf.tensor1d(this.weights.conv1Bias),
   ]);
 
-// Conv1D Layer 2
-model
-  .getLayer("conv1d_2")
-  .setWeights([
-    tf.tensor3d(this.weights.conv2Weights, MODEL_CONFIG.CONV1D_2_WEIGHT_SHAPE),
-    tf.tensor1d(this.weights.conv2Bias),
-  ]);
+// Conv1D Layer 2 (OPTIONAL - only exists in older model architectures)
+try {
+  if (this.weights.conv2Weights && this.weights.conv2Weights.length > 0) {
+    const conv2KernelSize = 3;
+    const conv2InputFilters = 48;
+    const conv2OutputFilters = 64;
+
+    model
+      .getLayer("conv1d_2")
+      .setWeights([
+        tf.tensor3d(this.weights.conv2Weights, [
+          conv2KernelSize,
+          conv2InputFilters,
+          conv2OutputFilters,
+        ]),
+        tf.tensor1d(this.weights.conv2Bias),
+      ]);
+  }
+} catch (error) {
+  console.log(
+    "Conv1D layer 2 not found in current model - using simplified architecture"
+  );
+}
 ```
 
 **Weight Shapes**:
@@ -200,41 +221,39 @@ model
 ##### LSTM Layers
 
 ```typescript
-// LSTM Layer 1
-model
-  .getLayer("lstm1")
-  .setWeights([
-    tf.tensor2d(this.weights.lstm1Weights, MODEL_CONFIG.LSTM1_WEIGHT_SHAPE),
-    tf.tensor2d(
-      this.weights.lstm1RecurrentWeights,
-      MODEL_CONFIG.LSTM1_RECURRENT_SHAPE
-    ),
-    tf.tensor1d(this.weights.lstm1Bias),
-  ]);
+// LSTM Layer - OPTIONAL (current simplified model only has one LSTM layer)
+// Calculate LSTM weight shapes dynamically based on current model architecture
+try {
+  if (this.weights.lstm1Weights && this.weights.lstm1Weights.length > 0) {
+    const inputFeatures = 48; // From Conv1D output filters
+    const lstmUnits = 64; // From TradeModelFactory - LSTM units
+    const gateParams = 4; // LSTM has 4 gates (forget, input, candidate, output)
 
-// LSTM Layer 2
-model
-  .getLayer("lstm2")
-  .setWeights([
-    tf.tensor2d(this.weights.lstm2Weights, MODEL_CONFIG.LSTM2_WEIGHT_SHAPE),
-    tf.tensor2d(
-      this.weights.lstm2RecurrentWeights,
-      MODEL_CONFIG.LSTM2_RECURRENT_SHAPE
-    ),
-    tf.tensor1d(this.weights.lstm2Bias),
-  ]);
+    model
+      .getLayer("lstm")
+      .setWeights([
+        tf.tensor2d(this.weights.lstm1Weights, [
+          inputFeatures,
+          lstmUnits * gateParams,
+        ]),
+        tf.tensor2d(this.weights.lstm1RecurrentWeights, [
+          lstmUnits,
+          lstmUnits * gateParams,
+        ]),
+        tf.tensor1d(this.weights.lstm1Bias),
+      ]);
+    console.log("✅ LSTM weights loaded successfully");
+  } else {
+    console.log("No LSTM weights found - using fresh initialization");
+  }
+} catch (error) {
+  console.log(
+    "LSTM layer not found in current model - using simplified architecture"
+  );
+}
 
-// LSTM Layer 3
-model
-  .getLayer("lstm3")
-  .setWeights([
-    tf.tensor2d(this.weights.lstm3Weights, MODEL_CONFIG.LSTM3_WEIGHT_SHAPE),
-    tf.tensor2d(
-      this.weights.lstm3RecurrentWeights,
-      MODEL_CONFIG.LSTM3_RECURRENT_SHAPE
-    ),
-    tf.tensor1d(this.weights.lstm3Bias),
-  ]);
+// Additional LSTM layers (OPTIONAL - only existed in older complex architectures)
+// Current simplified model only uses one LSTM layer
 ```
 
 **LSTM Weight Structure**:
@@ -303,26 +322,41 @@ model
 
 ```typescript
 // Dense Layer 1
+// Calculate dense weight shapes dynamically based on current model architecture
+const lstmUnits = 64; // From TradeModelFactory - LSTM output size
+const dense1Units = 32; // From TradeModelFactory - proven optimal dense layer size
+
 model
-  .getLayer("dense_1")
+  .getLayer("dense1")
   .setWeights([
-    tf.tensor2d(this.weights.dense1Weights, MODEL_CONFIG.DENSE_1_WEIGHT_SHAPE),
+    tf.tensor2d(this.weights.dense1Weights, [lstmUnits, dense1Units]),
     tf.tensor1d(this.weights.dense1Bias),
   ]);
 
-// Dense Layer 2 (dense_1_5)
-model
-  .getLayer("dense_1_5")
-  .setWeights([
-    tf.tensor2d(this.weights.dense2Weights, MODEL_CONFIG.DENSE_2_WEIGHT_SHAPE),
-    tf.tensor1d(this.weights.dense2Bias),
-  ]);
+// Dense Layer 2 - OPTIONAL (current model only has one dense layer)
+try {
+  if (this.weights.dense2Weights && this.weights.dense2Weights.length > 0) {
+    const dense2Units = 16; // Typical half of dense1 if it exists
+    model
+      .getLayer("dense2")
+      .setWeights([
+        tf.tensor2d(this.weights.dense2Weights, [dense1Units, dense2Units]),
+        tf.tensor1d(this.weights.dense2Bias),
+      ]);
+  }
+} catch (error) {
+  console.log("Dense layer 2 not found in current model");
+}
 
 // Output Layer
+// Calculate output weight shape dynamically
+const dense1Units = 32; // From TradeModelFactory - proven optimal dense layer size
+const outputClasses = TRAINING_CONFIG.OUTPUT_CLASSES; // Binary classification: Buy/Sell
+
 model
   .getLayer("output")
   .setWeights([
-    tf.tensor2d(this.weights.outputWeights, MODEL_CONFIG.OUTPUT_WEIGHT_SHAPE),
+    tf.tensor2d(this.weights.outputWeights, [dense1Units, outputClasses]),
     tf.tensor1d(this.weights.outputBias),
   ]);
 ```
@@ -338,12 +372,14 @@ model
 #### Feature Normalization Parameters
 
 ```typescript
+import { FeatureDetector } from "./FeatureDetector";
+
 public getFeatureMeans(): number[] {
-  return this.weights?.featureMeans || Array(MODEL_CONFIG.FEATURE_COUNT).fill(0);
+  return this.weights?.featureMeans || Array(FeatureDetector.getFeatureCount()).fill(0);
 }
 
 public getFeatureStds(): number[] {
-  return this.weights?.featureStds || Array(MODEL_CONFIG.FEATURE_COUNT).fill(1);
+  return this.weights?.featureStds || Array(FeatureDetector.getFeatureCount()).fill(1);
 }
 ```
 
@@ -352,7 +388,7 @@ public getFeatureStds(): number[] {
 
 - **Means**: Zero-mean normalization (no shift)
 - **Stds**: Unit variance normalization (no scaling)
-- **Feature Count**: Uses `MODEL_CONFIG.FEATURE_COUNT` constant (36 features)
+- **Feature Count**: Uses `FeatureDetector.getFeatureCount()` to dynamically determine feature count
 
 #### Normalization Application
 
@@ -373,18 +409,16 @@ const normalizedFeatures = features.sub(featureMeans).div(featureStds);
 import { MODEL_CONFIG } from "../constants";
 
 // Weight shapes for validation
-CONV1D_1_WEIGHT_SHAPE: [5, 36, 12]; // [kernelSize, features, filters]
-CONV1D_2_WEIGHT_SHAPE: [3, 12, 24]; // [kernelSize, filters, filters]
-LSTM1_WEIGHT_SHAPE: [24, 192]; // [inputFeatures, units * 4]
-LSTM1_RECURRENT_SHAPE: [48, 192]; // [units, units * 4]
-LSTM2_WEIGHT_SHAPE: [48, 96]; // [inputFeatures, units * 4]
-LSTM2_RECURRENT_SHAPE: [24, 96]; // [units, units * 4]
-LSTM3_WEIGHT_SHAPE: [24, 48]; // [inputFeatures, units * 4]
-LSTM3_RECURRENT_SHAPE: [12, 48]; // [units, units * 4]
-DENSE_1_WEIGHT_SHAPE: [12, 24]; // [inputFeatures, outputFeatures]
-DENSE_2_WEIGHT_SHAPE: [24, 12]; // [inputFeatures, outputFeatures]
-OUTPUT_WEIGHT_SHAPE: [12, 2]; // [inputFeatures, outputFeatures]
-FEATURE_COUNT: 36; // Total features
+// DEPRECATED: All weight shapes now calculated dynamically
+// Old approach: Static constants for all layer shapes
+// New approach: Calculate all shapes dynamically based on current model architecture
+
+// Examples of dynamic weight shape calculation:
+// Conv1D: [kernelSize, FeatureDetector.getFeatureCount(), filters]
+// LSTM: [inputFeatures, units * 4] and [units, units * 4] for recurrent
+// Dense: [inputFeatures, outputFeatures]
+// Output: [dense1Units, TRAINING_CONFIG.OUTPUT_CLASSES]
+// Total features obtained dynamically via FeatureDetector.getFeatureCount()
 ```
 
 ### File Names Configuration
@@ -421,11 +455,12 @@ try {
 import * as tf from "@tensorflow/tfjs-node";
 import { ModelWeightManager } from "./TradeModelWeightManager";
 import TradeModelFactory from "./TradeModelFactory";
+import { FeatureDetector } from "./FeatureDetector";
 
 // Create model and load weights
 const factory = new TradeModelFactory(
   MODEL_CONFIG.TIMESTEPS,
-  MODEL_CONFIG.FEATURE_COUNT
+  FeatureDetector.getFeatureCount()
 );
 const model = factory.createModel();
 
@@ -459,12 +494,14 @@ const prediction = model.predict(normalizedFeatures);
 ### Complete Model Initialization
 
 ```typescript
+import { FeatureDetector } from "./FeatureDetector";
+
 async function initializeTradingModel() {
   try {
     // 1. Create model architecture
     const factory = new TradeModelFactory(
       MODEL_CONFIG.TIMESTEPS,
-      MODEL_CONFIG.FEATURE_COUNT
+      FeatureDetector.getFeatureCount()
     );
     const model = factory.createModel();
 
@@ -545,7 +582,11 @@ if (Object.values(this.weights).some((w: any) => !w || isNaN(w[0]))) {
 ```typescript
 // Tensor creation with MODEL_CONFIG shapes
 try {
-  tf.tensor3d(this.weights.conv1Weights, MODEL_CONFIG.CONV1D_1_WEIGHT_SHAPE);
+  // Calculate shape dynamically
+  const kernelSize = 3;
+  const filters = 48;
+  const featureCount = FeatureDetector.getFeatureCount();
+  tf.tensor3d(this.weights.conv1Weights, [kernelSize, featureCount, filters]);
 } catch (error) {
   console.error("Weight shape mismatch:", error);
   this.weights = null;

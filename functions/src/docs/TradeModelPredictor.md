@@ -205,9 +205,10 @@ if (!sequence || sequence.length !== this.timesteps) {
 
 ```typescript
 // Prepare input tensor
+// Note: Import FeatureDetector first: import { FeatureDetector } from "./FeatureDetector";
 const inputTensor = tf.tensor3d(
   [sequence],
-  [1, this.timesteps, MODEL_CONFIG.FEATURE_COUNT]
+  [1, this.timesteps, FeatureDetector.getFeatureCount()]
 );
 
 // Execute prediction
@@ -451,7 +452,7 @@ if (marketMetrics.rsi < 30 && marketMetrics.momentum > 0) {
 ```typescript
 const PREDICTION_CONFIG = {
   TIMESTEPS: 30, // Sequence length
-  FEATURE_COUNT: 36, // Number of features
+  // Number of features obtained dynamically via FeatureDetector.getFeatureCount()
   CONFIDENCE_THRESHOLD: 0.6, // Minimum confidence for action
   VOLATILITY_THRESHOLD: 0.05, // High volatility threshold
   TREND_THRESHOLD: 0.02, // Strong trend threshold

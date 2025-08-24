@@ -77,9 +77,10 @@ console.log(
 const modelFactory = new TradeModelFactory();
 
 // Build neural network architecture
+// Note: Import FeatureDetector first: import { FeatureDetector } from "./FeatureDetector";
 const model = modelFactory.createModel({
   timesteps: MODEL_CONFIG.TIMESTEPS,
-  featureCount: MODEL_CONFIG.FEATURE_COUNT,
+  featureCount: FeatureDetector.getFeatureCount(),
   lstmUnits: [48, 24, 12],
   dropoutRate: 0.35,
   l2Regularization: 0.008,
@@ -165,7 +166,7 @@ console.log("Model weights saved to Firebase Storage");
 ```typescript
 const MODEL_CONFIG = {
   TIMESTEPS: 30, // Sequence length
-  FEATURE_COUNT: 36, // BTC features
+  // BTC features obtained dynamically via FeatureDetector.getFeatureCount()
   LSTM_UNITS_1: 48, // First LSTM layer units
   LSTM_UNITS_2: 24, // Second LSTM layer units
   LSTM_UNITS_3: 12, // Third LSTM layer units
@@ -288,7 +289,7 @@ if (trainingData.sequences.length < 100) {
   throw new Error("Insufficient training data");
 }
 
-if (trainingData.sequences[0][0].length !== MODEL_CONFIG.FEATURE_COUNT) {
+if (trainingData.sequences[0][0].length !== FeatureDetector.getFeatureCount()) {
   throw new Error("Feature count mismatch");
 }
 
@@ -306,7 +307,7 @@ if (inputShape[1] !== MODEL_CONFIG.TIMESTEPS) {
   throw new Error("Model timesteps mismatch");
 }
 
-if (inputShape[2] !== MODEL_CONFIG.FEATURE_COUNT) {
+if (inputShape[2] !== FeatureDetector.getFeatureCount()) {
   throw new Error("Model feature count mismatch");
 }
 
@@ -401,7 +402,7 @@ describe("Data Preparation", () => {
     expect(trainingData.sequences.length).toBeGreaterThan(0);
     expect(trainingData.labels.length).toBe(trainingData.sequences.length);
     expect(trainingData.sequences[0][0].length).toBe(
-      MODEL_CONFIG.FEATURE_COUNT
+      FeatureDetector.getFeatureCount()
     );
   });
 });
@@ -413,7 +414,7 @@ describe("Model Creation", () => {
     const model = modelFactory.createModel(MODEL_CONFIG);
 
     expect(model.inputs[0].shape[1]).toBe(MODEL_CONFIG.TIMESTEPS);
-    expect(model.inputs[0].shape[2]).toBe(MODEL_CONFIG.FEATURE_COUNT);
+    expect(model.inputs[0].shape[2]).toBe(FeatureDetector.getFeatureCount());
     expect(model.outputs[0].shape[1]).toBe(MODEL_CONFIG.OUTPUT_UNITS);
   });
 });

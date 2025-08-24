@@ -68,7 +68,7 @@ export const STRATEGY_CONFIG = {
   ATR_POSITION_THRESHOLD: 0.06, // Increased for better volatility control
 };
 
-const MODEL_CONFIG_BASE = {
+export const MODEL_CONFIG = {
   CONV1D_FILTERS_1: 32, // Much smaller for faster training
   CONV1D_FILTERS_2: 64, // Much smaller for faster training
   CONV1D_KERNEL_SIZE_1: 5, // Smaller kernel for faster training
@@ -85,64 +85,7 @@ const MODEL_CONFIG_BASE = {
   ATTENTION_UNITS_2: 16, // Much smaller for faster training
   RESIDUAL_UNITS_1: 32, // Much smaller for faster training
   RESIDUAL_UNITS_2: 16, // Much smaller for faster training
-  FEATURE_COUNT: 30, // v1.4.0: Enhanced feature set with multi-timeframe indicators
-  BTC_FEATURE_COUNT: 36, // v1.5.0: EXPERIMENT #61 - Advanced Market Microstructure Features
   TIMESTEPS: 35, // v1.3.0: Increased for monthly cycle capture in 7-day predictions
-};
-
-export const MODEL_CONFIG = {
-  ...MODEL_CONFIG_BASE,
-  LSTM1_INPUT_FEATURES: MODEL_CONFIG_BASE.CONV1D_FILTERS_2,
-  CONV1D_1_WEIGHT_SHAPE: [
-    MODEL_CONFIG_BASE.CONV1D_KERNEL_SIZE_1,
-    MODEL_CONFIG_BASE.FEATURE_COUNT,
-    MODEL_CONFIG_BASE.CONV1D_FILTERS_1,
-  ] as [number, number, number],
-  CONV1D_2_WEIGHT_SHAPE: [
-    MODEL_CONFIG_BASE.CONV1D_KERNEL_SIZE_2,
-    MODEL_CONFIG_BASE.CONV1D_FILTERS_1,
-    MODEL_CONFIG_BASE.CONV1D_FILTERS_2,
-  ] as [number, number, number],
-  LSTM1_WEIGHT_SHAPE: [
-    MODEL_CONFIG_BASE.CONV1D_FILTERS_2,
-    MODEL_CONFIG_BASE.LSTM_UNITS_1 * 4,
-  ] as [number, number],
-  LSTM1_RECURRENT_SHAPE: [
-    MODEL_CONFIG_BASE.LSTM_UNITS_1,
-    MODEL_CONFIG_BASE.LSTM_UNITS_1 * 4,
-  ] as [number, number],
-  LSTM2_WEIGHT_SHAPE: [
-    MODEL_CONFIG_BASE.LSTM_UNITS_1,
-    MODEL_CONFIG_BASE.LSTM_UNITS_2 * 4,
-  ] as [number, number],
-  LSTM2_RECURRENT_SHAPE: [
-    MODEL_CONFIG_BASE.LSTM_UNITS_2,
-    MODEL_CONFIG_BASE.LSTM_UNITS_2 * 4,
-  ] as [number, number],
-  LSTM3_WEIGHT_SHAPE: [
-    MODEL_CONFIG_BASE.LSTM_UNITS_2,
-    MODEL_CONFIG_BASE.LSTM_UNITS_3 * 4,
-  ] as [number, number],
-  LSTM3_RECURRENT_SHAPE: [
-    MODEL_CONFIG_BASE.LSTM_UNITS_3,
-    MODEL_CONFIG_BASE.LSTM_UNITS_3 * 4,
-  ] as [number, number],
-  TIME_DISTRIBUTED_WEIGHT_SHAPE: [
-    MODEL_CONFIG_BASE.LSTM_UNITS_3,
-    MODEL_CONFIG_BASE.TIME_DISTRIBUTED_DENSE_UNITS,
-  ] as [number, number],
-  DENSE_1_WEIGHT_SHAPE: [
-    MODEL_CONFIG_BASE.LSTM_UNITS_3,
-    MODEL_CONFIG_BASE.DENSE_UNITS_1,
-  ] as [number, number],
-  DENSE_2_WEIGHT_SHAPE: [
-    MODEL_CONFIG_BASE.DENSE_UNITS_1,
-    Math.floor(MODEL_CONFIG_BASE.DENSE_UNITS_1 / 2),
-  ] as [number, number],
-  OUTPUT_WEIGHT_SHAPE: [
-    Math.floor(MODEL_CONFIG_BASE.DENSE_UNITS_1 / 2),
-    MODEL_CONFIG_BASE.OUTPUT_UNITS,
-  ] as [number, number],
 };
 
 export const TRAINING_CONFIG = {
@@ -174,6 +117,6 @@ export const TIME_CONVERSIONS = {
   ONE_HOUR_IN_SECONDS: 3600,
   ONE_DAY_IN_MILLISECONDS: 86400000,
   ONE_DAY_IN_SECONDS: 86400,
-  TIMESTEP_IN_SECONDS: MODEL_CONFIG_BASE.TIMESTEPS * 86400, // v1.3.0: Updated with 35 timesteps
+  TIMESTEP_IN_SECONDS: MODEL_CONFIG.TIMESTEPS * 86400, // v1.3.0: Updated with 35 timesteps
   ONE_MONTH_IN_DAYS: 30,
 };

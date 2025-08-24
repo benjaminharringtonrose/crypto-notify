@@ -113,10 +113,11 @@ if (X[0].length !== this.config.timesteps) {
 #### Tensor Creation
 
 ```typescript
+// Note: Import FeatureDetector first: import { FeatureDetector } from "./FeatureDetector";
 const X_tensor = tf.tensor3d(X, [
   X.length,
   this.config.timesteps,
-  MODEL_CONFIG.FEATURE_COUNT,
+  FeatureDetector.getFeatureCount(),
 ]);
 
 const y_tensor = tf.tensor2d(
@@ -234,9 +235,10 @@ const valDataset = tf.data
 #### Model Initialization
 
 ```typescript
+// Note: Import FeatureDetector first: import { FeatureDetector } from "./FeatureDetector";
 const factory = new TradeModelFactory(
   this.config.timesteps,
-  MODEL_CONFIG.FEATURE_COUNT
+  FeatureDetector.getFeatureCount()
 );
 this.model = factory.createModel();
 ```

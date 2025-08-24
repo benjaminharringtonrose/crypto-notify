@@ -154,8 +154,11 @@ sequence.push(features);
 ### 5. Sequence Padding
 
 ```typescript
+// Note: Import FeatureDetector first: import { FeatureDetector } from "./FeatureDetector";
 while (sequence.length < this.timesteps) {
-  sequence.unshift(sequence[0] || Array(MODEL_CONFIG.FEATURE_COUNT).fill(0));
+  sequence.unshift(
+    sequence[0] || Array(FeatureDetector.getFeatureCount()).fill(0)
+  );
 }
 ```
 
@@ -163,11 +166,11 @@ while (sequence.length < this.timesteps) {
 
 ### Total Feature Count
 
-- **BTC Features**: 36 technical indicators and patterns (as of v1.5.0)
+- **BTC Features**: Dynamic number of technical indicators and patterns determined by `FeatureDetector.getFeatureCount()`
 
 ### Feature Categories
 
-The feature sequence consists of 36 comprehensive technical analysis features (as of v1.5.0 - Advanced Market Microstructure Features):
+The feature sequence consists of comprehensive technical analysis features determined dynamically by `FeatureDetector.getFeatureCount()`:
 
 1. **Technical Indicators**: RSI, MACD, SMA, ATR, Bollinger Bands, Stochastic RSI
 2. **Market Regime Features**: Volatility, trend, and momentum regime scores
@@ -195,7 +198,7 @@ const sequence = generator.generateSequence(
 );
 
 console.log(`Sequence shape: ${sequence.length} × ${sequence[0].length}`);
-// Output: Sequence shape: 20 × 36
+// Output: Sequence shape: 20 × [FeatureDetector.getFeatureCount()]
 ```
 
 ### Batch Sequence Generation
@@ -215,7 +218,7 @@ console.log(
   `Each sequence: ${batchSequences[0].length} × ${batchSequences[0][0].length}`
 );
 // Output: Generated 80 sequences
-// Output: Each sequence: 20 × 36
+// Output: Each sequence: 20 × [FeatureDetector.getFeatureCount()]
 ```
 
 ### Training Data Preparation
@@ -237,7 +240,7 @@ const y = generateLabels(trainingSequences); // Labels
 console.log(
   `Training data shape: ${X.length} × ${X[0].length} × ${X[0][0].length}`
 );
-// Output: Training data shape: 1000 × 20 × 36
+// Output: Training data shape: 1000 × 20 × [FeatureDetector.getFeatureCount()]
 ```
 
 ## Configuration

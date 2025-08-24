@@ -1,14 +1,4 @@
-export interface CoinGeckoPriceResponse {
-  bitcoin: {
-    usd: number;
-  };
-}
 
-export interface CoinGeckoMarketChartResponse {
-  prices: [number, number][];
-  market_caps: [number, number][];
-  total_volumes: [number, number][];
-}
 
 export interface Indicators {
   rsi: number;
@@ -64,12 +54,7 @@ export interface Indicators {
   vpt: number;
 }
 
-export interface StrategyResult {
-  buyProb: number;
-  sellProb: number;
-  holdProb: number;
-  recommendation: Recommendation;
-}
+
 
 export interface Probabilities {
   buy: number;
@@ -77,35 +62,7 @@ export interface Probabilities {
   sell: number;
 }
 
-export interface TradeDecision {
-  currentPrice: number;
-  rsi?: string;
-  sma7: string;
-  sma21: string;
-  macdLine: string;
-  signalLine: string;
-  sma20: string;
-  upperBand: string;
-  lowerBand: string;
-  obv: string;
-  atr: string;
-  zScore: string;
-  vwap: string;
-  stochRsi: string;
-  stochRsiSignal: string;
-  fib61_8: string;
-  volumeOscillator: string;
-  metConditions: string[];
-  probabilities: Probabilities;
-  recommendation: Recommendation;
-  timestamp: any;
-  profitPotential: number;
-  isDoubleTop: boolean;
-  isTripleTop: boolean;
-  isHeadAndShoulders: boolean;
-  isTripleBottom: boolean;
-  momentum: number;
-}
+
 
 export interface TradeRecommendation {
   probability: number;

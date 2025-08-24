@@ -5,7 +5,6 @@ export class PredictionLoggerCallback {
   private model: tf.LayersModel | null = null;
   private X_val: tf.Tensor;
   private y_val: tf.Tensor;
-  private trainer: TradeModelTrainer;
   private epochCount: number = 0;
   private bestBuyF1: number = 0;
   private bestBalancedAccuracy: number = 0;
@@ -13,7 +12,6 @@ export class PredictionLoggerCallback {
   constructor(X_val: tf.Tensor, y_val: tf.Tensor, trainer: TradeModelTrainer) {
     this.X_val = X_val;
     this.y_val = y_val;
-    this.trainer = trainer;
   }
 
   setModel(model: tf.LayersModel): void {

@@ -12,7 +12,6 @@ export const PERIODS = {
   EMA_SHORT: 12,
   EMA_LONG: 26,
   MACD_SIGNAL: 9,
-  BOLLINGER: 20,
   ATR: 14,
   VWAP: 7,
   STOCH_RSI: 14,
@@ -67,9 +66,6 @@ export const STRATEGY_CONFIG = {
   VOLUME_MULTIPLIER: 0.1, // Much more permissive for volume
   TREND_STRENGTH_REVERSAL_THRESHOLD: -0.015, // Increased for better trend signals
   ATR_POSITION_THRESHOLD: 0.06, // Increased for better volatility control
-  BUY_PROB_MAX_MULTIPLIER: 1.8, // Reduced for more conservative approach
-  CONSECUTIVE_BUYS_MAX: 3, // Reduced for better risk management
-  CONSECUTIVE_BUY_CONFIDENCE_LEVELS: [0.3, 0.35, 0.4], // Increased confidence levels
 };
 
 const MODEL_CONFIG_BASE = {
@@ -92,127 +88,6 @@ const MODEL_CONFIG_BASE = {
   FEATURE_COUNT: 30, // v1.4.0: Enhanced feature set with multi-timeframe indicators
   BTC_FEATURE_COUNT: 36, // v1.5.0: EXPERIMENT #61 - Advanced Market Microstructure Features
   TIMESTEPS: 35, // v1.3.0: Increased for monthly cycle capture in 7-day predictions
-  BATCH_NORM_MOMENTUM: 0.99,
-  BATCH_NORM_EPSILON: 0.001,
-  ACTIVATION: "relu" as const,
-  RECURRENT_ACTIVATION: "sigmoid" as const,
-  KERNEL_INITIALIZER: "glorotNormal" as const,
-  RECURRENT_INITIALIZER: "orthogonal" as const,
-  BIAS_INITIALIZER: "zeros" as const,
-  KERNEL_REGULARIZER: "l2" as const,
-  RECURRENT_REGULARIZER: "l2" as const,
-  BIAS_REGULARIZER: "l2" as const,
-  ACTIVITY_REGULARIZER: "l2" as const,
-  KERNEL_CONSTRAINT: "maxNorm" as const,
-  RECURRENT_CONSTRAINT: "maxNorm" as const,
-  BIAS_CONSTRAINT: "maxNorm" as const,
-  DROPOUT_IMPLEMENTATION: 1,
-  UNROLL: false,
-  TIME_MAJOR: false,
-  GO_BACKWARDS: false,
-  STATEFUL: false,
-  RETURN_SEQUENCES: true,
-  RETURN_STATE: false,
-  IMPLEMENTATION: 1,
-  RESET_AFTER: true,
-  USE_BIAS: true,
-  TRAINABLE: true,
-  DYNAMIC: false,
-  INPUT_SHAPE: [35, 30] as [number, number], // v1.4.0: 35 timesteps, 30 enhanced features
-  OUTPUT_SHAPE: [2] as [number],
-  LOSS: "focalLoss" as const,
-  OPTIMIZER: "adam" as const,
-  METRICS: ["binaryAccuracy", "customF1Buy", "customF1Sell"] as const,
-  CALLBACKS: [
-    "earlyStopping",
-    "reduceLROnPlateau",
-    "modelCheckpoint",
-    "tensorBoard",
-    "csvLogger",
-    "gradientClipping",
-    "curriculumLearning",
-    "exponentialDecayLR",
-    "trainingLogger",
-    "predictionLogger",
-  ] as const,
-  COMPILE_OPTIONS: {
-    loss: "focalLoss",
-    optimizer: "adam",
-    metrics: ["binaryAccuracy", "customF1Buy", "customF1Sell"],
-  },
-  FIT_OPTIONS: {
-    epochs: 100,
-    batchSize: 64,
-    validationSplit: 0.15,
-    shuffle: true,
-    verbose: 1,
-    callbacks: [
-      "earlyStopping",
-      "reduceLROnPlateau",
-      "modelCheckpoint",
-      "tensorBoard",
-      "csvLogger",
-      "gradientClipping",
-      "curriculumLearning",
-      "exponentialDecayLR",
-      "trainingLogger",
-      "predictionLogger",
-    ],
-  },
-  PREDICT_OPTIONS: {
-    batchSize: 32,
-    verbose: 0,
-  },
-  EVALUATE_OPTIONS: {
-    batchSize: 32,
-    verbose: 0,
-  },
-  SAVE_OPTIONS: {
-    includeOptimizer: false,
-    saveFormat: "tfjs" as const,
-  },
-  LOAD_OPTIONS: {
-    customObjects: {},
-  },
-  SUMMARY_OPTIONS: {
-    lineLength: 80,
-    positions: [0.44, 0.62, 0.75, 1.0] as [number, number, number, number],
-  },
-  PLOT_OPTIONS: {
-    showShapes: true,
-    showLayerNames: true,
-    showLayerActivations: true,
-    showLayerWeights: true,
-    showLayerGradients: true,
-    showLayerOutputs: true,
-    showLayerInputs: true,
-    showLayerConfigs: true,
-    showLayerSummaries: true,
-    showLayerMetrics: true,
-  },
-  DEBUG_OPTIONS: {
-    verbose: true,
-    logLevel: "info" as const,
-    logFormat: "detailed" as const,
-    logTiming: true,
-    logMemory: true,
-    logGradients: true,
-    logWeights: true,
-    logActivations: true,
-    logPredictions: true,
-    logMetrics: true,
-    logCallbacks: true,
-    logTraining: true,
-    logValidation: true,
-    logTesting: true,
-    logInference: true,
-    logPerformance: true,
-    logOptimization: true,
-    logRegularization: true,
-    logNormalization: true,
-    logAugmentation: true,
-    logBalancing: true,
-  },
 };
 
 export const MODEL_CONFIG = {
@@ -291,39 +166,11 @@ export const TRAINING_CONFIG = {
   LR_DECAY_RATE: 0.8, // REDUCED: was 0.92, now 0.8 for more aggressive decay
   WARMUP_EPOCHS: 2, // REDUCED: was 5, now 2 for faster warmup
   WARMUP_INITIAL_LR: 0.0001, // INCREASED: was 0.00005, now 0.0001
-  ATTENTION_DROPOUT: 0.1, // REDUCED: was 0.15, now 0.1
-  RESIDUAL_DROPOUT: 0.1, // REDUCED: was 0.15, now 0.1
-  L2_REGULARIZATION: 0.0001, // REDUCED: was 0.0008, now 0.0001 for less constraint
-  BATCH_NORMALIZATION: false, // DISABLED: was true, now false for speed
-  USE_ATTENTION: false, // DISABLED: was true, now false for speed
-  USE_RESIDUAL_CONNECTIONS: false, // DISABLED: was true, now false for speed
-  USE_GRADIENT_CLIPPING: true,
-  USE_LEARNING_RATE_SCHEDULER: true,
-  USE_WARMUP: true,
-  USE_DROPOUT: true,
-  USE_L2_REGULARIZATION: true,
-  USE_BATCH_NORMALIZATION: false, // DISABLED: was true, now false for speed
-  VERBOSE: 1,
-  // CRITICAL FIX: Use stratified split instead of time-based split
-  TIME_BASED_SPLIT: false, // CHANGED: was true, now false for better learning
-  CALLBACKS: [
-    "earlyStopping",
-    "reduceLROnPlateau",
-    "modelCheckpoint",
-    "tensorBoard",
-    "csvLogger",
-    "gradientClipping",
-    "curriculumLearning",
-    "exponentialDecayLR",
-    "trainingLogger",
-    "predictionLogger",
-  ],
 };
 
 export const TIME_CONVERSIONS = {
   ONE_SECOND_IN_MILLISECONDS: 1000,
   THIRTY_MINUTES_IN_MILLISECONDS: 1800000,
-  ONE_MINUTE_IN_SECONDS: 60,
   ONE_HOUR_IN_SECONDS: 3600,
   ONE_DAY_IN_MILLISECONDS: 86400000,
   ONE_DAY_IN_SECONDS: 86400,

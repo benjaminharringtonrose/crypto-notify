@@ -156,13 +156,7 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
     experimentAdded: "Experiment #61",
     importance: "medium",
   },
-  {
-    name: "vpt",
-    description: "Volume-Price Trend (VPT)",
-    category: "microstructure",
-    experimentAdded: "Experiment #61",
-    importance: "high",
-  },
+
   {
     name: "volumeMA20",
     description: "20-day volume moving average",
@@ -255,6 +249,27 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
     description: "Price acceleration indicator",
     category: "microstructure",
     experimentAdded: "Experiment #5 - Price Acceleration",
+    importance: "medium",
+  },
+  {
+    name: "proc",
+    description: "Price Rate of Change (PROC)",
+    category: "microstructure",
+    experimentAdded: "Experiment #2 - PROC",
+    importance: "medium",
+  },
+  {
+    name: "stochRsi",
+    description: "Stochastic RSI (StochRSI)",
+    category: "microstructure",
+    experimentAdded: "Experiment #4 - StochRSI",
+    importance: "medium",
+  },
+  {
+    name: "vwma",
+    description: "Volume Weighted Moving Average (VWMA)",
+    category: "microstructure",
+    experimentAdded: "Experiment #5 - VWMA",
     importance: "medium",
   },
 ];

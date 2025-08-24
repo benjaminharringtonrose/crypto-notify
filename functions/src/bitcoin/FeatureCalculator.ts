@@ -612,6 +612,36 @@ export default class FeatureCalculator {
     return currentPrice > 0 ? acceleration / currentPrice : 0;
   }
 
+  public calculatePROC(prices: number[], period: number = 10): number {
+    if (prices.length < period + 1) return 0;
+
+    const currentPrice = prices[prices.length - 1];
+    const pastPrice = prices[prices.length - 1 - period];
+
+    // Calculate percentage change in price
+    return pastPrice > 0 ? ((currentPrice - pastPrice) / pastPrice) * 100 : 0;
+  }
+
+  public calculateVWMA(
+    prices: number[],
+    volumes: number[],
+    period: number = 20
+  ): number {
+    if (prices.length < period || volumes.length < period) return 0;
+
+    const recentPrices = prices.slice(-period);
+    const recentVolumes = volumes.slice(-period);
+
+    // Calculate volume-weighted moving average
+    const volumeSum = recentVolumes.reduce((sum, vol) => sum + vol, 0);
+    const vwma =
+      recentPrices.reduce((sum, price, index) => {
+        return sum + price * recentVolumes[index];
+      }, 0) / volumeSum;
+
+    return vwma;
+  }
+
   public calculateSlice(data: number[], periods: number, offset = 0): number[] {
     return data.slice(-periods - offset, offset === 0 ? undefined : -offset);
   }
@@ -1489,6 +1519,11 @@ export default class FeatureCalculator {
       priceAcceleration: this.calculatePriceAcceleration(
         prices.slice(0, dayIndex + 1)
       ),
+      proc: this.calculatePROC(prices.slice(0, dayIndex + 1)),
+      vwma: this.calculateVWMA(
+        prices.slice(0, dayIndex + 1),
+        volumes.slice(0, dayIndex + 1)
+      ),
     };
   }
 
@@ -1561,7 +1596,6 @@ export default class FeatureCalculator {
 
       // 21-27: Advanced Microstructure Features (7 features)
       indicators.williamsR, // Williams %R momentum oscillator
-      indicators.vpt, // Volume-Price Trend (VPT)
       volumes
         .slice(Math.max(0, dayIndex - 19), dayIndex + 1)
         .reduce((a, b) => a + b, 0) / Math.min(20, dayIndex + 1), // volumeMA20
@@ -1584,6 +1618,9 @@ export default class FeatureCalculator {
       indicators.fibonacciPosition, // Fibonacci Retracement position
       indicators.stochasticK, // Stochastic K oscillator
       indicators.priceAcceleration, // Price acceleration indicator
+      indicators.proc, // Price Rate of Change (PROC)
+      indicators.stochRsi, // Stochastic RSI (StochRSI)
+      indicators.vwma, // Volume Weighted Moving Average (VWMA)
     ];
 
     return optimizedFeatures;

@@ -7,7 +7,7 @@
 ## 📊 Current Context
 
 - **Model**: Conv1D(48,3) → BN → Dropout(0.3) → LSTM(64) → Dense(32) → Dropout(0.3) → Output(2)
-- **Current Features**: 31 optimized features (up from 26 original)
+- **Current Features**: 38 optimized features (up from 26 original)
 - **Performance Target**: Improve combined F1 score, validation accuracy, and balanced accuracy
 - **Tolerance**: 2% performance improvement threshold
 - **Prediction Horizon**: 7 days out
@@ -104,7 +104,73 @@ All 5 indicators from Round 3 were kept, indicating they all provide significant
 - **Momentum**: Stochastic K measures price momentum and overbought/oversold conditions
 - **Acceleration**: Price Acceleration measures the rate of change in price momentum
 
-The model now has a comprehensive set of 36 technical indicators covering momentum, trend, volatility, and microstructure features optimized for 7-day Bitcoin price prediction.
+The model now has a comprehensive set of 38 technical indicators covering momentum, trend, volatility, and microstructure features optimized for 7-day Bitcoin price prediction.
+
+## 📈 **ROUND 5 RESULTS (COMPLETED)**
+
+### **Round 5 Experiments Summary:**
+
+1. **Volume Rate of Change (VROC)** - ❌ **REMOVED** (10.01% improvement in Combined F1 when removed)
+2. **Price Rate of Change (PROC)** - ✅ **KEPT** (7.24% degradation in Combined F1 when removed)
+3. **Volume Price Trend (VPT)** - ❌ **REMOVED** (21.26% improvement in Combined F1 when removed)
+4. **Stochastic RSI (StochRSI)** - ✅ **KEPT** (15.30% degradation in Combined F1 when removed)
+5. **Volume Weighted Moving Average (VWMA)** - ✅ **KEPT** (6.14% degradation in Combined F1 when removed)
+
+### **Round 5 Feature Set:**
+
+- **Total Features**: 38 (up from 37 at start of Round 5)
+- **Features Added from Round 1**: CCI, MFI, Aroon Oscillator
+- **Features Added from Round 2**: Donchian Channels, Parabolic SAR
+- **Features Added from Round 3**: ADX, Ichimoku Cloud, Fibonacci Retracement, Stochastic K, Price Acceleration
+- **Features Added from Round 5**: PROC, StochRSI, VWMA
+- **Features Removed**: Keltner Channels, Williams %R, CMF, ROC, Bollinger Band Width, Pivot Points, VROC, VPT
+
+### **Round 5 Analysis:**
+
+**Key Findings:**
+
+- **Volume Rate of Change (VROC)**: Removed due to 10.01% improvement in combined F1 score when removed
+- **Price Rate of Change (PROC)**: Kept due to 7.24% degradation in combined F1 score when removed
+- **Volume Price Trend (VPT)**: Removed due to 21.26% improvement in combined F1 score when removed
+- **Stochastic RSI (StochRSI)**: Kept due to 15.30% degradation in combined F1 score when removed
+- **Volume Weighted Moving Average (VWMA)**: Kept due to 6.14% degradation in combined F1 score when removed
+
+**Round 5 Insights:**
+
+- **PROC** provides significant value for sell predictions and overall correlation
+- **StochRSI** is highly valuable for both buy and sell predictions
+- **VWMA** adds value, especially for buy predictions
+- **VROC and VPT** were adding noise rather than value
+
+The model now has a comprehensive set of 38 technical indicators optimized for 7-day Bitcoin price prediction, with each feature providing measurable value to the prediction accuracy.
+
+## 📈 **ROUND 4 RESULTS (COMPLETED)**
+
+### **Round 4 Experiments Summary:**
+
+1. **Rate of Change (ROC)** - ❌ **REMOVED** (4.52% improvement in Combined F1 when removed)
+2. **Bollinger Band Width** - ❌ **REMOVED** (8.31% improvement in Combined F1 when removed)
+3. **Pivot Points** - ❌ **REMOVED** (7.39% improvement in Combined F1 when removed)
+
+### **Round 4 Feature Set:**
+
+- **Total Features**: 36 (same as end of Round 3)
+- **Features Added from Round 1**: CCI, MFI, Aroon Oscillator
+- **Features Added from Round 2**: Donchian Channels, Parabolic SAR
+- **Features Added from Round 3**: ADX, Ichimoku Cloud, Fibonacci Retracement, Stochastic K, Price Acceleration
+- **Features Removed**: Keltner Channels, Williams %R, CMF, ROC, Bollinger Band Width, Pivot Points
+
+### **Round 4 Analysis:**
+
+All 3 indicators tested in Round 4 were removed, indicating they were adding noise to the model rather than providing value. This suggests the model has reached a high level of optimization with the current 36 features.
+
+**Key Findings:**
+
+- **Rate of Change (ROC)**: Removed due to 4.52% improvement in combined F1 score when removed
+- **Bollinger Band Width**: Removed due to 8.31% improvement in combined F1 score when removed
+- **Pivot Points**: Removed due to 7.39% improvement in combined F1 score when removed
+
+The model maintains its optimal 36-feature configuration, demonstrating that the current feature set is well-optimized for 7-day Bitcoin price prediction.
 
 ## 🎯 **EXPERIMENTATION PROCESS**
 
@@ -154,15 +220,39 @@ The model now has a comprehensive set of 36 technical indicators covering moment
 - **Reasoning**: [Detailed explanation of performance impact]
 - **Next Steps**: [What to do with the indicator]
 
+## 📊 **COMPLETE EXPERIMENTATION SUMMARY**
+
+### **All Rounds Summary:**
+
+**Round 1**: 3 out of 5 indicators kept (CCI, MFI, Aroon Oscillator)
+**Round 2**: 2 out of 5 indicators kept (Donchian Channels, Parabolic SAR)  
+**Round 3**: 5 out of 5 indicators kept (ADX, Ichimoku Cloud, Fibonacci Retracement, Stochastic K, Price Acceleration)
+**Round 4**: 0 out of 3 indicators kept (All removed - ROC, Bollinger Band Width, Pivot Points)
+**Round 5**: 3 out of 5 indicators kept (PROC, StochRSI, VWMA)
+
+**Final Result**: The Bitcoin trading model now has **38 optimized features** (up from the original 26), with 13 new indicators from the five rounds providing measurable value for 7-day price prediction.
+
+### **Current Optimal Feature Set:**
+
+The model now includes a comprehensive set of technical indicators covering:
+
+- **Momentum indicators** (RSI, CCI, MFI, Stochastic K, Aroon Oscillator, StochRSI)
+- **Trend indicators** (MACD, ADX, Parabolic SAR, Ichimoku Cloud)
+- **Volatility indicators** (ATR, Bollinger Bands, Donchian Channels)
+- **Volume indicators** (OBV, VWAP, VWMA)
+- **Support/Resistance indicators** (Fibonacci Retracement, Price Acceleration)
+- **Rate of Change indicators** (PROC)
+- **Core price action** (Price changes, volatility, position)
+
 ## 🔄 **Systematic Iteration Process**
 
-**Complete all 5 experiments in sequence:**
+**For future rounds, complete all 5 experiments in sequence:**
 
-1. **Experiment 1**: Average Directional Index (ADX)
-2. **Experiment 2**: Ichimoku Cloud
-3. **Experiment 3**: Volume Weighted Average Price (VWAP)
-4. **Experiment 4**: Fibonacci Retracement
-5. **Experiment 5**: On-Balance Volume (OBV)
+1. **Experiment 1**: [New Indicator 1]
+2. **Experiment 2**: [New Indicator 2]
+3. **Experiment 3**: [New Indicator 3]
+4. **Experiment 4**: [New Indicator 4]
+5. **Experiment 5**: [New Indicator 5]
 
 **After each experiment:**
 

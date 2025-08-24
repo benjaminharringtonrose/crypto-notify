@@ -59,6 +59,8 @@ export interface Indicators {
   fibonacciPosition: number;
   stochasticK: number;
   priceAcceleration: number;
+  proc: number;
+  vwma: number;
 }
 
 export interface Probabilities {

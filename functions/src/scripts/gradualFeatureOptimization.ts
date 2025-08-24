@@ -75,7 +75,6 @@ class GradualFeatureOptimizer {
 
     // 21-27: Advanced Microstructure Features (7 features)
     "williamsR",
-    "vpt",
     "volumeMA20",
     "volumeOscillator",
     "bollingerSqueeze",
@@ -90,6 +89,9 @@ class GradualFeatureOptimizer {
     "fibonacciPosition",
     "stochasticK",
     "priceAcceleration",
+    "proc",
+    "stochRsi",
+    "vwma",
   ];
 
   public async runOptimization(): Promise<void> {

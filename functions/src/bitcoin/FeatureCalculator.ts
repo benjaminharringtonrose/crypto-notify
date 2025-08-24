@@ -344,6 +344,124 @@ export default class FeatureCalculator {
     return { upper, middle, lower, position };
   }
 
+  public calculateParabolicSAR(
+    high: number[],
+    low: number[],
+    close: number[],
+    acceleration: number = 0.02,
+    maximum: number = 0.2
+  ): { sar: number; trend: number } {
+    if (high.length < 2 || low.length < 2 || close.length < 2) {
+      return { sar: 0, trend: 0 };
+    }
+
+    // Initialize SAR
+    let sar = low[0];
+    let af = acceleration; // Acceleration Factor
+    let ep = high[0]; // Extreme Point
+    let trend = 1; // 1 for uptrend, -1 for downtrend
+
+    // Calculate SAR for the last few periods
+    for (let i = 1; i < close.length; i++) {
+      const currentHigh = high[i];
+      const currentLow = low[i];
+
+      if (trend === 1) {
+        // Uptrend
+        if (currentLow > sar) {
+          // Continue uptrend
+          sar = sar + af * (ep - sar);
+          if (currentHigh > ep) {
+            ep = currentHigh;
+            af = Math.min(af + acceleration, maximum);
+          }
+        } else {
+          // Reverse to downtrend
+          trend = -1;
+          sar = ep;
+          ep = currentLow;
+          af = acceleration;
+        }
+      } else {
+        // Downtrend
+        if (currentHigh < sar) {
+          // Continue downtrend
+          sar = sar + af * (ep - sar);
+          if (currentLow < ep) {
+            ep = currentLow;
+            af = Math.min(af + acceleration, maximum);
+          }
+        } else {
+          // Reverse to uptrend
+          trend = 1;
+          sar = ep;
+          ep = currentHigh;
+          af = acceleration;
+        }
+      }
+    }
+
+    // Normalize SAR to a position relative to current price
+    const currentPrice = close[close.length - 1];
+    const sarPosition = (currentPrice - sar) / currentPrice;
+
+    return { sar, trend: trend * Math.abs(sarPosition) };
+  }
+
+  public calculateCMF(
+    high: number[],
+    low: number[],
+    close: number[],
+    volume: number[],
+    period: number = 20
+  ): number {
+    if (
+      high.length < period ||
+      low.length < period ||
+      close.length < period ||
+      volume.length < period
+    ) {
+      return 0;
+    }
+
+    let moneyFlowVolume = 0;
+    let totalVolume = 0;
+
+    // Calculate CMF for the last 'period' days
+    for (let i = high.length - period; i < high.length; i++) {
+      const highPrice = high[i];
+      const lowPrice = low[i];
+      const closePrice = close[i];
+      const vol = volume[i];
+
+      // Calculate Money Flow Multiplier
+      const moneyFlowMultiplier =
+        (closePrice - lowPrice - (highPrice - closePrice)) /
+        (highPrice - lowPrice);
+
+      // Calculate Money Flow Volume
+      const mfv = moneyFlowMultiplier * vol;
+
+      moneyFlowVolume += mfv;
+      totalVolume += vol;
+    }
+
+    // Calculate CMF
+    return totalVolume > 0 ? moneyFlowVolume / totalVolume : 0;
+  }
+
+  public calculateROC(prices: number[], period: number = 10): number {
+    if (prices.length < period + 1) {
+      return 0;
+    }
+
+    const currentPrice = prices[prices.length - 1];
+    const pastPrice = prices[prices.length - 1 - period];
+
+    // Calculate Rate of Change
+    return pastPrice > 0 ? ((currentPrice - pastPrice) / pastPrice) * 100 : 0;
+  }
+
   public calculateStochasticK(prices: number[], period: number = 14): number {
     if (prices.length < period) return 50;
     const recentPrices = prices.slice(-period);
@@ -1224,6 +1342,11 @@ export default class FeatureCalculator {
         prices.slice(0, dayIndex + 1),
         prices.slice(0, dayIndex + 1)
       ).position,
+      parabolicSAR: this.calculateParabolicSAR(
+        prices.slice(0, dayIndex + 1),
+        prices.slice(0, dayIndex + 1),
+        prices.slice(0, dayIndex + 1)
+      ).trend,
     };
   }
 
@@ -1313,6 +1436,7 @@ export default class FeatureCalculator {
       indicators.mfi, // Money Flow Index (MFI)
       indicators.aroonOscillator, // Aroon Oscillator
       indicators.donchianPosition, // Donchian Channels position
+      indicators.parabolicSAR, // Parabolic SAR trend
     ];
 
     return optimizedFeatures;

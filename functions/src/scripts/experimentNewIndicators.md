@@ -7,7 +7,7 @@
 ## 📊 Current Context
 
 - **Model**: Conv1D(48,3) → BN → Dropout(0.3) → LSTM(64) → Dense(32) → Dropout(0.3) → Output(2)
-- **Current Features**: 28 optimized features (up from 26 original)
+- **Current Features**: 31 optimized features (up from 26 original)
 - **Performance Target**: Improve combined F1 score, validation accuracy, and balanced accuracy
 - **Tolerance**: 2% performance improvement threshold
 
@@ -52,45 +52,28 @@ Keep the new indicator if it meets ANY of these criteria:
 4. **Keltner Channels** - ❌ **REMOVED** (1.99% improvement in Combined F1 when removed)
 5. **Aroon Oscillator** - ✅ **KEPT** (massive 32.38% decline in Sell F1 when removed)
 
-### **Current Feature Set:**
+### **Round 1 Feature Set:**
 
 - **Total Features**: 28 (up from 26 original)
 - **New Features Added**: CCI, MFI, Aroon Oscillator
 - **Features Removed**: Keltner Channels
 
-## 📈 **ROUND 2: 5 NEW INDICATORS FOR EXPERIMENTATION**
+## 📈 **ROUND 2 RESULTS (COMPLETED)**
 
-Based on analysis of current feature set, these indicators are available but not in optimized features:
+### **Round 2 Experiments Summary:**
 
-### **1. Williams %R** - Momentum
+1. **Williams %R** - ❌ **REMOVED** (6.22% improvement in Combined F1 when removed)
+2. **Donchian Channels** - ✅ **KEPT** (16.40% decline in Combined F1 when removed)
+3. **Parabolic SAR** - ✅ **KEPT** (6.80% decline in Combined F1 when removed)
+4. **Chaikin Money Flow (CMF)** - ❌ **REMOVED** (32.02% improvement in Combined F1 when removed)
+5. **Rate of Change (ROC)** - ❌ **REMOVED** (17.31% improvement in Combined F1 when removed)
 
-- **Status**: Already implemented in `calculateWilliamsR()` but not in optimized features
-- **Expected Benefit**: Momentum oscillator that measures overbought/oversold levels
-- **Implementation**: Add `indicators.williamsR` to optimized features
+### **Final Feature Set:**
 
-### **2. Donchian Channels** - Volatility
-
-- **Status**: Not implemented yet
-- **Expected Benefit**: Volatility-based support/resistance levels using highest highs and lowest lows
-- **Implementation**: Add `calculateDonchianChannels()` method and integrate
-
-### **3. Parabolic SAR** - Trend
-
-- **Status**: Not implemented yet
-- **Expected Benefit**: Trend following indicator that provides stop-loss levels
-- **Implementation**: Add `calculateParabolicSAR()` method and integrate
-
-### **4. Chaikin Money Flow (CMF)** - Volume
-
-- **Status**: Not implemented yet
-- **Expected Benefit**: Volume-weighted indicator that measures buying/selling pressure
-- **Implementation**: Add `calculateCMF()` method and integrate
-
-### **5. Rate of Change (ROC)** - Momentum
-
-- **Status**: Not implemented yet
-- **Expected Benefit**: Momentum indicator that measures price change over time
-- **Implementation**: Add `calculateROC()` method and integrate
+- **Total Features**: 31 (up from 26 original)
+- **Features Added from Round 1**: CCI, MFI, Aroon Oscillator
+- **Features Added from Round 2**: Donchian Channels, Parabolic SAR
+- **Features Removed**: Keltner Channels, Williams %R, CMF, ROC
 
 ## 🎯 **EXPERIMENTATION PROCESS**
 

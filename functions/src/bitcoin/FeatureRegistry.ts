@@ -215,6 +215,13 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
     experimentAdded: "Experiment #2 - Donchian",
     importance: "medium",
   },
+  {
+    name: "parabolicSAR",
+    description: "Parabolic SAR trend",
+    category: "microstructure",
+    experimentAdded: "Experiment #3 - Parabolic SAR",
+    importance: "medium",
+  },
 ];
 
 /**

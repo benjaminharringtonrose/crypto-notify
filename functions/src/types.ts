@@ -54,6 +54,7 @@ export interface Indicators {
   mfi: number;
   aroonOscillator: number;
   donchianPosition: number;
+  parabolicSAR: number;
 }
 
 export interface Probabilities {

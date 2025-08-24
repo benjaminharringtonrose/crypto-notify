@@ -4,6 +4,8 @@
 
 **Systematically experiment with 5 new technical indicators** to improve our Bitcoin trading model performance using the gradual feature optimization script. **Keep any indicator that improves the model and move on to the next experiment.**
 
+**IMPORTANT**: You must come up with 5 completely new technical indicators that we have NOT tested before. Do not retest any indicators that have already been experimented with in previous rounds.
+
 ## 📊 Current Context
 
 - **Model**: Conv1D(48,3) → BN → Dropout(0.3) → LSTM(64) → Dense(32) → Dropout(0.3) → Output(2)
@@ -16,12 +18,36 @@
 
 ### 1. **New Indicator Integration**
 
-- Add the new technical indicator to `FeatureCalculator.ts` in the `compute` method that we have not experimented with before - please read below to make sure you aren't retesting features we deemed as not optimal
+- **CRITICAL**: You must select 5 completely new technical indicators that have NOT been tested in any previous rounds
+- Add the new technical indicator to `FeatureCalculator.ts` in the `compute` method
 - Add corresponding feature definition to `FeatureRegistry.ts`
 - Ensure the indicator is added to the `optimizedFeatures` array
 - Update the feature count in `FeatureDetector.ts` if needed
 
-### 2. **Testing Process**
+### 2. **Indicator Selection Requirements**
+
+**You must research and select 5 new indicators from the following categories that we have NOT tested:**
+
+- **Advanced Momentum Indicators**: (e.g., Choppiness Index, Detrended Price Oscillator, Ease of Movement)
+- **Advanced Volatility Indicators**: (e.g., Historical Volatility, Volatility Ratio, Volatility Index)
+- **Advanced Trend Indicators**: (e.g., Trend Intensity Index, Trend Vigor, Trend Strength Index)
+- **Advanced Volume Indicators**: (e.g., Volume Price Trend, Volume Rate of Change, Volume Weighted Average Price)
+- **Advanced Oscillators**: (e.g., Ultimate Oscillator, Awesome Oscillator, Accelerator Oscillator)
+- **Advanced Support/Resistance**: (e.g., Pivot Points, Camarilla Pivots, Woodie Pivots)
+- **Advanced Price Action**: (e.g., Price Rate of Change, Price Momentum, Price Acceleration)
+- **Advanced Market Microstructure**: (e.g., True Strength Index, Accumulation/Distribution Line, Price Momentum Oscillator)
+
+**DO NOT retest any indicators from previous rounds:**
+
+- Round 1: CCI, MFI, Aroon Oscillator, Keltner Channels, StochRSI
+- Round 2: Williams %R, Donchian Channels, Parabolic SAR, CMF, ROC
+- Round 3: ADX, Ichimoku Cloud, Fibonacci Retracement, Stochastic K, Price Acceleration
+- Round 4: ROC, Bollinger Band Width, Pivot Points
+- Round 5: VROC, PROC, VPT, StochRSI, VWMA
+- Round 6: Center of Gravity Oscillator (COG)
+- Round 7: TSI, ADL, PMO, Bollinger Band Width, Williams %R
+
+### 3. **Testing Process**
 
 Use the gradual feature optimization script to test the new indicator:
 
@@ -33,7 +59,7 @@ npm run features:gradual -- --feature "newIndicatorName"
 npm run features:gradual
 ```
 
-### 3. **Performance Evaluation Criteria**
+### 4. **Performance Evaluation Criteria**
 
 Keep the new indicator if it meets ANY of these criteria:
 
@@ -249,15 +275,17 @@ The model maintains its optimal 36-feature configuration, demonstrating that the
 
 ## 🎯 **EXPERIMENTATION PROCESS**
 
-**For each of the 5 indicators:**
+**For each of the 5 NEW indicators (you must select 5 completely untested indicators):**
 
-1. **Research the indicator**: Explain its calculation, interpretation, and typical use cases
+1. **Research and select a new indicator**: Choose from untested categories, explain its calculation, interpretation, and typical use cases
 2. **Implement the indicator**: Add it to FeatureCalculator.ts and FeatureRegistry.ts
 3. **Test with gradual optimization**: Use the script to evaluate performance impact
 4. **Analyze results**: Compare before/after metrics and make recommendation
 5. **If beneficial**: Keep the indicator and update the optimized feature set
 6. **If not beneficial**: Revert changes and explain why it didn't work
-7. **Move to next indicator**: Continue with the next indicator in the list
+7. **Move to next indicator**: Continue with the next untested indicator in the list
+
+**IMPORTANT**: You must select 5 completely new indicators that have never been tested in any previous round. Do not retest any indicators from the list above.
 
 ## 📋 Expected Output Format
 
@@ -321,13 +349,13 @@ The model now includes a comprehensive set of technical indicators covering:
 
 ## 🔄 **Systematic Iteration Process**
 
-**For future rounds, complete all 5 experiments in sequence:**
+**For future rounds, complete all 5 experiments in sequence with COMPLETELY NEW indicators:**
 
-1. **Experiment 1**: [New Indicator 1]
-2. **Experiment 2**: [New Indicator 2]
-3. **Experiment 3**: [New Indicator 3]
-4. **Experiment 4**: [New Indicator 4]
-5. **Experiment 5**: [New Indicator 5]
+1. **Experiment 1**: [New Untested Indicator 1]
+2. **Experiment 2**: [New Untested Indicator 2]
+3. **Experiment 3**: [New Untested Indicator 3]
+4. **Experiment 4**: [New Untested Indicator 4]
+5. **Experiment 5**: [New Untested Indicator 5]
 
 **After each experiment:**
 
@@ -335,10 +363,12 @@ The model now includes a comprehensive set of technical indicators covering:
 - If no improvement → **REMOVE** and revert changes
 - **Continue to next indicator** regardless of outcome
 
+**CRITICAL REQUIREMENT**: You must research and select 5 completely new technical indicators that have never been tested in any previous round. Do not retest any indicators from the comprehensive list provided above.
+
 ## 📝 **Specific Request Format**
 
 ```
-Please experiment with [INDICATOR_NAME] for our Bitcoin trading model.
+Please experiment with [NEW_UNTESTED_INDICATOR_NAME] for our Bitcoin trading model.
 This is experiment #[X] of 5 in our systematic indicator testing process.
 [Brief description of why this indicator might help with 7-day predictions]
 ```
@@ -346,3 +376,5 @@ This is experiment #[X] of 5 in our systematic indicator testing process.
 ---
 
 **Note**: This systematic approach ensures we test multiple indicators efficiently, keeping only those that provide measurable performance improvements while maintaining the model's current optimization level.
+
+**CRITICAL**: You must select 5 completely new technical indicators that have never been tested in any previous round. The comprehensive list of tested indicators is provided above to ensure no duplication.

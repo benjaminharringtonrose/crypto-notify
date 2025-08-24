@@ -1014,86 +1014,73 @@ export default class FeatureCalculator {
       currentPrice,
     });
 
-    // EXPERIMENT NEW-6: Reduced Core Feature Set (25 features)
-    // Focus on essential indicators that crypto traders actually use
-    const coreFeatures = [
-      // 1-3: Price Action (3 features)
-      indicators.currentPrice,
-      dayIndex > 0 ? prices[dayIndex - 1] : prices[0], // Previous price
-      indicators.priceChangePct, // Price change %
-
-      // 4-6: Trend Indicators (3 features)
-      indicators.sma7,
-      indicators.sma21,
-      indicators.sma50 || indicators.sma20,
-
-      // 7-11: Enhanced Momentum Indicators (5 features) - v1.4.0
-      indicators.rsi, // 14-day RSI (standard)
-      this.calculateRSI(prices.slice(0, dayIndex + 1), 21), // 21-day RSI for longer trend
-      this.calculateRSI(prices.slice(0, dayIndex + 1), 7), // 7-day RSI for short-term momentum
-      indicators.macdLine,
-      indicators.signalLine,
-
-      // 10-12: Volatility Indicators (3 features)
-      indicators.atr,
-      indicators.upperBand, // Bollinger Band upper
-      indicators.lowerBand, // Bollinger Band lower
-
-      // 15-18: Enhanced Volume Indicators (4 features) - v1.4.0
-      volumes[dayIndex],
-      // Volume MA (20-day)
-      volumes
-        .slice(Math.max(0, dayIndex - 19), dayIndex + 1)
-        .reduce((a, b) => a + b, 0) / Math.min(20, dayIndex + 1),
-      indicators.vwap,
-      // Volume momentum: current vs 5-day average
-      dayIndex >= 4
-        ? volumes[dayIndex] /
-          (volumes
-            .slice(Math.max(0, dayIndex - 4), dayIndex + 1)
-            .reduce((a, b) => a + b, 0) /
-            Math.min(5, dayIndex + 1))
-        : 1,
-
-      // 16-20: Relative/Ratio Features (5 features)
-      currentPrice / (indicators.sma7 || currentPrice), // Price/SMA7 ratio
-      currentPrice / (indicators.sma21 || currentPrice), // Price/SMA21 ratio
-      currentPrice / (indicators.sma50 || indicators.sma20 || currentPrice), // Price/SMA50 ratio
-      indicators.rsi / 100, // Normalized RSI
-      // Bollinger Band position (0-1 scale)
-      (indicators.currentPrice - indicators.lowerBand) /
-        (indicators.upperBand - indicators.lowerBand || 1),
-
-      // 19-25: Enhanced Secondary Indicators (7 features) - v1.4.0
-      indicators.prevRsi, // Previous RSI for momentum
-      indicators.macdLine - indicators.signalLine, // MACD histogram
-      indicators.atr / (indicators.currentPrice || 1), // Normalized ATR
+    // OPTIMIZED FEATURE SET: 26 Most Important Features (Based on Gradual Optimization)
+    // Selected features that provide maximum trading performance with minimal redundancy
+    const optimizedFeatures = [
+      // 1-5: Core Price Action & Volatility (5 features)
+      indicators.priceChangePct, // Price change percentage
+      dayIndex >= 20
+        ? Math.max(...prices.slice(dayIndex - 19, dayIndex + 1)) -
+          Math.min(...prices.slice(dayIndex - 19, dayIndex + 1))
+        : 0, // highLowRange
+      dayIndex >= 5
+        ? this.calculateStdDev(
+            prices.slice(dayIndex - 4, dayIndex + 1),
+            prices
+              .slice(dayIndex - 4, dayIndex + 1)
+              .reduce((a, b) => a + b, 0) / 5
+          )
+        : 0, // priceVolatility
+      dayIndex >= 20
+        ? (currentPrice -
+            Math.min(...prices.slice(dayIndex - 19, dayIndex + 1))) /
+          (Math.max(...prices.slice(dayIndex - 19, dayIndex + 1)) -
+            Math.min(...prices.slice(dayIndex - 19, dayIndex + 1)) || 1)
+        : 0.5, // pricePosition
       volumes[dayIndex] /
         (volumes
           .slice(Math.max(0, dayIndex - 19), dayIndex + 1)
           .reduce((a, b) => a + b, 0) /
-          Math.min(20, dayIndex + 1)), // Volume ratio
+          Math.min(20, dayIndex + 1)), // relativeVolume
+
+      // 6-10: Technical Indicators (5 features)
+      indicators.rsi, // RSI momentum oscillator
+      indicators.signalLine, // MACD signal line
+      currentPrice / (indicators.vwap || currentPrice), // vwapRatio
+      indicators.atr, // Average True Range
+      indicators.obv, // On-Balance Volume
+
+      // 11-15: Enhanced Indicators (5 features)
       indicators.momentum, // Raw momentum
-      // Bollinger Band squeeze indicator (tight bands = low volatility)
+      indicators.macdLine - indicators.signalLine, // MACD histogram
+      currentPrice / (indicators.sma7 || currentPrice), // priceSMA7Ratio
+      currentPrice / (indicators.sma21 || currentPrice), // priceSMA21Ratio
+      currentPrice / (indicators.sma50 || indicators.sma20 || currentPrice), // priceSMA50Ratio
+
+      // 16-20: Market Regime Features (5 features)
+      indicators.trendRegime, // Trend regime score
+      indicators.volatilityRegimeScore / 5.0, // volatilityRegime (normalized)
+      indicators.ichimokuTenkanSen, // Ichimoku Tenkan-sen (9-period)
+      indicators.ichimokuKijunSen, // Ichimoku Kijun-sen (26-period)
+      indicators.ichimokuCloudPosition, // Position relative to Ichimoku cloud
+
+      // 21-26: Advanced Microstructure Features (6 features)
+      indicators.williamsR, // Williams %R momentum oscillator
+      indicators.vpt, // Volume-Price Trend (VPT)
+      volumes
+        .slice(Math.max(0, dayIndex - 19), dayIndex + 1)
+        .reduce((a, b) => a + b, 0) / Math.min(20, dayIndex + 1), // volumeMA20
+      indicators.volumeOscillator, // Volume oscillator
       dayIndex >= 20
         ? (indicators.upperBand - indicators.lowerBand) /
           indicators.currentPrice
-        : 0.1,
-      // RSI divergence signal (price vs RSI momentum alignment)
+        : 0.1, // bollingerSqueeze
       dayIndex >= 1
         ? Math.sign(indicators.currentPrice - prices[dayIndex - 1]) *
           Math.sign(indicators.rsi - indicators.prevRsi)
-        : 0,
-
-      // 31-36: EXPERIMENT #61 - Advanced Market Microstructure Features (6 features)
-      indicators.ichimokuTenkanSen, // Ichimoku Tenkan-sen (9-period conversion line)
-      indicators.ichimokuKijunSen, // Ichimoku Kijun-sen (26-period base line)
-      indicators.ichimokuCloudPosition, // Position relative to Ichimoku cloud (-1, 0, 1)
-      indicators.williamsR, // Williams %R momentum oscillator
-      indicators.stochasticK, // Stochastic %K oscillator
-      indicators.vpt, // Volume-Price Trend (VPT) for volume analysis
+        : 0, // rsiDivergence
     ];
 
-    return coreFeatures;
+    return optimizedFeatures;
   }
 }

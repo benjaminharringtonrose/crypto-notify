@@ -12,20 +12,15 @@ export interface FeatureDefinition {
 }
 
 /**
- * Complete feature registry matching FeatureCalculator.ts coreFeatures array
+ * OPTIMIZED feature registry matching FeatureCalculator.ts optimizedFeatures array
  * Order MUST match the exact order in FeatureCalculator
+ * Optimized from 36 to 26 features based on gradual optimization results
  */
 export const FEATURE_REGISTRY: FeatureDefinition[] = [
-  // 1-8: Core Price/Volume Features (8 features)
+  // 1-5: Core Price Action & Volatility (5 features)
   {
     name: "priceChangePct",
     description: "Price change percentage",
-    category: "core",
-    importance: "high",
-  },
-  {
-    name: "volumeChangePct",
-    description: "Volume change percentage",
     category: "core",
     importance: "high",
   },
@@ -42,20 +37,8 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
     importance: "high",
   },
   {
-    name: "volumeMA5Ratio",
-    description: "Volume to 5-day MA ratio",
-    category: "core",
-    importance: "medium",
-  },
-  {
     name: "pricePosition",
     description: "Price position in recent range",
-    category: "core",
-    importance: "medium",
-  },
-  {
-    name: "volumeMA20Ratio",
-    description: "Volume to 20-day MA ratio",
     category: "core",
     importance: "medium",
   },
@@ -66,16 +49,10 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
     importance: "medium",
   },
 
-  // 9-15: Technical Indicators (7 features)
+  // 6-10: Technical Indicators (5 features)
   {
     name: "rsi",
     description: "RSI momentum oscillator",
-    category: "technical",
-    importance: "high",
-  },
-  {
-    name: "macdLine",
-    description: "MACD line",
     category: "technical",
     importance: "high",
   },
@@ -86,31 +63,37 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
     importance: "high",
   },
   {
-    name: "bollingerPosition",
-    description: "Position within Bollinger Bands",
-    category: "technical",
-    importance: "high",
-  },
-  {
     name: "vwapRatio",
     description: "Price to VWAP ratio",
     category: "technical",
     importance: "high",
   },
   {
-    name: "atrNormalized",
-    description: "Normalized ATR",
+    name: "atr",
+    description: "Average True Range",
     category: "technical",
+    importance: "high",
+  },
+  {
+    name: "obv",
+    description: "On-Balance Volume",
+    category: "technical",
+    importance: "high",
+  },
+
+  // 11-15: Enhanced Indicators (5 features)
+  {
+    name: "momentum",
+    description: "Raw momentum",
+    category: "enhanced",
     importance: "medium",
   },
   {
-    name: "volumeOscillator",
-    description: "Volume oscillator",
-    category: "technical",
+    name: "macdHistogram",
+    description: "MACD histogram",
+    category: "enhanced",
     importance: "medium",
   },
-
-  // 16-20: Relative/Ratio Features (5 features)
   {
     name: "priceSMA7Ratio",
     description: "Price to SMA7 ratio",
@@ -129,48 +112,67 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
     category: "ratio",
     importance: "medium",
   },
+
+  // 16-20: Market Regime Features (5 features)
   {
-    name: "rsiNormalized",
-    description: "Normalized RSI (0-1)",
-    category: "ratio",
+    name: "trendRegime",
+    description: "Trend regime score",
+    category: "enhanced",
+    importance: "high",
+  },
+  {
+    name: "volatilityRegime",
+    description: "Volatility regime score (normalized)",
+    category: "enhanced",
     importance: "medium",
   },
   {
-    name: "bollingerBandPosition",
-    description: "Bollinger Band position (0-1)",
-    category: "ratio",
+    name: "ichimokuTenkanSen",
+    description: "Ichimoku Tenkan-sen (9-period)",
+    category: "microstructure",
+    experimentAdded: "Experiment #61",
+    importance: "medium",
+  },
+  {
+    name: "ichimokuKijunSen",
+    description: "Ichimoku Kijun-sen (26-period)",
+    category: "microstructure",
+    experimentAdded: "Experiment #61",
+    importance: "medium",
+  },
+  {
+    name: "ichimokuCloudPosition",
+    description: "Position relative to Ichimoku cloud",
+    category: "microstructure",
+    experimentAdded: "Experiment #61",
     importance: "medium",
   },
 
-  // 21-30: Enhanced Secondary Indicators (10 features)
+  // 21-26: Advanced Microstructure Features (6 features)
   {
-    name: "prevRsi",
-    description: "Previous RSI for momentum",
-    category: "enhanced",
-    importance: "low",
-  },
-  {
-    name: "macdHistogram",
-    description: "MACD histogram",
-    category: "enhanced",
+    name: "williamsR",
+    description: "Williams %R momentum oscillator",
+    category: "microstructure",
+    experimentAdded: "Experiment #61",
     importance: "medium",
   },
   {
-    name: "atrRatio",
-    description: "ATR to price ratio",
-    category: "enhanced",
-    importance: "low",
+    name: "vpt",
+    description: "Volume-Price Trend (VPT)",
+    category: "microstructure",
+    experimentAdded: "Experiment #61",
+    importance: "high",
   },
   {
-    name: "volumeRatio20",
-    description: "20-day volume ratio",
-    category: "enhanced",
-    importance: "low",
+    name: "volumeMA20",
+    description: "20-day volume moving average",
+    category: "technical",
+    importance: "medium",
   },
   {
-    name: "momentum",
-    description: "Raw momentum",
-    category: "enhanced",
+    name: "volumeOscillator",
+    description: "Volume oscillator",
+    category: "technical",
     importance: "medium",
   },
   {
@@ -184,68 +186,6 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
     description: "RSI divergence signal",
     category: "enhanced",
     importance: "low",
-  },
-  {
-    name: "volatilityRegime",
-    description: "Volatility regime score",
-    category: "enhanced",
-    importance: "unknown",
-  },
-  {
-    name: "trendRegime",
-    description: "Trend regime score",
-    category: "enhanced",
-    importance: "unknown",
-  },
-  {
-    name: "momentumRegime",
-    description: "Momentum regime score",
-    category: "enhanced",
-    importance: "unknown",
-  },
-
-  // 31-36: EXPERIMENT #61 - Advanced Market Microstructure Features (6 features)
-  {
-    name: "ichimokuTenkanSen",
-    description: "Ichimoku Tenkan-sen (9-period)",
-    category: "microstructure",
-    experimentAdded: "Experiment #61",
-    importance: "unknown",
-  },
-  {
-    name: "ichimokuKijunSen",
-    description: "Ichimoku Kijun-sen (26-period)",
-    category: "microstructure",
-    experimentAdded: "Experiment #61",
-    importance: "unknown",
-  },
-  {
-    name: "ichimokuCloudPosition",
-    description: "Position relative to Ichimoku cloud",
-    category: "microstructure",
-    experimentAdded: "Experiment #61",
-    importance: "unknown",
-  },
-  {
-    name: "williamsR",
-    description: "Williams %R momentum oscillator",
-    category: "microstructure",
-    experimentAdded: "Experiment #61",
-    importance: "unknown",
-  },
-  {
-    name: "stochasticK",
-    description: "Stochastic %K oscillator",
-    category: "microstructure",
-    experimentAdded: "Experiment #61",
-    importance: "unknown",
-  },
-  {
-    name: "vpt",
-    description: "Volume-Price Trend (VPT)",
-    category: "microstructure",
-    experimentAdded: "Experiment #61",
-    importance: "unknown",
   },
 ];
 

@@ -17,6 +17,8 @@
     "features:analyze": "npx ts-node src/scripts/analyzeFeatures.ts",
     "features:ablation": "npx ts-node src/scripts/featureAblationStudy.ts",
     "features:optimize": "npx ts-node src/scripts/optimizeFeatureSet.ts",
+    "features:gradual": "npx ts-node src/scripts/gradualFeatureOptimization.ts",
+    "features:apply": "npx ts-node src/scripts/applyOptimizedFeatures.ts",
     "features:fix-registry": "npx ts-node src/scripts/fixFeatureRegistry.ts",
     "features:all": "npm run features:fix-registry && npm run features:analyze && npm run features:optimize"
   },

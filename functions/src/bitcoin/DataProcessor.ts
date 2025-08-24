@@ -1,7 +1,8 @@
 import { CryptoCompareService } from "../api/CryptoCompareService";
-import { MODEL_CONFIG, PERIODS } from "../constants";
+import { PERIODS } from "../constants";
 import { HistoricalData, ModelConfig } from "../types";
 import FeatureCalculator from "./FeatureCalculator";
+import { FeatureDetector } from "./FeatureDetector";
 
 const cryptoCompare = new CryptoCompareService();
 
@@ -145,7 +146,7 @@ export class DataProcessor {
   private validateFeatures(btcFeatures: number[]): boolean {
     return (
       Array.isArray(btcFeatures) &&
-      btcFeatures.length === MODEL_CONFIG.BTC_FEATURE_COUNT
+      btcFeatures.length === FeatureDetector.getFeatureCount()
     );
   }
 

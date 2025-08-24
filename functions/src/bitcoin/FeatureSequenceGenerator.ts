@@ -1,5 +1,5 @@
-import { MODEL_CONFIG } from "../constants";
 import FeatureCalculator from "./FeatureCalculator";
+import { FeatureDetector } from "./FeatureDetector";
 
 export class FeatureSequenceGenerator {
   private timesteps: number;
@@ -33,7 +33,7 @@ export class FeatureSequenceGenerator {
 
     while (sequence.length < this.timesteps) {
       sequence.unshift(
-        sequence[0] || Array(MODEL_CONFIG.FEATURE_COUNT).fill(0)
+        sequence[0] || Array(FeatureDetector.getFeatureCount()).fill(0)
       );
     }
     return sequence.slice(-this.timesteps); // Ensure exact length

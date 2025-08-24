@@ -2,84 +2,55 @@
 
 ## Overview
 
-The `CryptoCompareService` class is a comprehensive service that provides access to cryptocurrency market data through the CryptoCompare API. It offers methods for retrieving historical price and volume data, real-time market information, and comprehensive cryptocurrency analytics for the Bitcoin trading system.
+The `CryptoCompareService` class is a simplified service that provides access to historical cryptocurrency market data through the CryptoCompare API. It offers a single method for retrieving historical price and volume data for Bitcoin and other cryptocurrencies used in the trading system.
 
 ## Architecture
 
-The CryptoCompareService follows a RESTful API integration pattern:
+The CryptoCompareService follows a simple RESTful API integration pattern:
 
 ```
-API Requests → Data Processing → Error Handling → Cached Results
-     ↓              ↓                ↓              ↓
-CryptoCompare    JSON Parsing    Retry Logic    Memory Cache
-REST Endpoints   Data Validation  Fallback      Performance
+API Requests → Chunked Data Processing → Rate Limiting → Historical Data
+     ↓                    ↓                   ↓              ↓
+CryptoCompare         JSON Parsing        Request Throttling  Price/Volume Arrays
+REST Endpoints       Data Validation     50ms Delays        Chronological Order
 ```
 
 ### Key Responsibilities
 
 - **Historical Data Retrieval**: Fetch historical price and volume data
-- **Real-time Market Data**: Get current market prices and statistics
+- **Chunked Processing**: Handle large date ranges through chunk-based requests
 - **API Integration**: Manage CryptoCompare API requests and responses
-- **Error Handling**: Robust error management and retry logic
-- **Data Caching**: Optimize performance with intelligent caching
-- **Rate Limiting**: Respect API rate limits and quotas
+- **Error Handling**: Robust error management and data validation
+- **Rate Limiting**: Respect API rate limits with request throttling
 
 ## Class Structure
 
 ```typescript
 export class CryptoCompareService {
-  private apiKey: string;
   private baseUrl: string;
-  private cache: Map<string, any>;
-  private rateLimiter: RateLimiter;
 
-  constructor(apiKey?: string);
+  constructor();
 
   public async getHistoricalData(
     cryptoSymbol: string,
-    days: number
-  ): Promise<HistoricalData>;
-
-  public async getCurrentPrice(cryptoSymbol: string): Promise<number>;
-  public async getMarketCap(cryptoSymbol: string): Promise<number>;
-  public async get24hVolume(cryptoSymbol: string): Promise<number>;
-  public async getPriceChange24h(cryptoSymbol: string): Promise<number>;
+    totalDays: number,
+    chunkDays?: number
+  ): Promise<{ prices: number[]; volumes: number[] }>;
 }
 ```
 
 ### Constructor Parameters
 
-- `apiKey?: string` - Optional CryptoCompare API key for enhanced rate limits
+- No parameters required - uses default CryptoCompare endpoint
 
 ## Core Interfaces
 
-### HistoricalData
+### Return Type
 
 ```typescript
-interface HistoricalData {
-  prices: number[]; // Historical price data
-  volumes: number[]; // Historical volume data
-  timestamps: number[]; // Unix timestamps
-  metadata: {
-    symbol: string;
-    days: number;
-    lastUpdated: number;
-  };
-}
-```
-
-### MarketData
-
-```typescript
-interface MarketData {
-  price: number;
-  marketCap: number;
-  volume24h: number;
-  priceChange24h: number;
-  priceChangePercent24h: number;
-  high24h: number;
-  low24h: number;
-  lastUpdated: number;
+interface HistoricalDataResponse {
+  prices: number[]; // Historical closing prices in chronological order
+  volumes: number[]; // Historical volume data in chronological order
 }
 ```
 
@@ -87,144 +58,103 @@ interface MarketData {
 
 ### Public Methods
 
-#### `getHistoricalData(cryptoSymbol, days): Promise<HistoricalData>`
+#### `getHistoricalData(cryptoSymbol, totalDays, chunkDays): Promise<{prices: number[], volumes: number[]}>`
 
-Retrieves historical price and volume data for a specified cryptocurrency.
+Retrieves historical price and volume data for a specified cryptocurrency using chunked requests to handle large date ranges.
 
 **Parameters:**
 
 - `cryptoSymbol: string` - Cryptocurrency symbol (e.g., "BTC", "ETH", "ADA")
-- `days: number` - Number of days of historical data to retrieve
+- `totalDays: number` - Total number of days of historical data to retrieve
+- `chunkDays: number` - Optional chunk size for API requests (default: 90 days)
 
 **Returns:**
 
-- `Promise<HistoricalData>` - Historical price and volume data
+- `Promise<{prices: number[], volumes: number[]}>` - Historical price and volume arrays
 
 **Process:**
 
-1. **API Request**: Constructs CryptoCompare API request
-2. **Data Retrieval**: Fetches historical data from API
-3. **Data Processing**: Parses and validates response data
-4. **Cache Storage**: Stores results in memory cache
-5. **Error Handling**: Manages API failures and retries
-
-#### `getCurrentPrice(cryptoSymbol): Promise<number>`
-
-Retrieves the current price for a specified cryptocurrency.
-
-**Parameters:**
-
-- `cryptoSymbol: string` - Cryptocurrency symbol
-
-**Returns:**
-
-- `Promise<number>` - Current price in USD
-
-#### `getMarketCap(cryptoSymbol): Promise<number>`
-
-Retrieves the current market capitalization for a specified cryptocurrency.
-
-**Parameters:**
-
-- `cryptoSymbol: string` - Cryptocurrency symbol
-
-**Returns:**
-
-- `Promise<number>` - Market capitalization in USD
-
-#### `get24hVolume(cryptoSymbol): Promise<number>`
-
-Retrieves the 24-hour trading volume for a specified cryptocurrency.
-
-**Parameters:**
-
-- `cryptoSymbol: string` - Cryptocurrency symbol
-
-**Returns:**
-
-- `Promise<number>` - 24-hour volume in USD
-
-#### `getPriceChange24h(cryptoSymbol): Promise<number>`
-
-Retrieves the 24-hour price change for a specified cryptocurrency.
-
-**Parameters:**
-
-- `cryptoSymbol: string` - Cryptocurrency symbol
-
-**Returns:**
-
-- `Promise<number>` - 24-hour price change in USD
+1. **Chunk Calculation**: Divides total days into manageable chunks (90 days by default)
+2. **API Requests**: Makes sequential API requests with 50ms throttling
+3. **Data Processing**: Parses and validates response data from each chunk
+4. **Data Merging**: Combines chunks in chronological order using `unshift`
+5. **Error Handling**: Validates API responses and data structure
 
 ## Data Flow
 
-### 1. API Request Construction
+### 1. Chunked Data Processing
 
 ```typescript
-// Construct API URL
-const url = `${this.baseUrl}/data/v2/histoday?fsym=${cryptoSymbol}&tsym=USD&limit=${days}`;
+// Calculate chunk parameters
+const endDate = new Date();
+const totalMilliseconds = totalDays * TIME_CONVERSIONS.ONE_DAY_IN_MILLISECONDS;
+const chunkMilliseconds = chunkDays * TIME_CONVERSIONS.ONE_DAY_IN_MILLISECONDS;
+const numChunks = Math.ceil(totalDays / chunkDays);
 
-// Add API key if available
-if (this.apiKey) {
-  url += `&api_key=${this.apiKey}`;
+// Process each chunk
+for (let i = 0; i < numChunks; i++) {
+  const chunkEnd = new Date(endDate.getTime() - i * chunkMilliseconds);
+  const chunkStart = new Date(chunkEnd.getTime() - chunkMilliseconds);
+
+  // Add 50ms delay for rate limiting
+  if (i > 0) await delay(50);
+
+  // Make API request
+  const response = await axios.get(`${this.baseUrl}/histoday`, {
+    params: {
+      fsym: cryptoSymbol.toUpperCase(),
+      tsym: "USD",
+      limit: limit,
+      toTs: toTimestamp,
+      api_key: process.env.CRYPTOCOMPARE_API_KEY,
+    },
+  });
 }
-
-// Set request headers
-const headers = {
-  "Content-Type": "application/json",
-  "User-Agent": "CryptoNotify/1.0",
-};
 ```
 
-### 2. Data Retrieval and Processing
+### 2. Data Validation and Processing
 
 ```typescript
-// Make API request
-const response = await fetch(url, { headers });
-
-if (!response.ok) {
+// Validate API response structure
+if (
+  !response.data ||
+  !response.data.Data ||
+  !Array.isArray(response.data.Data.Data)
+) {
   throw new Error(
-    `API request failed: ${response.status} ${response.statusText}`
+    `Invalid API response structure: ${JSON.stringify(response.data)}`
   );
 }
 
-// Parse response data
-const data = await response.json();
+// Extract prices and volumes
+const chunkPrices = data.map((entry: any) => {
+  if (entry.close === undefined) {
+    throw new Error(`Missing 'close' price in entry: ${JSON.stringify(entry)}`);
+  }
+  return entry.close;
+});
 
-// Extract and validate data
-const historicalData: HistoricalData = {
-  prices: data.Data.Data.map((item: any) => item.close),
-  volumes: data.Data.Data.map((item: any) => item.volumeto),
-  timestamps: data.Data.Data.map((item: any) => item.time),
-  metadata: {
-    symbol: cryptoSymbol,
-    days: days,
-    lastUpdated: Date.now(),
-  },
-};
+const chunkVolumes = data.map((entry: any) => {
+  if (entry.volumeto === undefined) {
+    throw new Error(`Missing 'volumeto' in entry: ${JSON.stringify(entry)}`);
+  }
+  return entry.volumeto;
+});
 ```
 
-### 3. Caching and Performance
+### 3. Data Merging
 
 ```typescript
-// Check cache first
-const cacheKey = `${cryptoSymbol}_${days}`;
-const cachedData = this.cache.get(cacheKey);
+// Merge chunks in chronological order
+prices.unshift(...chunkPrices);
+volumes.unshift(...chunkVolumes);
 
-if (
-  cachedData &&
-  Date.now() - cachedData.metadata.lastUpdated < CACHE_DURATION
-) {
-  return cachedData;
+// Final validation
+if (prices.length === 0 || volumes.length === 0) {
+  throw new Error(`No valid data retrieved for ${cryptoSymbol}`);
 }
 
-// Fetch fresh data
-const freshData = await this.fetchFromAPI(cryptoSymbol, days);
-
-// Store in cache
-this.cache.set(cacheKey, freshData);
-
-return freshData;
+return { prices, volumes };
 ```
 
 ## Usage Examples
@@ -237,62 +167,24 @@ import { CryptoCompareService } from "./CryptoCompareService";
 const cryptoCompare = new CryptoCompareService();
 
 // Retrieve 1 year of daily data for BTC
-const btcData = await cryptoCompare.getHistoricalData("BTC", 365);
+const { prices, volumes } = await cryptoCompare.getHistoricalData("BTC", 365);
 
-console.log(`Retrieved ${btcData.prices.length} days of BTC data`);
-console.log(`Latest price: $${btcData.prices[btcData.prices.length - 1]}`);
-console.log(`Latest volume: ${btcData.volumes[btcData.volumes.length - 1]}`);
+console.log(`Retrieved ${prices.length} days of BTC data`);
+console.log(`Latest price: $${prices[prices.length - 1]}`);
+console.log(`Latest volume: ${volumes[volumes.length - 1]}`);
 ```
 
-### Current Market Data
+### Custom Chunk Size
 
 ```typescript
-// Get current BTC price
-const btcPrice = await cryptoCompare.getCurrentPrice("BTC");
-console.log(`Current BTC price: $${btcPrice}`);
-
-// Get market cap
-const btcMarketCap = await cryptoCompare.getMarketCap("BTC");
-console.log(`BTC market cap: $${btcMarketCap.toLocaleString()}`);
-
-// Get 24h volume
-const btcVolume = await cryptoCompare.get24hVolume("BTC");
-console.log(`BTC 24h volume: $${btcVolume.toLocaleString()}`);
-
-// Get price change
-const btcPriceChange = await cryptoCompare.getPriceChange24h("BTC");
-console.log(`BTC 24h price change: $${btcPriceChange}`);
-```
-
-### Multiple Cryptocurrency Data
-
-```typescript
-// Fetch data for multiple cryptocurrencies
-const symbols = ["BTC", "ETH", "SOL", "MATIC"];
-
-const marketData = await Promise.all(
-  symbols.map(async (symbol) => {
-    const price = await cryptoCompare.getCurrentPrice(symbol);
-    const marketCap = await cryptoCompare.getMarketCap(symbol);
-    const volume = await cryptoCompare.get24hVolume(symbol);
-
-    return {
-      symbol,
-      price,
-      marketCap,
-      volume,
-    };
-  })
+// Retrieve 2 years of data with 60-day chunks
+const { prices, volumes } = await cryptoCompare.getHistoricalData(
+  "BTC",
+  730, // 2 years
+  60 // 60-day chunks
 );
 
-console.log("Market Data Summary:");
-marketData.forEach((data) => {
-  console.log(
-    `${data.symbol}: $${
-      data.price
-    } | MC: $${data.marketCap.toLocaleString()} | Vol: $${data.volume.toLocaleString()}`
-  );
-});
+console.log(`Retrieved ${prices.length} days with custom chunking`);
 ```
 
 ### Integration with DataProcessor
@@ -301,39 +193,12 @@ marketData.forEach((data) => {
 import { DataProcessor } from "./bitcoin/DataProcessor";
 
 // Use CryptoCompareService with DataProcessor
-const dataProcessor = new DataProcessor();
 const cryptoCompare = new CryptoCompareService();
 
-// Fetch historical data
-const btcData = await cryptoCompare.getHistoricalData("BTC", 450); // 1.25 years
+// Fetch historical data for the DataProcessor
+const btcData = await cryptoCompare.getHistoricalData("BTC", 1200); // ~3.3 years
 
-// Process data for training
-const trainingData = await dataProcessor.prepareTrainingData();
-
-console.log(`Prepared ${trainingData.sequences.length} training sequences`);
-```
-
-### Integration with Backtesting
-
-```typescript
-import { TradeModelBacktester } from "./bitcoin/TradeModelBacktester";
-
-// Use CryptoCompareService for backtesting
-const backtester = new TradeModelBacktester(model, strategy, 10000);
-const cryptoCompare = new CryptoCompareService();
-
-// Fetch historical data for backtesting
-const recentData = await cryptoCompare.getHistoricalData("BTC", 180); // 6 months
-const historicalData = await cryptoCompare.getHistoricalData("BTC", 365); // 1 year
-
-// Run backtest
-const trades = await backtester.backtest(
-  historicalData,
-  100, // startIndex
-  300 // endIndex
-);
-
-console.log(`Backtest completed with ${trades.length} trades`);
+console.log(`Fetched ${btcData.prices.length} days for training`);
 ```
 
 ## Configuration
@@ -342,25 +207,17 @@ console.log(`Backtest completed with ${trades.length} trades`);
 
 ```typescript
 const API_CONFIG = {
-  BASE_URL: "https://min-api.cryptocompare.com",
-  RATE_LIMIT: 1000, // Requests per minute
-  CACHE_DURATION: 5 * 60 * 1000, // 5 minutes in milliseconds
-  TIMEOUT: 10000, // 10 seconds
-  RETRY_ATTEMPTS: 3, // Number of retry attempts
-  RETRY_DELAY: 1000, // Delay between retries in ms
+  BASE_URL: "https://min-api.cryptocompare.com/data/v2",
+  DEFAULT_CHUNK_DAYS: 90, // Days per API request chunk
+  RATE_LIMIT_DELAY: 50, // Milliseconds between requests
+  DEFAULT_SYMBOL: "USD", // Base currency for price data
 };
 ```
 
-### Error Handling Configuration
+### Environment Variables
 
-```typescript
-const ERROR_CONFIG = {
-  MAX_RETRIES: 3,
-  RETRY_DELAY: 1000,
-  TIMEOUT: 10000,
-  RATE_LIMIT_WINDOW: 60000, // 1 minute
-  RATE_LIMIT_MAX: 1000, // Max requests per window
-};
+```bash
+CRYPTOCOMPARE_API_KEY=your_cryptocompare_api_key
 ```
 
 ## Error Handling
@@ -368,175 +225,95 @@ const ERROR_CONFIG = {
 ### API Error Management
 
 ```typescript
-// Handle different types of API errors
 try {
-  const data = await this.getHistoricalData("BTC", 365);
-  return data;
+  const response = await axios.get(`${this.baseUrl}/histoday`, {
+    params: {
+      fsym: cryptoSymbol.toUpperCase(),
+      tsym: "USD",
+      limit: limit,
+      toTs: toTimestamp,
+      api_key: process.env.CRYPTOCOMPARE_API_KEY,
+    },
+  });
 } catch (error) {
-  if (error.message.includes("429")) {
-    // Rate limit exceeded
-    console.log("Rate limit exceeded, waiting before retry...");
-    await this.delay(this.retryDelay);
-    return this.getHistoricalData("BTC", 365);
-  } else if (error.message.includes("404")) {
-    // Symbol not found
-    throw new Error(`Cryptocurrency symbol not found: BTC`);
-  } else if (error.message.includes("500")) {
-    // Server error
-    console.log("Server error, retrying...");
-    return this.retryRequest(() => this.getHistoricalData("BTC", 365));
-  } else {
-    // Other errors
-    throw new Error(`API request failed: ${error.message}`);
-  }
+  console.error(`Error fetching historical data for ${cryptoSymbol}:`, error);
+  throw error;
 }
+```
+
+### Data Validation
+
+```typescript
+// Validate API response structure
+if (
+  !response.data ||
+  !response.data.Data ||
+  !Array.isArray(response.data.Data.Data)
+) {
+  throw new Error(
+    `Invalid API response structure: ${JSON.stringify(response.data)}`
+  );
+}
+
+// Validate required fields
+const chunkPrices = data.map((entry: any) => {
+  if (entry.close === undefined) {
+    throw new Error(`Missing 'close' price in entry: ${JSON.stringify(entry)}`);
+  }
+  return entry.close;
+});
 ```
 
 ### Rate Limiting
 
-```typescript
-// Implement rate limiting
-private async checkRateLimit(): Promise<void> {
-  const now = Date.now();
-  const windowStart = now - this.rateLimitWindow;
-
-  // Remove old requests from window
-  this.requestTimestamps = this.requestTimestamps.filter(
-    timestamp => timestamp > windowStart
-  );
-
-  // Check if we're at the limit
-  if (this.requestTimestamps.length >= this.rateLimitMax) {
-    const oldestRequest = this.requestTimestamps[0];
-    const waitTime = this.rateLimitWindow - (now - oldestRequest);
-    await this.delay(waitTime);
-  }
-
-  // Add current request
-  this.requestTimestamps.push(now);
-}
-```
-
-### Fallback Mechanisms
-
-```typescript
-// Implement fallback data sources
-private async getFallbackData(cryptoSymbol: string, days: number): Promise<HistoricalData> {
-  console.log(`Attempting fallback data source for ${cryptoSymbol}`);
-
-  // Try alternative API endpoints
-  const fallbackUrls = [
-    `https://api.coingecko.com/api/v3/coins/${cryptoSymbol}/market_chart?vs_currency=usd&days=${days}`,
-    `https://api.binance.com/api/v3/klines?symbol=${cryptoSymbol}USDT&interval=1d&limit=${days}`
-  ];
-
-  for (const url of fallbackUrls) {
-    try {
-      const response = await fetch(url);
-      if (response.ok) {
-        return this.parseFallbackResponse(await response.json(), cryptoSymbol, days);
-      }
-    } catch (error) {
-      console.log(`Fallback source failed: ${url}`);
-    }
-  }
-
-  throw new Error(`All data sources failed for ${cryptoSymbol}`);
-}
-```
+- **Fixed Delay**: 50ms delay between requests
+- **Sequential Processing**: Chunks processed sequentially to avoid overwhelming API
+- **Respect Limits**: Stays well below CryptoCompare's rate limits
 
 ## Performance Considerations
 
-### Caching Strategy
+### Chunking Strategy
 
-```typescript
-// Implement intelligent caching
-private getCacheKey(cryptoSymbol: string, days: number): string {
-  return `${cryptoSymbol}_${days}_${Math.floor(Date.now() / this.cacheDuration)}`;
-}
+- **Default 90-day chunks**: Balances API efficiency with memory usage
+- **Configurable chunk size**: Can be adjusted based on requirements
+- **Sequential processing**: Prevents API rate limit violations
 
-private isCacheValid(cachedData: any): boolean {
-  const age = Date.now() - cachedData.metadata.lastUpdated;
-  return age < this.cacheDuration;
-}
-```
+### Memory Management
 
-### Batch Processing
-
-```typescript
-// Process multiple requests efficiently
-public async getMultipleHistoricalData(
-  symbols: string[],
-  days: number
-): Promise<Record<string, HistoricalData>> {
-  const results: Record<string, HistoricalData> = {};
-
-  // Process in batches to respect rate limits
-  const batchSize = 5;
-  for (let i = 0; i < symbols.length; i += batchSize) {
-    const batch = symbols.slice(i, i + batchSize);
-
-    const batchPromises = batch.map(async (symbol) => {
-      const data = await this.getHistoricalData(symbol, days);
-      return { symbol, data };
-    });
-
-    const batchResults = await Promise.all(batchPromises);
-
-    batchResults.forEach(({ symbol, data }) => {
-      results[symbol] = data;
-    });
-
-    // Rate limiting delay between batches
-    if (i + batchSize < symbols.length) {
-      await this.delay(1000);
-    }
-  }
-
-  return results;
-}
-```
+- **Efficient array operations**: Uses unshift for chronological ordering
+- **Minimal memory allocation**: Processes chunks incrementally
+- **No caching**: Simple implementation without memory overhead
 
 ## Dependencies
 
 ### External Dependencies
 
-- **Fetch API**: HTTP requests (Node.js 18+ or polyfill)
-- **CryptoCompare API**: External cryptocurrency data source
+- **axios**: HTTP client for API requests
+- **TIME_CONVERSIONS**: Time utility constants from application
 
 ### Internal Dependencies
 
-- **Rate Limiter**: Custom rate limiting implementation
-- **Cache Manager**: Memory-based caching system
-- **Error Handler**: Comprehensive error management
+- **Environment variables**: CRYPTOCOMPARE_API_KEY for API access
 
 ## Testing
 
 ### Unit Testing Strategy
 
 - **API Mocking**: Mock CryptoCompare API responses
-- **Error Scenarios**: Test various error conditions
-- **Rate Limiting**: Verify rate limit enforcement
-- **Caching**: Test cache hit/miss scenarios
+- **Error Scenarios**: Test various error conditions and data validation
+- **Chunking Logic**: Verify correct chunk calculation and processing
 
 ### Integration Testing
 
 - **Real API Calls**: Test with actual CryptoCompare API
-- **Performance Testing**: Measure response times and throughput
-- **Error Recovery**: Test fallback mechanisms
+- **Rate Limiting**: Verify throttling behavior
+- **Data Integrity**: Validate chronological ordering and completeness
 
 ## Future Enhancements
 
 ### Potential Improvements
 
-- **WebSocket Support**: Real-time data streaming
-- **Multiple Data Sources**: Integration with other APIs
-- **Advanced Caching**: Redis-based distributed caching
-- **Data Validation**: Enhanced data quality checks
-
-### Advanced Features
-
-- **Predictive Caching**: Pre-fetch frequently requested data
-- **Data Compression**: Compress cached data for memory efficiency
-- **Analytics**: Track API usage and performance metrics
-- **Webhook Support**: Real-time data updates via webhooks
+- **Caching Layer**: Add optional response caching for frequently requested data
+- **Parallel Processing**: Process multiple chunks concurrently with rate limiting
+- **Retry Logic**: Add automatic retry for failed requests
+- **Multiple Symbols**: Support batch requests for multiple cryptocurrencies

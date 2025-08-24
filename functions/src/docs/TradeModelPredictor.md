@@ -451,7 +451,7 @@ if (marketMetrics.rsi < 30 && marketMetrics.momentum > 0) {
 ```typescript
 const PREDICTION_CONFIG = {
   TIMESTEPS: 30, // Sequence length
-  FEATURE_COUNT: 62, // Number of features
+  FEATURE_COUNT: 36, // Number of features
   CONFIDENCE_THRESHOLD: 0.6, // Minimum confidence for action
   VOLATILITY_THRESHOLD: 0.05, // High volatility threshold
   TREND_THRESHOLD: 0.02, // Strong trend threshold

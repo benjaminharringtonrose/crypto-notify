@@ -165,7 +165,7 @@ console.log("Model weights saved to Firebase Storage");
 ```typescript
 const MODEL_CONFIG = {
   TIMESTEPS: 30, // Sequence length
-  FEATURE_COUNT: 62, // BTC features
+  FEATURE_COUNT: 36, // BTC features
   LSTM_UNITS_1: 48, // First LSTM layer units
   LSTM_UNITS_2: 24, // Second LSTM layer units
   LSTM_UNITS_3: 12, // Third LSTM layer units

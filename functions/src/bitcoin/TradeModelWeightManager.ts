@@ -2,6 +2,7 @@ import * as tf from "@tensorflow/tfjs-node";
 import { FirebaseService } from "../api/FirebaseService";
 import { Bucket } from "@google-cloud/storage";
 import { FILE_NAMES, MODEL_CONFIG } from "../constants";
+import { FeatureDetector } from "./FeatureDetector";
 
 export class ModelWeightManager {
   private weights: any;
@@ -391,13 +392,15 @@ export class ModelWeightManager {
 
   public getFeatureMeans(): number[] {
     return (
-      this.weights?.featureMeans || Array(MODEL_CONFIG.FEATURE_COUNT).fill(0)
+      this.weights?.featureMeans ||
+      Array(FeatureDetector.getFeatureCount()).fill(0)
     );
   }
 
   public getFeatureStds(): number[] {
     return (
-      this.weights?.featureStds || Array(MODEL_CONFIG.FEATURE_COUNT).fill(1)
+      this.weights?.featureStds ||
+      Array(FeatureDetector.getFeatureCount()).fill(1)
     );
   }
 }

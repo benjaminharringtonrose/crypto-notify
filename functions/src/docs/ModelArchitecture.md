@@ -9,7 +9,7 @@ This document provides a comprehensive explanation of the crypto trading model a
 The model follows a **CNN-LSTM-Dense** hybrid architecture specifically designed for time series prediction in cryptocurrency markets:
 
 ```
-Input (30 timesteps × 62 features)
+Input (30 timesteps × 36 features)
     ↓
 Conv1D Layer 1 (12 filters, kernel=5) + BatchNorm + Dropout(0.2)
     ↓
@@ -32,9 +32,9 @@ Output Layer (2 units, Softmax)
 
 ### 1. Input Layer
 
-- **Shape**: `[batch_size, 30, 62]`
+- **Shape**: `[batch_size, 30, 36]`
 - **Timesteps**: 30 days of historical data
-- **Features**: 62 total features (BTC features only)
+- **Features**: 36 total features (BTC features only)
 
 ### 2. Convolutional Layers (Feature Extraction)
 
@@ -43,7 +43,7 @@ Output Layer (2 units, Softmax)
 - **Filters**: 12
 - **Kernel Size**: 5
 - **Activation**: ReLU
-- **Input Shape**: `[30, 62]`
+- **Input Shape**: `[30, 36]`
 - **Output Shape**: `[26, 12]`
 - **Purpose**: Extract local temporal patterns in price movements
 
@@ -113,9 +113,9 @@ Output Layer (2 units, Softmax)
 
 ## Feature Engineering
 
-### Input Features (62 total)
+### Input Features (36 total)
 
-The model uses 62 technical indicators and features computed from Bitcoin price and volume data:
+The model uses 36 technical indicators and features computed from Bitcoin price and volume data (as of v1.5.0 - Advanced Market Microstructure Features):
 
 1. **Momentum Indicators**:
 
@@ -201,7 +201,7 @@ The model uses 62 technical indicators and features computed from Bitcoin price 
 ### Data Preparation
 
 1. **Historical Data Fetching**: 1200 days of BTC data
-2. **Feature Calculation**: 62 technical indicators computed
+2. **Feature Calculation**: 36 technical indicators computed
 3. **Sequence Generation**: 30-day sliding windows
 4. **Data Normalization**: Z-score normalization per feature
 5. **Data Augmentation**: Noise injection and sequence balancing
@@ -253,7 +253,7 @@ The model uses 62 technical indicators and features computed from Bitcoin price 
 ### Design Decisions
 
 1. **30 Timesteps**: Balance between sufficient history and computational efficiency
-2. **62 Features**: Comprehensive technical analysis without overfitting
+2. **36 Features**: Comprehensive technical analysis without overfitting
 3. **3 LSTM Layers**: Gradual temporal abstraction (48→24→12 units)
 4. **Batch Normalization**: Stabilize training and improve convergence
 5. **Dropout**: Prevent overfitting in deep architecture

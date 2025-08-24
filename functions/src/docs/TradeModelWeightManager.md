@@ -352,7 +352,7 @@ public getFeatureStds(): number[] {
 
 - **Means**: Zero-mean normalization (no shift)
 - **Stds**: Unit variance normalization (no scaling)
-- **Feature Count**: Uses `MODEL_CONFIG.FEATURE_COUNT` constant (62 features)
+- **Feature Count**: Uses `MODEL_CONFIG.FEATURE_COUNT` constant (36 features)
 
 #### Normalization Application
 
@@ -373,7 +373,7 @@ const normalizedFeatures = features.sub(featureMeans).div(featureStds);
 import { MODEL_CONFIG } from "../constants";
 
 // Weight shapes for validation
-CONV1D_1_WEIGHT_SHAPE: [5, 62, 12]; // [kernelSize, features, filters]
+CONV1D_1_WEIGHT_SHAPE: [5, 36, 12]; // [kernelSize, features, filters]
 CONV1D_2_WEIGHT_SHAPE: [3, 12, 24]; // [kernelSize, filters, filters]
 LSTM1_WEIGHT_SHAPE: [24, 192]; // [inputFeatures, units * 4]
 LSTM1_RECURRENT_SHAPE: [48, 192]; // [units, units * 4]
@@ -384,7 +384,7 @@ LSTM3_RECURRENT_SHAPE: [12, 48]; // [units, units * 4]
 DENSE_1_WEIGHT_SHAPE: [12, 24]; // [inputFeatures, outputFeatures]
 DENSE_2_WEIGHT_SHAPE: [24, 12]; // [inputFeatures, outputFeatures]
 OUTPUT_WEIGHT_SHAPE: [12, 2]; // [inputFeatures, outputFeatures]
-FEATURE_COUNT: 62; // Total features
+FEATURE_COUNT: 36; // Total features
 ```
 
 ### File Names Configuration
@@ -447,7 +447,7 @@ const featureStds = weightManager.getFeatureStds();
 // Apply normalization to input features
 const inputFeatures = tf.tensor2d([
   [
-    /* 62 feature values */
+    /* 36 feature values */
   ],
 ]);
 const normalizedFeatures = inputFeatures.sub(featureMeans).div(featureStds);

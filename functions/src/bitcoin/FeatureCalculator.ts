@@ -1,5 +1,6 @@
 import { Indicators } from "../types";
-import { MODEL_CONFIG, PERIODS } from "../constants";
+import { PERIODS } from "../constants";
+import { FeatureDetector } from "./FeatureDetector";
 
 interface ComputeParams {
   prices: number[];
@@ -1003,7 +1004,7 @@ export default class FeatureCalculator {
     currentPrice,
   }: ComputeParams): number[] {
     if (!prices || !volumes || dayIndex < 0 || dayIndex >= prices.length) {
-      return Array(MODEL_CONFIG.BTC_FEATURE_COUNT).fill(0);
+      return Array(FeatureDetector.getFeatureCount()).fill(0);
     }
 
     const indicators = this.calculateIndicators({

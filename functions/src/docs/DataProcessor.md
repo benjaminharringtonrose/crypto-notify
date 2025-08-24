@@ -28,21 +28,35 @@ Price/Volume      Pattern Detection     Sequences        Movement Labels   Datas
 
 ```typescript
 export class DataProcessor {
-  private cryptoCompare: CryptoCompareService;
-  private featureCalculator: FeatureCalculator;
-  private sequenceGenerator: FeatureSequenceGenerator;
+  private readonly config: ModelConfig;
+  private readonly startDaysAgo: number;
+  private difficultyLevel: number;
 
-  constructor();
+  constructor(config: ModelConfig, startDaysAgo: number);
 
-  public async fetchHistoricalData(): Promise<{ btcData: HistoricalData }>;
-  public buildSequence(
+  // Curriculum Learning Methods
+  public setDifficultyLevel(level: number): void;
+  public getDifficultyLevel(): number;
+
+  // Core Processing Methods
+  private buildSequence(
     btcData: HistoricalData,
     index: number
   ): number[][] | null;
-  public computeFeatures(btcData: HistoricalData, index: number): number[];
-  public validateFeatures(btcFeatures: number[]): boolean;
-  public labelData(params: LabelParams): number;
-  public async prepareTrainingData(): Promise<TrainingData>;
+  private computeFeatures(btcData: HistoricalData, index: number): number[];
+  private validateFeatures(btcFeatures: number[]): boolean;
+  private labelData(params: LabelParams): number;
+  private balanceDataset(
+    X: number[][][],
+    y: number[]
+  ): { X: number[][][]; y: number[] };
+
+  // Main Interface
+  public async prepareData(): Promise<{ X: number[][][]; y: number[] }>;
+  public computeFeatureStats(features: number[][]): {
+    mean: number[];
+    std: number[];
+  };
 }
 ```
 
@@ -64,23 +78,26 @@ interface HistoricalData {
 interface LabelParams {
   prices: number[]; // Price array for labeling
   dayIndex: number; // Current day index
-  lookaheadDays?: number; // Days to look ahead (default: 7)
-  threshold?: number; // Price change threshold (default: 0.02)
+  threshold?: number; // Price change threshold (default: 0.001)
+  horizon?: number; // Days to look ahead (default: 7)
 }
 ```
 
-### TrainingData
+### ModelConfig
 
 ```typescript
-interface TrainingData {
-  sequences: number[][][]; // 3D array: [samples, timesteps, features]
-  labels: number[]; // Binary labels: 0 (hold/sell), 1 (buy)
-  metadata: {
-    totalSamples: number;
-    buySamples: number;
-    holdSamples: number;
-    featureCount: number;
-  };
+interface ModelConfig {
+  timesteps: number; // Number of timesteps in sequences
+  BTC_FEATURE_COUNT: number; // Number of BTC features (36)
+}
+```
+
+### PrepareDataResult
+
+```typescript
+interface PrepareDataResult {
+  X: number[][][]; // 3D array: [samples, timesteps, features]
+  y: number[]; // Binary labels: 0 (sell), 1 (buy)
 }
 ```
 
@@ -88,24 +105,62 @@ interface TrainingData {
 
 ### Public Methods
 
-#### `fetchHistoricalData(): Promise<{ btcData: HistoricalData }>`
+#### `setDifficultyLevel(level: number): void`
 
-Fetches historical cryptocurrency data from external APIs.
+Sets the curriculum learning difficulty level for data filtering.
+
+**Parameters:**
+
+- `level: number` - Difficulty level between 0.1 and 1.0 (1.0 = use all data)
+
+**Usage:** Controls which samples are included based on complexity scoring.
+
+#### `getDifficultyLevel(): number`
+
+Returns the current curriculum learning difficulty level.
 
 **Returns:**
 
-- `Promise<{ btcData: HistoricalData }>` - Historical BTC data
+- `number` - Current difficulty level (0.1-1.0)
+
+#### `prepareData(): Promise<{ X: number[][][]; y: number[] }>`
+
+Prepares complete training dataset with sequences and labels.
+
+**Returns:**
+
+- `Promise<{ X: number[][][]; y: number[] }>` - Training sequences and labels
 
 **Process:**
 
-1. **API Integration**: Uses CryptoCompareService for data retrieval
-2. **Data Validation**: Ensures data quality and completeness
-3. **Error Handling**: Manages API failures and data inconsistencies
-4. **Data Formatting**: Standardizes data format for processing
+1. **Data Fetching**: Retrieves historical BTC data from CryptoCompareService
+2. **Sequence Generation**: Creates feature sequences with noise augmentation
+3. **Label Generation**: Creates trading labels with 0.001 threshold and 7-day horizon
+4. **Dataset Balancing**: Ensures balanced buy/sell distribution
+5. **Curriculum Filtering**: Applies difficulty-based sample filtering
+
+#### `computeFeatureStats(features: number[][]): { mean: number[]; std: number[] }`
+
+Computes normalization statistics for feature arrays.
+
+**Parameters:**
+
+- `features: number[][]` - 2D array of feature vectors
+
+**Returns:**
+
+- `{ mean: number[]; std: number[] }` - Mean and standard deviation for each feature
+
+**Features:**
+
+- **Robust Statistics**: Uses clipping to prevent outlier dominance
+- **Minimum STD**: Ensures minimum 0.01 standard deviation to prevent division by zero
+
+### Private Methods
 
 #### `buildSequence(btcData: HistoricalData, index: number): number[][] | null`
 
-Builds a feature sequence for a specific time index.
+Builds a feature sequence for a specific time index with data augmentation.
 
 **Parameters:**
 
@@ -116,12 +171,11 @@ Builds a feature sequence for a specific time index.
 
 - `number[][] | null` - Feature sequence or null if invalid
 
-**Process:**
+**Features:**
 
-1. **Index Validation**: Ensures valid time index
-2. **Feature Computation**: Calculates technical indicators
-3. **Sequence Assembly**: Combines BTC features
-4. **Quality Check**: Validates sequence integrity
+- **Data Augmentation**: Adds volatility-based noise and temporal shifts
+- **ATR-based Scaling**: Uses Average True Range for volatility-aware augmentation
+- **Sequence Padding**: Ensures correct timestep length
 
 #### `computeFeatures(btcData: HistoricalData, index: number): number[]`
 
@@ -134,33 +188,7 @@ Computes feature vector for a specific time index.
 
 **Returns:**
 
-- `number[]` - Feature vector (62 BTC features)
-
-**Process:**
-
-1. **Technical Analysis**: Computes all technical indicators
-2. **Pattern Detection**: Identifies chart patterns
-3. **Feature Integration**: Combines all features into vector
-4. **Normalization**: Applies scaling and normalization
-
-#### `validateFeatures(btcFeatures: number[]): boolean`
-
-Validates feature vector integrity and quality.
-
-**Parameters:**
-
-- `btcFeatures: number[]` - BTC feature vector
-
-**Returns:**
-
-- `boolean` - True if features are valid
-
-**Validation Checks:**
-
-- **Length**: Ensures correct feature count
-- **Range**: Validates feature value ranges
-- **NaN/Infinity**: Checks for invalid numerical values
-- **Consistency**: Verifies feature relationships
+- `number[]` - Feature vector (36 BTC features)
 
 #### `labelData(params: LabelParams): number`
 
@@ -172,30 +200,13 @@ Generates trading labels based on future price movements.
 
 **Returns:**
 
-- `number` - Binary label (0: hold/sell, 1: buy)
+- `number` - Binary label (0: sell, 1: buy)
 
-**Labeling Logic:**
+**Configuration:**
 
-1. **Future Price Analysis**: Examines price movement over lookahead period
-2. **Threshold Comparison**: Compares price change to threshold
-3. **Label Assignment**: Assigns buy (1) or hold/sell (0) label
-4. **Edge Case Handling**: Manages boundary conditions
-
-#### `prepareTrainingData(): Promise<TrainingData>`
-
-Prepares complete training dataset with sequences and labels.
-
-**Returns:**
-
-- `Promise<TrainingData>` - Complete training dataset
-
-**Process:**
-
-1. **Data Fetching**: Retrieves historical BTC data
-2. **Sequence Generation**: Creates feature sequences
-3. **Label Generation**: Creates trading labels
-4. **Dataset Balancing**: Handles class imbalance
-5. **Quality Assurance**: Validates final dataset
+- **Threshold**: 0.001 (0.1% price change)
+- **Horizon**: 7 days lookahead
+- **Strategy**: Simple threshold-based labeling
 
 ## Data Flow
 
@@ -349,7 +360,7 @@ const { btcData } = await processor.fetchHistoricalData();
 const features = processor.computeFeatures(btcData, 100);
 
 console.log(`Generated ${features.length} features`);
-// Output: Generated 62 features
+// Output: Generated 36 features
 ```
 
 ### Complete Training Data Preparation
@@ -388,7 +399,7 @@ console.log(`Custom label: ${customLabel}`);
 
 ```typescript
 const FEATURE_CONFIG = {
-  BTC_FEATURE_COUNT: 62, // Number of BTC features
+  BTC_FEATURE_COUNT: 36, // Number of BTC features
   TIMESTEPS: 30, // Sequence length
   LOOKAHEAD_DAYS: 7, // Labeling lookahead
   PRICE_CHANGE_THRESHOLD: 0.02, // 2% price change threshold

@@ -8,13 +8,16 @@
 
 **IMPORTANT**: You must come up with 5 completely new technical indicators that we have NOT tested before. Do not retest any indicators that have already been experimented with in previous rounds.
 
+**MODEL PURPOSE**: The Bitcoin trading model predicts whether to **BUY** or **SELL** Bitcoin 7 days into the future based on current market conditions and technical indicators.
+
 ## 📊 Current Context
 
 - **Model**: Conv1D(48,3) → BN → Dropout(0.3) → LSTM(64) → Dense(32) → Dropout(0.3) → Output(2)
-- **Current Features**: 38 optimized features (up from 26 original)
+- **Current Features**: 49 optimized features (up from 26 original)
 - **Performance Target**: Improve combined F1 score, validation accuracy, and balanced accuracy
 - **Tolerance**: 2% performance improvement threshold
 - **Prediction Horizon**: 7 days out
+- **Model Output**: Binary classification - **BUY** (1) or **SELL** (0) decision for Bitcoin 7 days in the future
 
 ## 🔧 Implementation Requirements
 
@@ -72,6 +75,8 @@ Keep the new indicator if it meets ANY of these criteria:
 - **Balanced Accuracy**: Improves by >2%
 - **Matthews Correlation**: Improves by >2%
 - **Sell F1 Score**: Improves significantly (addresses current imbalance)
+
+**Note**: The model outputs binary predictions - **BUY** (1) when it predicts Bitcoin price will rise in 7 days, **SELL** (0) when it predicts Bitcoin price will fall in 7 days.
 
 ## 📈 **ROUND 1 RESULTS (COMPLETED)**
 
@@ -214,7 +219,7 @@ The model now has a comprehensive set of 38 technical indicators covering moment
 - **Williams %R** is crucial for sell predictions and overall model balance
 - **ADL** was adding substantial noise rather than value
 
-The model now has a comprehensive set of 42 technical indicators optimized for 7-day Bitcoin price prediction, with each feature providing measurable value to the prediction accuracy.
+The model now has a comprehensive set of 42 technical indicators optimized for 7-day Bitcoin BUY/SELL prediction, with each feature providing measurable value to the prediction accuracy.
 
 ### **Round 6 Analysis:**
 
@@ -247,7 +252,7 @@ The model now has a comprehensive set of 42 technical indicators optimized for 7
 - **VWMA** adds value, especially for buy predictions
 - **VROC and VPT** were adding noise rather than value
 
-The model now has a comprehensive set of 38 technical indicators optimized for 7-day Bitcoin price prediction, with each feature providing measurable value to the prediction accuracy.
+The model now has a comprehensive set of 38 technical indicators optimized for 7-day Bitcoin BUY/SELL prediction, with each feature providing measurable value to the prediction accuracy.
 
 ## 📈 **ROUND 4 RESULTS (COMPLETED)**
 
@@ -275,7 +280,7 @@ All 3 indicators tested in Round 4 were removed, indicating they were adding noi
 - **Bollinger Band Width**: Removed due to 8.31% improvement in combined F1 score when removed
 - **Pivot Points**: Removed due to 7.39% improvement in combined F1 score when removed
 
-The model maintains its optimal 36-feature configuration, demonstrating that the current feature set is well-optimized for 7-day Bitcoin price prediction.
+The model maintains its optimal 36-feature configuration, demonstrating that the current feature set is well-optimized for 7-day Bitcoin BUY/SELL prediction.
 
 ## 🎯 **EXPERIMENTATION PROCESS**
 
@@ -289,6 +294,8 @@ The model maintains its optimal 36-feature configuration, demonstrating that the
 6. **If not beneficial**: Revert changes and explain why it didn't work
 7. **Move to next indicator**: Continue with the next untested indicator in the list
 
+**Goal**: Improve the model's ability to predict whether to **BUY** or **SELL** Bitcoin 7 days into the future.
+
 **IMPORTANT**: You must select 5 completely new indicators that have never been tested in any previous round. Do not retest any indicators from the list above.
 
 ## 📋 Expected Output Format
@@ -299,7 +306,7 @@ The model maintains its optimal 36-feature configuration, demonstrating that the
 - **Type**: [Momentum/Volatility/Trend/Volume/Advanced]
 - **Calculation**: [Mathematical formula and implementation]
 - **Interpretation**: [How to read the signals]
-- **Expected Benefits**: [Why it might improve our 7-day model]
+- **Expected Benefits**: [Why it might improve our 7-day BUY/SELL prediction model]
 
 ### **Implementation Details**
 
@@ -341,7 +348,7 @@ The model maintains its optimal 36-feature configuration, demonstrating that the
 **Round 8**: 3 out of 5 indicators kept (Historical Volatility, Camarilla Pivots, Accelerator Oscillator)
 **Round 9**: 4 out of 5 indicators kept (Chaikin Oscillator, Elder Force Index, Klinger Volume Oscillator, Price Channel)
 
-**Final Result**: The Bitcoin trading model now has **49 optimized features** (up from the original 26), with 25 new indicators from the nine rounds providing measurable value for 7-day price prediction.
+**Final Result**: The Bitcoin trading model now has **49 optimized features** (up from the original 26), with 25 new indicators from the nine rounds providing measurable value for 7-day BUY/SELL prediction.
 
 ### **Current Optimal Feature Set:**
 
@@ -390,7 +397,7 @@ The model now includes a comprehensive set of technical indicators covering:
 - **AO** adds value for momentum acceleration/deceleration detection
 - **TII and VR** were adding noise rather than value to the model
 
-The model now has a comprehensive set of 45 technical indicators optimized for 7-day Bitcoin price prediction, with each feature providing measurable value to the prediction accuracy.
+The model now has a comprehensive set of 45 technical indicators optimized for 7-day Bitcoin BUY/SELL prediction, with each feature providing measurable value to the prediction accuracy.
 
 ## 📈 **ROUND 9 RESULTS (COMPLETED)**
 
@@ -426,7 +433,7 @@ The model now has a comprehensive set of 45 technical indicators optimized for 7
 - **PC** is crucial for buy predictions and overall model balance
 - **MI** was adding minimal value and was removed to optimize the feature set
 
-The model now has a comprehensive set of 49 technical indicators optimized for 7-day Bitcoin price prediction, with each feature providing measurable value to the prediction accuracy.
+The model now has a comprehensive set of 49 technical indicators optimized for 7-day Bitcoin BUY/SELL prediction, with each feature providing measurable value to the prediction accuracy.
 
 ## 📝 **DOCUMENTATION REQUIREMENTS**
 
@@ -522,7 +529,7 @@ Add all tested indicators from the new round to the comprehensive list of tested
 ```
 Please experiment with [NEW_UNTESTED_INDICATOR_NAME] for our Bitcoin trading model.
 This is experiment #[X] of 5 in our systematic indicator testing process.
-[Brief description of why this indicator might help with 7-day predictions]
+[Brief description of why this indicator might help with 7-day BUY/SELL predictions]
 ```
 
 ---
@@ -530,3 +537,5 @@ This is experiment #[X] of 5 in our systematic indicator testing process.
 **Note**: This systematic approach ensures we test multiple indicators efficiently, keeping only those that provide measurable performance improvements while maintaining the model's current optimization level.
 
 **CRITICAL**: You must select 5 completely new technical indicators that have never been tested in any previous round. The comprehensive list of tested indicators is provided above to ensure no duplication.
+
+**MODEL PURPOSE**: The Bitcoin trading model predicts binary **BUY** (1) or **SELL** (0) decisions for Bitcoin 7 days into the future, helping traders make informed decisions about when to enter or exit positions.

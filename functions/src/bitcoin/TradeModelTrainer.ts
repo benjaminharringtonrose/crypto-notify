@@ -12,6 +12,7 @@ import { FirebaseService } from "../api/FirebaseService";
 import { FILE_NAMES, MODEL_CONFIG, TRAINING_CONFIG } from "../constants";
 import { DataProcessor } from "./DataProcessor";
 import { Metrics } from "./Metrics";
+import { FeatureDetector } from "./FeatureDetector";
 
 dotenv.config();
 FirebaseService.getInstance();
@@ -32,6 +33,31 @@ export class TradeModelTrainer {
   private bestValLoss: number = Infinity; // Track best validation loss
   private patienceCounter: number = 0; // Early stopping counter
 
+  // Final metrics for analysis
+  private finalMetrics: {
+    balancedAccuracy: number;
+    buyF1: number;
+    sellF1: number;
+    combinedF1: number;
+    matthewsCorrelation: number;
+    buyPrecision: number;
+    sellPrecision: number;
+    buyRecall: number;
+    sellRecall: number;
+    finalEpoch: number;
+  } = {
+    balancedAccuracy: 0,
+    buyF1: 0,
+    sellF1: 0,
+    combinedF1: 0,
+    matthewsCorrelation: 0,
+    buyPrecision: 0,
+    sellPrecision: 0,
+    buyRecall: 0,
+    sellRecall: 0,
+    finalEpoch: 0,
+  };
+
   constructor() {
     // CRITICAL FIX: Stabilize random initialization to prevent class collapse
     tf.randomUniform([1, 1], 0, 1, "float32", 42); // Seed TensorFlow random
@@ -44,22 +70,49 @@ export class TradeModelTrainer {
     console.log("TradeModelTrainer initialized");
   }
 
+  /**
+   * Initialize dynamic feature detection before training
+   */
+  private async initializeFeatureDetection(): Promise<number> {
+    const featureCount = await FeatureDetector.detectFeatureCount();
+    console.log(
+      `🔍 Dynamic feature detection: ${featureCount} features detected`
+    );
+    return featureCount;
+  }
+
   private async trainModel(
     X: number[][][],
     y: number[]
   ): Promise<{ X_mean: tf.Tensor; X_std: tf.Tensor }> {
+    // Dynamic feature detection and validation
+    const detectedFeatureCount = FeatureDetector.getFeatureCount();
+    const actualFeatureCount = X[0][0].length;
+
     console.log(
-      `Input data dimensions: [${X.length}, ${X[0].length}, ${X[0][0].length}]`
+      `Input data dimensions: [${X.length}, ${X[0].length}, ${actualFeatureCount}]`
     );
+    console.log(
+      `🔍 Expected features: ${detectedFeatureCount}, Actual: ${actualFeatureCount}`
+    );
+
     if (X[0].length !== this.config.timesteps) {
       throw new Error(
         `Data timestep mismatch: expected ${this.config.timesteps}, got ${X[0].length}`
       );
     }
+
+    if (actualFeatureCount !== detectedFeatureCount) {
+      throw new Error(
+        `Feature count mismatch! Expected ${detectedFeatureCount}, got ${actualFeatureCount}. ` +
+          `This suggests inconsistent feature calculation.`
+      );
+    }
+
     const X_tensor = tf.tensor3d(X, [
       X.length,
       this.config.timesteps,
-      MODEL_CONFIG.FEATURE_COUNT,
+      detectedFeatureCount, // Dynamic feature count!
     ]);
     const y_tensor = tf.tensor2d(
       y.map((label) => [label === 0 ? 1 : 0, label === 1 ? 1 : 0]),
@@ -131,7 +184,7 @@ export class TradeModelTrainer {
 
       const factory = new TradeModelFactory(
         this.config.timesteps,
-        MODEL_CONFIG.FEATURE_COUNT
+        detectedFeatureCount // Dynamic feature count!
       );
       this.model = factory.createModel();
 
@@ -194,6 +247,7 @@ export class TradeModelTrainer {
       await this.model.fitDataset(trainDataset, {
         epochs: this.config.epochs,
         validationData: valDataset,
+        verbose: TRAINING_CONFIG.TRAINING_VERBOSE, // Configurable training output
         callbacks: [
           {
             onEpochEnd: async (epoch: number, logs?: tf.Logs) => {
@@ -231,6 +285,7 @@ export class TradeModelTrainer {
                     console.log(
                       `Early stopping triggered at epoch ${epoch + 1}`
                     );
+                    this.finalMetrics.finalEpoch = epoch + 1; // Track actual final epoch
                     this.model!.stopTraining = true;
                   }
                 }
@@ -262,7 +317,26 @@ export class TradeModelTrainer {
       });
 
       console.log("Model training completed.");
-      await Metrics.evaluateModel(this.model, X_normalized, y_tensor);
+
+      // Capture final metrics for multi-run analysis
+      const evaluationResults = await Metrics.evaluateModel(
+        this.model,
+        X_normalized,
+        y_tensor
+      );
+      this.finalMetrics = {
+        balancedAccuracy: evaluationResults.balancedAccuracy,
+        buyF1: evaluationResults.buyF1,
+        sellF1: evaluationResults.sellF1,
+        combinedF1: evaluationResults.combinedF1,
+        matthewsCorrelation: evaluationResults.matthewsCorrelation,
+        buyPrecision: evaluationResults.buyPrecision,
+        sellPrecision: evaluationResults.sellPrecision,
+        buyRecall: evaluationResults.buyRecall,
+        sellRecall: evaluationResults.sellRecall,
+        finalEpoch: this.config.epochs, // Will be updated with actual final epoch if early stopping
+      };
+
       console.log(
         `Training Buy Ratio: ${y.filter((l) => l === 1).length / y.length}`
       );
@@ -287,7 +361,7 @@ export class TradeModelTrainer {
     if (!this.model) throw new Error("Model not initialized");
     console.log("Saving simplified model weights...");
 
-    // SIMPLIFIED: Only save weights that exist in our simplified architecture
+    // REVERTED: Back to proven baseline weight saving
     const weights = {
       // Conv1D layer
       conv1Weights: Array.from(
@@ -307,25 +381,6 @@ export class TradeModelTrainer {
       ),
       bnConv1MovingVariance: Array.from(
         await this.model.getLayer("bn_conv1").getWeights()[3].data()
-      ),
-
-      // LSTM layer
-      lstm1Weights: Array.from(
-        await this.model.getLayer("lstm1").getWeights()[0].data()
-      ),
-      lstm1RecurrentWeights: Array.from(
-        await this.model.getLayer("lstm1").getWeights()[1].data()
-      ),
-      lstm1Bias: Array.from(
-        await this.model.getLayer("lstm1").getWeights()[2].data()
-      ),
-
-      // Dense layer
-      dense1Weights: Array.from(
-        await this.model.getLayer("dense1").getWeights()[0].data()
-      ),
-      dense1Bias: Array.from(
-        await this.model.getLayer("dense1").getWeights()[1].data()
       ),
 
       // Output layer
@@ -349,6 +404,10 @@ export class TradeModelTrainer {
   public async train(): Promise<void> {
     try {
       const startTime = performance.now();
+
+      // Initialize dynamic feature detection
+      await this.initializeFeatureDetection();
+
       const { X, y } = await this.dataProcessor.prepareData();
       const { X_mean, X_std } = await this.trainModel(X, y);
       await this.saveModelWeights(X_mean, X_std);
@@ -364,5 +423,29 @@ export class TradeModelTrainer {
 
   public getBestThreshold(): number {
     return this.bestThreshold;
+  }
+
+  public getFinalMetrics() {
+    return this.finalMetrics;
+  }
+
+  public getBalancedAccuracy(): number {
+    return this.finalMetrics.balancedAccuracy;
+  }
+
+  public getBuyF1(): number {
+    return this.finalMetrics.buyF1;
+  }
+
+  public getSellF1(): number {
+    return this.finalMetrics.sellF1;
+  }
+
+  public getCombinedF1(): number {
+    return this.finalMetrics.combinedF1;
+  }
+
+  public getMatthewsCorrelation(): number {
+    return this.finalMetrics.matthewsCorrelation;
   }
 }

@@ -4,6 +4,7 @@ import TradeModelFactory from "./TradeModelFactory";
 import { FeatureSequenceGenerator } from "./FeatureSequenceGenerator";
 import { FirebaseService } from "../api/FirebaseService";
 import { MODEL_CONFIG, PERIODS } from "../constants";
+import { FeatureDetector } from "./FeatureDetector";
 
 export class TradeModelPredictor {
   private weightManager: ModelWeightManager;
@@ -16,12 +17,41 @@ export class TradeModelPredictor {
     this.weightManager = new ModelWeightManager();
     this.sequenceGenerator = new FeatureSequenceGenerator(this.timesteps);
     FirebaseService.getInstance();
+
+    // Initialize with a placeholder model - will be recreated with correct feature count
     const factory = new TradeModelFactory(
       MODEL_CONFIG.TIMESTEPS,
-      MODEL_CONFIG.FEATURE_COUNT
+      36 // Temporary - will be updated when feature detection completes
     );
     this.model = factory.createModel();
-    this.loadWeightsAsync();
+    this.initializeAsync();
+  }
+
+  /**
+   * Asynchronous initialization with dynamic feature detection
+   */
+  private async initializeAsync(): Promise<void> {
+    try {
+      // Detect feature count dynamically
+      const featureCount = await FeatureDetector.detectFeatureCount();
+
+      // Recreate model with correct feature count
+      const factory = new TradeModelFactory(
+        MODEL_CONFIG.TIMESTEPS,
+        featureCount
+      );
+      this.model = factory.createModel();
+
+      console.log(
+        `🔍 TradeModelPredictor: Initialized with ${featureCount} features`
+      );
+
+      // Load weights after model is properly initialized
+      await this.loadWeightsAsync();
+    } catch (error) {
+      console.error("Failed to initialize TradeModelPredictor:", error);
+      throw error;
+    }
   }
 
   private async loadWeightsAsync(): Promise<void> {
@@ -98,20 +128,25 @@ export class TradeModelPredictor {
         .join(", ")}...]`
     );
 
+    // Dynamic feature count validation
+    const expectedFeatureCount = FeatureDetector.getFeatureCount();
+
     if (
       sequence.length !== MODEL_CONFIG.TIMESTEPS ||
-      sequence[0].length !== MODEL_CONFIG.FEATURE_COUNT
+      sequence[0].length !== expectedFeatureCount
     ) {
       throw new Error(
-        `Sequence shape mismatch: expected [${MODEL_CONFIG.TIMESTEPS}, ${
-          MODEL_CONFIG.FEATURE_COUNT
-        }], got [${sequence.length}, ${sequence[0]?.length || 0}]`
+        `Sequence shape mismatch: expected [${
+          MODEL_CONFIG.TIMESTEPS
+        }, ${expectedFeatureCount}], got [${sequence.length}, ${
+          sequence[0]?.length || 0
+        }]`
       );
     }
 
     const features = tf.tensor3d(
       [sequence],
-      [1, MODEL_CONFIG.TIMESTEPS, MODEL_CONFIG.FEATURE_COUNT]
+      [1, MODEL_CONFIG.TIMESTEPS, expectedFeatureCount] // Dynamic feature count!
     );
     const means = tf.tensor1d(this.weightManager.getFeatureMeans());
     const stds = tf.tensor1d(this.weightManager.getFeatureStds());

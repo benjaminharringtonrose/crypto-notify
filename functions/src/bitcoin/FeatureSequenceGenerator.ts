@@ -26,7 +26,6 @@ export class FeatureSequenceGenerator {
         volumes: btcVolumes,
         dayIndex: i,
         currentPrice: btcPrices[i],
-        isBTC: true,
       });
 
       sequence.push(btcFeatures);

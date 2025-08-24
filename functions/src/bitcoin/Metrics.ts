@@ -211,58 +211,6 @@ export class Metrics {
     };
   }
 
-  static async evaluateModel(
-    model: tf.LayersModel,
-    X: tf.Tensor,
-    y: tf.Tensor
-  ): Promise<void> {
-    console.log("\n=== Model Evaluation ===");
-    const predictions = model.predict(X) as tf.Tensor;
-    const predictedLabels = Array.from(await predictions.argMax(-1).data());
-    const yArray = Array.from(await y.argMax(-1).data());
-
-    const metrics = Metrics.calculateMetrics(predictedLabels, yArray);
-    console.log(
-      `Precision - Buy: ${metrics.precisionBuy.toFixed(
-        4
-      )}, Sell: ${metrics.precisionSell.toFixed(4)}`
-    );
-    console.log(
-      `Recall - Buy: ${metrics.recallBuy.toFixed(
-        4
-      )}, Sell: ${metrics.recallSell.toFixed(4)}`
-    );
-    console.log(
-      `F1 Score - Buy: ${metrics.f1Buy.toFixed(
-        4
-      )}, Sell: ${metrics.f1Sell.toFixed(4)}`
-    );
-
-    // Calculate additional metrics
-    const balancedAccuracy = (metrics.recallBuy + metrics.recallSell) / 2;
-    console.log(`Balanced Accuracy: ${balancedAccuracy.toFixed(4)}`);
-
-    // Calculate Matthews Correlation Coefficient
-    const mcc = this.calculateMCC(predictedLabels, yArray);
-    console.log(`Matthews Correlation Coefficient: ${mcc.toFixed(4)}`);
-
-    // Calculate confusion matrix
-    const confusionMatrix = this.calculateConfusionMatrix(
-      predictedLabels,
-      yArray
-    );
-    console.log("Confusion Matrix:");
-    console.log(`[ [ ${confusionMatrix[0][0]}, ${confusionMatrix[0][1]} ],`);
-    console.log(`  [ ${confusionMatrix[1][0]}, ${confusionMatrix[1][1]} ] ]`);
-
-    // Calculate class distribution
-    const buyCount = yArray.filter((l) => l === 1).length;
-    const sellCount = yArray.filter((l) => l === 0).length;
-    console.log(`Class Distribution - Buy: ${buyCount}, Sell: ${sellCount}`);
-
-    predictions.dispose();
-  }
-
   private static calculateMCC(
     predictedLabels: number[],
     trueLabels: number[]
@@ -345,5 +293,87 @@ export class Metrics {
       console.warn("Error in balancedAccuracy calculation:", error);
       return tf.scalar(0) as tf.Scalar;
     }
+  }
+
+  // Comprehensive model evaluation method
+  static async evaluateModel(
+    model: tf.LayersModel,
+    X: tf.Tensor,
+    y: tf.Tensor
+  ): Promise<{
+    balancedAccuracy: number;
+    buyF1: number;
+    sellF1: number;
+    combinedF1: number;
+    matthewsCorrelation: number;
+    buyPrecision: number;
+    sellPrecision: number;
+    buyRecall: number;
+    sellRecall: number;
+    confusionMatrix: number[][];
+  }> {
+    console.log("\n=== Model Evaluation ===");
+
+    // Get predictions
+    const predictions = model.predict(X) as tf.Tensor;
+    const predLabels = predictions.argMax(-1);
+
+    // Convert to arrays
+    const predArray = Array.from(await predLabels.data());
+    const trueLabels = y.argMax(-1);
+    const trueArray = Array.from(await trueLabels.data());
+
+    // Calculate comprehensive metrics
+    const metrics = this.calculateMetrics(predArray, trueArray);
+    const mcc = this.calculateMCC(predArray, trueArray);
+    const confusionMatrix = this.calculateConfusionMatrix(predArray, trueArray);
+
+    // Calculate balanced accuracy
+    const balancedAccuracy = (metrics.recallBuy + metrics.recallSell) / 2;
+
+    // Print results
+    console.log(
+      `Precision - Buy: ${metrics.precisionBuy.toFixed(
+        4
+      )}, Sell: ${metrics.precisionSell.toFixed(4)}`
+    );
+    console.log(
+      `Recall - Buy: ${metrics.recallBuy.toFixed(
+        4
+      )}, Sell: ${metrics.recallSell.toFixed(4)}`
+    );
+    console.log(
+      `F1 Score - Buy: ${metrics.f1Buy.toFixed(
+        4
+      )}, Sell: ${metrics.f1Sell.toFixed(4)}`
+    );
+    console.log(`Balanced Accuracy: ${balancedAccuracy.toFixed(4)}`);
+    console.log(`Matthews Correlation Coefficient: ${mcc.toFixed(4)}`);
+    console.log("Confusion Matrix:");
+    console.log(`[ [ ${confusionMatrix[0][0]}, ${confusionMatrix[0][1]} ],`);
+    console.log(`  [ ${confusionMatrix[1][0]}, ${confusionMatrix[1][1]} ] ]`);
+    console.log(
+      `Class Distribution - Buy: ${
+        trueArray.filter((l) => l === 1).length
+      }, Sell: ${trueArray.filter((l) => l === 0).length}`
+    );
+
+    // Clean up tensors
+    predictions.dispose();
+    predLabels.dispose();
+    trueLabels.dispose();
+
+    return {
+      balancedAccuracy,
+      buyF1: metrics.f1Buy,
+      sellF1: metrics.f1Sell,
+      combinedF1: metrics.f1Buy + metrics.f1Sell,
+      matthewsCorrelation: mcc,
+      buyPrecision: metrics.precisionBuy,
+      sellPrecision: metrics.precisionSell,
+      buyRecall: metrics.recallBuy,
+      sellRecall: metrics.recallSell,
+      confusionMatrix,
+    };
   }
 }

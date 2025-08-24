@@ -6,7 +6,6 @@ interface ComputeParams {
   volumes: number[];
   dayIndex: number;
   currentPrice: number;
-  isBTC: boolean;
 }
 
 interface CalculateIndicatorsParams {
@@ -76,6 +75,88 @@ export default class FeatureCalculator {
     const minusDI = (minusDM / trSum) * 100;
     const dx = (Math.abs(plusDI - minusDI) / (plusDI + minusDI)) * 100;
     return dx || 0;
+  }
+
+  // EXPERIMENT #61: Advanced Market Microstructure Features
+  public calculateIchimokuTenkanSen(
+    prices: number[],
+    period: number = 9
+  ): number {
+    if (prices.length < period) return prices[prices.length - 1];
+    const recentPrices = prices.slice(-period);
+    const high = Math.max(...recentPrices);
+    const low = Math.min(...recentPrices);
+    return (high + low) / 2;
+  }
+
+  public calculateIchimokuKijunSen(
+    prices: number[],
+    period: number = 26
+  ): number {
+    if (prices.length < period) return prices[prices.length - 1];
+    const recentPrices = prices.slice(-period);
+    const high = Math.max(...recentPrices);
+    const low = Math.min(...recentPrices);
+    return (high + low) / 2;
+  }
+
+  public calculateIchimokuCloudPosition(
+    currentPrice: number,
+    prices: number[]
+  ): number {
+    // Senkou Span A (short-term cloud boundary)
+    const tenkanSen = this.calculateIchimokuTenkanSen(prices, 9);
+    const kijunSen = this.calculateIchimokuKijunSen(prices, 26);
+    const senkouSpanA = (tenkanSen + kijunSen) / 2;
+
+    // Senkou Span B (long-term cloud boundary)
+    const senkouSpanB = this.calculateIchimokuKijunSen(prices, 52);
+
+    // Cloud boundaries
+    const cloudTop = Math.max(senkouSpanA, senkouSpanB);
+    const cloudBottom = Math.min(senkouSpanA, senkouSpanB);
+
+    // Position relative to cloud: +1 = above, 0 = in cloud, -1 = below
+    if (currentPrice > cloudTop) return 1;
+    if (currentPrice < cloudBottom) return -1;
+    return 0;
+  }
+
+  public calculateWilliamsR(prices: number[], period: number = 14): number {
+    if (prices.length < period) return -50;
+    const recentPrices = prices.slice(-period);
+    const highest = Math.max(...recentPrices);
+    const lowest = Math.min(...recentPrices);
+    const currentPrice = prices[prices.length - 1];
+
+    if (highest === lowest) return -50;
+    return ((highest - currentPrice) / (highest - lowest)) * -100;
+  }
+
+  public calculateStochasticK(prices: number[], period: number = 14): number {
+    if (prices.length < period) return 50;
+    const recentPrices = prices.slice(-period);
+    const highest = Math.max(...recentPrices);
+    const lowest = Math.min(...recentPrices);
+    const currentPrice = prices[prices.length - 1];
+
+    if (highest === lowest) return 50;
+    return ((currentPrice - lowest) / (highest - lowest)) * 100;
+  }
+
+  public calculateVPT(prices: number[], volumes: number[]): number {
+    if (prices.length < 2 || volumes.length < 2) return 0;
+
+    let vpt = 0;
+    for (let i = 1; i < prices.length; i++) {
+      const priceChange = prices[i] - prices[i - 1];
+      const priceChangePercent = priceChange / prices[i - 1];
+      vpt += volumes[i] * priceChangePercent;
+    }
+
+    // Normalize by average volume to make it scale-independent
+    const avgVolume = volumes.reduce((a, b) => a + b, 0) / volumes.length;
+    return avgVolume > 0 ? vpt / avgVolume : 0;
   }
 
   public calculateSlice(data: number[], periods: number, offset = 0): number[] {
@@ -895,6 +976,23 @@ export default class FeatureCalculator {
       ),
       realizedVolatility: marketRegimeFeatures.realizedVolatility,
       regimeScore: marketRegimeFeatures.regimeScore,
+      // EXPERIMENT #61: Advanced Market Microstructure Features
+      ichimokuTenkanSen: this.calculateIchimokuTenkanSen(
+        prices.slice(0, dayIndex + 1)
+      ),
+      ichimokuKijunSen: this.calculateIchimokuKijunSen(
+        prices.slice(0, dayIndex + 1)
+      ),
+      ichimokuCloudPosition: this.calculateIchimokuCloudPosition(
+        currentPrice,
+        prices.slice(0, dayIndex + 1)
+      ),
+      williamsR: this.calculateWilliamsR(prices.slice(0, dayIndex + 1)),
+      stochasticK: this.calculateStochasticK(prices.slice(0, dayIndex + 1)),
+      vpt: this.calculateVPT(
+        prices.slice(0, dayIndex + 1),
+        volumes.slice(0, dayIndex + 1)
+      ),
     };
   }
 
@@ -903,7 +1001,6 @@ export default class FeatureCalculator {
     volumes,
     dayIndex,
     currentPrice,
-    isBTC,
   }: ComputeParams): number[] {
     if (!prices || !volumes || dayIndex < 0 || dayIndex >= prices.length) {
       return Array(MODEL_CONFIG.BTC_FEATURE_COUNT).fill(0);
@@ -986,6 +1083,14 @@ export default class FeatureCalculator {
         ? Math.sign(indicators.currentPrice - prices[dayIndex - 1]) *
           Math.sign(indicators.rsi - indicators.prevRsi)
         : 0,
+
+      // 31-36: EXPERIMENT #61 - Advanced Market Microstructure Features (6 features)
+      indicators.ichimokuTenkanSen, // Ichimoku Tenkan-sen (9-period conversion line)
+      indicators.ichimokuKijunSen, // Ichimoku Kijun-sen (26-period base line)
+      indicators.ichimokuCloudPosition, // Position relative to Ichimoku cloud (-1, 0, 1)
+      indicators.williamsR, // Williams %R momentum oscillator
+      indicators.stochasticK, // Stochastic %K oscillator
+      indicators.vpt, // Volume-Price Trend (VPT) for volume analysis
     ];
 
     return coreFeatures;

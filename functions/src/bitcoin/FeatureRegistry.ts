@@ -1,0 +1,347 @@
+/**
+ * FeatureRegistry - Central registry of all features with metadata
+ * This eliminates hardcoded feature counts and enables feature analysis
+ */
+
+export interface FeatureDefinition {
+  name: string;
+  description: string;
+  category: "core" | "technical" | "ratio" | "enhanced" | "microstructure";
+  experimentAdded?: string; // e.g., "Experiment #61"
+  importance?: "high" | "medium" | "low" | "unknown";
+}
+
+/**
+ * Complete feature registry matching FeatureCalculator.ts coreFeatures array
+ * Order MUST match the exact order in FeatureCalculator
+ */
+export const FEATURE_REGISTRY: FeatureDefinition[] = [
+  // 1-8: Core Price/Volume Features (8 features)
+  {
+    name: "priceChangePct",
+    description: "Price change percentage",
+    category: "core",
+    importance: "high",
+  },
+  {
+    name: "volumeChangePct",
+    description: "Volume change percentage",
+    category: "core",
+    importance: "high",
+  },
+  {
+    name: "highLowRange",
+    description: "High-low price range",
+    category: "core",
+    importance: "medium",
+  },
+  {
+    name: "priceVolatility",
+    description: "Short-term price volatility",
+    category: "core",
+    importance: "high",
+  },
+  {
+    name: "volumeMA5Ratio",
+    description: "Volume to 5-day MA ratio",
+    category: "core",
+    importance: "medium",
+  },
+  {
+    name: "pricePosition",
+    description: "Price position in recent range",
+    category: "core",
+    importance: "medium",
+  },
+  {
+    name: "volumeMA20Ratio",
+    description: "Volume to 20-day MA ratio",
+    category: "core",
+    importance: "medium",
+  },
+  {
+    name: "relativeVolume",
+    description: "Relative volume indicator",
+    category: "core",
+    importance: "medium",
+  },
+
+  // 9-15: Technical Indicators (7 features)
+  {
+    name: "rsi",
+    description: "RSI momentum oscillator",
+    category: "technical",
+    importance: "high",
+  },
+  {
+    name: "macdLine",
+    description: "MACD line",
+    category: "technical",
+    importance: "high",
+  },
+  {
+    name: "signalLine",
+    description: "MACD signal line",
+    category: "technical",
+    importance: "high",
+  },
+  {
+    name: "bollingerPosition",
+    description: "Position within Bollinger Bands",
+    category: "technical",
+    importance: "high",
+  },
+  {
+    name: "vwapRatio",
+    description: "Price to VWAP ratio",
+    category: "technical",
+    importance: "high",
+  },
+  {
+    name: "atrNormalized",
+    description: "Normalized ATR",
+    category: "technical",
+    importance: "medium",
+  },
+  {
+    name: "volumeOscillator",
+    description: "Volume oscillator",
+    category: "technical",
+    importance: "medium",
+  },
+
+  // 16-20: Relative/Ratio Features (5 features)
+  {
+    name: "priceSMA7Ratio",
+    description: "Price to SMA7 ratio",
+    category: "ratio",
+    importance: "medium",
+  },
+  {
+    name: "priceSMA21Ratio",
+    description: "Price to SMA21 ratio",
+    category: "ratio",
+    importance: "medium",
+  },
+  {
+    name: "priceSMA50Ratio",
+    description: "Price to SMA50 ratio",
+    category: "ratio",
+    importance: "medium",
+  },
+  {
+    name: "rsiNormalized",
+    description: "Normalized RSI (0-1)",
+    category: "ratio",
+    importance: "medium",
+  },
+  {
+    name: "bollingerBandPosition",
+    description: "Bollinger Band position (0-1)",
+    category: "ratio",
+    importance: "medium",
+  },
+
+  // 21-30: Enhanced Secondary Indicators (10 features)
+  {
+    name: "prevRsi",
+    description: "Previous RSI for momentum",
+    category: "enhanced",
+    importance: "low",
+  },
+  {
+    name: "macdHistogram",
+    description: "MACD histogram",
+    category: "enhanced",
+    importance: "medium",
+  },
+  {
+    name: "atrRatio",
+    description: "ATR to price ratio",
+    category: "enhanced",
+    importance: "low",
+  },
+  {
+    name: "volumeRatio20",
+    description: "20-day volume ratio",
+    category: "enhanced",
+    importance: "low",
+  },
+  {
+    name: "momentum",
+    description: "Raw momentum",
+    category: "enhanced",
+    importance: "medium",
+  },
+  {
+    name: "bollingerSqueeze",
+    description: "Bollinger Band squeeze indicator",
+    category: "enhanced",
+    importance: "low",
+  },
+  {
+    name: "rsiDivergence",
+    description: "RSI divergence signal",
+    category: "enhanced",
+    importance: "low",
+  },
+  {
+    name: "volatilityRegime",
+    description: "Volatility regime score",
+    category: "enhanced",
+    importance: "unknown",
+  },
+  {
+    name: "trendRegime",
+    description: "Trend regime score",
+    category: "enhanced",
+    importance: "unknown",
+  },
+  {
+    name: "momentumRegime",
+    description: "Momentum regime score",
+    category: "enhanced",
+    importance: "unknown",
+  },
+
+  // 31-36: EXPERIMENT #61 - Advanced Market Microstructure Features (6 features)
+  {
+    name: "ichimokuTenkanSen",
+    description: "Ichimoku Tenkan-sen (9-period)",
+    category: "microstructure",
+    experimentAdded: "Experiment #61",
+    importance: "unknown",
+  },
+  {
+    name: "ichimokuKijunSen",
+    description: "Ichimoku Kijun-sen (26-period)",
+    category: "microstructure",
+    experimentAdded: "Experiment #61",
+    importance: "unknown",
+  },
+  {
+    name: "ichimokuCloudPosition",
+    description: "Position relative to Ichimoku cloud",
+    category: "microstructure",
+    experimentAdded: "Experiment #61",
+    importance: "unknown",
+  },
+  {
+    name: "williamsR",
+    description: "Williams %R momentum oscillator",
+    category: "microstructure",
+    experimentAdded: "Experiment #61",
+    importance: "unknown",
+  },
+  {
+    name: "stochasticK",
+    description: "Stochastic %K oscillator",
+    category: "microstructure",
+    experimentAdded: "Experiment #61",
+    importance: "unknown",
+  },
+  {
+    name: "vpt",
+    description: "Volume-Price Trend (VPT)",
+    category: "microstructure",
+    experimentAdded: "Experiment #61",
+    importance: "unknown",
+  },
+];
+
+/**
+ * FeatureRegistry utility functions
+ */
+export class FeatureRegistry {
+  /**
+   * Get total feature count
+   */
+  public static getFeatureCount(): number {
+    return FEATURE_REGISTRY.length;
+  }
+
+  /**
+   * Get features by category
+   */
+  public static getFeaturesByCategory(
+    category: FeatureDefinition["category"]
+  ): FeatureDefinition[] {
+    return FEATURE_REGISTRY.filter((f) => f.category === category);
+  }
+
+  /**
+   * Get features added in a specific experiment
+   */
+  public static getFeaturesByExperiment(
+    experimentName: string
+  ): FeatureDefinition[] {
+    return FEATURE_REGISTRY.filter((f) => f.experimentAdded === experimentName);
+  }
+
+  /**
+   * Get features by importance level
+   */
+  public static getFeaturesByImportance(
+    importance: FeatureDefinition["importance"]
+  ): FeatureDefinition[] {
+    return FEATURE_REGISTRY.filter((f) => f.importance === importance);
+  }
+
+  /**
+   * Get feature definition by index
+   */
+  public static getFeatureByIndex(index: number): FeatureDefinition | null {
+    return FEATURE_REGISTRY[index] || null;
+  }
+
+  /**
+   * Get feature index by name
+   */
+  public static getFeatureIndex(name: string): number {
+    return FEATURE_REGISTRY.findIndex((f) => f.name === name);
+  }
+
+  /**
+   * Validate that feature count matches expected count
+   */
+  public static validateFeatureCount(actualCount: number): void {
+    const expectedCount = this.getFeatureCount();
+    if (actualCount !== expectedCount) {
+      throw new Error(
+        `Feature count mismatch! Registry defines ${expectedCount} features, got ${actualCount}. ` +
+          `Check FeatureCalculator.ts coreFeatures array matches FeatureRegistry.ts`
+      );
+    }
+  }
+
+  /**
+   * Get summary statistics
+   */
+  public static getSummary(): {
+    total: number;
+    byCategory: Record<string, number>;
+    byImportance: Record<string, number>;
+  } {
+    const byCategory: Record<string, number> = {};
+    const byImportance: Record<string, number> = {};
+
+    FEATURE_REGISTRY.forEach((feature) => {
+      byCategory[feature.category] = (byCategory[feature.category] || 0) + 1;
+      byImportance[feature.importance || "unknown"] =
+        (byImportance[feature.importance || "unknown"] || 0) + 1;
+    });
+
+    return {
+      total: FEATURE_REGISTRY.length,
+      byCategory,
+      byImportance,
+    };
+  }
+
+  /**
+   * Get feature names in order (useful for analysis)
+   */
+  public static getFeatureNames(): string[] {
+    return FEATURE_REGISTRY.map((f) => f.name);
+  }
+}

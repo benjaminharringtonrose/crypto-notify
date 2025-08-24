@@ -90,7 +90,7 @@ const MODEL_CONFIG_BASE = {
   RESIDUAL_UNITS_1: 32, // Much smaller for faster training
   RESIDUAL_UNITS_2: 16, // Much smaller for faster training
   FEATURE_COUNT: 30, // v1.4.0: Enhanced feature set with multi-timeframe indicators
-  BTC_FEATURE_COUNT: 30, // v1.4.0: Advanced technical indicators
+  BTC_FEATURE_COUNT: 36, // v1.5.0: EXPERIMENT #61 - Advanced Market Microstructure Features
   TIMESTEPS: 35, // v1.3.0: Increased for monthly cycle capture in 7-day predictions
   BATCH_NORM_MOMENTUM: 0.99,
   BATCH_NORM_EPSILON: 0.001,
@@ -271,18 +271,18 @@ export const MODEL_CONFIG = {
 };
 
 export const TRAINING_CONFIG = {
-  // RECOVERY-1: Revert to PROVEN optimal training configuration
-  EPOCHS: 30, // PROVEN OPTIMAL: 30 epochs for faster iteration, 50+ caused issues
+  EPOCHS: 35, // PROVEN OPTIMAL: 30 epochs for faster iteration, 50+ caused issues
   BATCH_SIZE: 16, // PROVEN OPTIMAL: Best balance for gradient updates
   SHUFFLE_CHUNK_SIZE: 10,
   INITIAL_LEARNING_RATE: 0.0005, // PROVEN OPTIMAL: 0.0008 showed promise but 0.0005 is baseline
   MIN_LEARNING_RATE: 0.00005, // 7DAY-2: Higher floor for better 7-day convergence
   CYCLIC_LR_STEP_SIZE: 15, // PROVEN OPTIMAL: 10 showed minor promise but 15 is baseline
   OUTPUT_CLASSES: 2,
-  START_DAYS_AGO: 600, // PROVEN OPTIMAL: 600 days documented in experiments
+  START_DAYS_AGO: 730, // PROVEN OPTIMAL: 600 days documented in experiments
   TRAIN_SPLIT: 0.8, // PROVEN OPTIMAL: 80% train / 20% validation split
   PREFETCH_BUFFER: 4,
   PATIENCE: 10, // PROVEN OPTIMAL: Early stopping patience
+  TRAINING_VERBOSE: 0, // 0=silent, 1=progress bar, 2=one line per epoch
   BYTES_TO_MB: 1024 * 1024,
   MS_TO_SECONDS: 1000,
   GAMMA: 1.5, // PROVEN OPTIMAL: Found in experiments, prevents class collapse

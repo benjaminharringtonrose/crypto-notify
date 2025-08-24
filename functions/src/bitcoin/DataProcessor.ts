@@ -138,7 +138,6 @@ export class DataProcessor {
       volumes: btcData.volumes,
       dayIndex: index,
       currentPrice: btcData.prices[index],
-      isBTC: true,
     });
     return btcFeatures;
   }

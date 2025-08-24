@@ -55,6 +55,13 @@ export interface Indicators {
   momentumRegimeScore: number;
   realizedVolatility: number;
   regimeScore: number;
+  // EXPERIMENT #61: Advanced Market Microstructure Features
+  ichimokuTenkanSen: number;
+  ichimokuKijunSen: number;
+  ichimokuCloudPosition: number;
+  williamsR: number;
+  stochasticK: number;
+  vpt: number;
 }
 
 export interface StrategyResult {

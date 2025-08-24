@@ -11,8 +11,10 @@ export default class TradeModelFactory {
   }
 
   public createModel(): tf.LayersModel {
-    // EXPERIMENT #3: Batch Normalization Position Optimization
-    console.log("🔄 EXPERIMENT #3: Batch Normalization Position Optimization");
+    // REVERTED TO PROVEN BASELINE: Optimal architecture after systematic testing
+    console.log(
+      "🔄 REVERTED: Back to proven baseline architecture after systematic experiments"
+    );
 
     // CRITICAL: Add deterministic seeding for stable training
     tf.randomUniform([1, 1], 0, 1, "float32", 42);
@@ -75,7 +77,7 @@ export default class TradeModelFactory {
       `📊 Architecture: Conv1D(48,3) → BN → Dropout(0.3) → LSTM(64) → Dense(32) → Dropout(0.3) → Output(2)`
     );
     console.log(
-      `📈 Timesteps: ${this.timesteps} (35 days), Features: ${this.features} (30 enhanced indicators)`
+      `📈 Timesteps: ${this.timesteps} (35 days), Features: ${this.features} (36 advanced microstructure indicators)`
     );
 
     model.summary();

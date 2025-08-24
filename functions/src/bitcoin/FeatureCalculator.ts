@@ -123,6 +123,43 @@ export default class FeatureCalculator {
     return 0;
   }
 
+  public calculateIchimoku(
+    high: number[],
+    low: number[],
+    close: number[]
+  ): { conversion: number; base: number; spanA: number; spanB: number; position: number } {
+    if (high.length < 52 || low.length < 52 || close.length < 52) {
+      return { conversion: 0, base: 0, spanA: 0, spanB: 0, position: 0 };
+    }
+
+    const currentPrice = close[close.length - 1];
+
+    // Tenkan-sen (Conversion Line) - 9-period
+    const tenkanSen = this.calculateIchimokuTenkanSen(close, 9);
+
+    // Kijun-sen (Base Line) - 26-period
+    const kijunSen = this.calculateIchimokuKijunSen(close, 26);
+
+    // Senkou Span A (Leading Span A) - (Tenkan + Kijun) / 2
+    const senkouSpanA = (tenkanSen + kijunSen) / 2;
+
+    // Senkou Span B (Leading Span B) - 52-period
+    const senkouSpanB = this.calculateIchimokuKijunSen(close, 52);
+
+    // Calculate position relative to cloud
+    const cloudTop = Math.max(senkouSpanA, senkouSpanB);
+    const cloudBottom = Math.min(senkouSpanA, senkouSpanB);
+    const position = currentPrice > cloudTop ? 1 : currentPrice < cloudBottom ? -1 : 0;
+
+    return {
+      conversion: tenkanSen,
+      base: kijunSen,
+      spanA: senkouSpanA,
+      spanB: senkouSpanB,
+      position: position
+    };
+  }
+
   public calculateWilliamsR(prices: number[], period: number = 14): number {
     if (prices.length < period) return -50;
     const recentPrices = prices.slice(-period);
@@ -450,17 +487,9 @@ export default class FeatureCalculator {
     return totalVolume > 0 ? moneyFlowVolume / totalVolume : 0;
   }
 
-  public calculateROC(prices: number[], period: number = 10): number {
-    if (prices.length < period + 1) {
-      return 0;
-    }
 
-    const currentPrice = prices[prices.length - 1];
-    const pastPrice = prices[prices.length - 1 - period];
 
-    // Calculate Rate of Change
-    return pastPrice > 0 ? ((currentPrice - pastPrice) / pastPrice) * 100 : 0;
-  }
+
 
   public calculateStochasticK(prices: number[], period: number = 14): number {
     if (prices.length < period) return 50;
@@ -1347,6 +1376,16 @@ export default class FeatureCalculator {
         prices.slice(0, dayIndex + 1),
         prices.slice(0, dayIndex + 1)
       ).trend,
+      adx: this.calculateADX(
+        prices.slice(0, dayIndex + 1),
+        prices.slice(0, dayIndex + 1),
+        prices.slice(0, dayIndex + 1)
+      ),
+      ichimokuPosition: this.calculateIchimoku(
+        prices.slice(0, dayIndex + 1),
+        prices.slice(0, dayIndex + 1),
+        prices.slice(0, dayIndex + 1)
+      ).position,
     };
   }
 
@@ -1437,6 +1476,8 @@ export default class FeatureCalculator {
       indicators.aroonOscillator, // Aroon Oscillator
       indicators.donchianPosition, // Donchian Channels position
       indicators.parabolicSAR, // Parabolic SAR trend
+      indicators.adx, // Average Directional Index (ADX)
+      indicators.ichimokuPosition, // Ichimoku Cloud position
     ];
 
     return optimizedFeatures;

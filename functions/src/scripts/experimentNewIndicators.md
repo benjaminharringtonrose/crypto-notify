@@ -10,6 +10,7 @@
 - **Current Features**: 31 optimized features (up from 26 original)
 - **Performance Target**: Improve combined F1 score, validation accuracy, and balanced accuracy
 - **Tolerance**: 2% performance improvement threshold
+- **Prediction Horizon**: 7 days out
 
 ## 🔧 Implementation Requirements
 
@@ -68,12 +69,51 @@ Keep the new indicator if it meets ANY of these criteria:
 4. **Chaikin Money Flow (CMF)** - ❌ **REMOVED** (32.02% improvement in Combined F1 when removed)
 5. **Rate of Change (ROC)** - ❌ **REMOVED** (17.31% improvement in Combined F1 when removed)
 
-### **Final Feature Set:**
+### **Round 2 Feature Set:**
 
 - **Total Features**: 31 (up from 26 original)
 - **Features Added from Round 1**: CCI, MFI, Aroon Oscillator
 - **Features Added from Round 2**: Donchian Channels, Parabolic SAR
 - **Features Removed**: Keltner Channels, Williams %R, CMF, ROC
+
+## 📈 **ROUND 3: 5 NEW INDICATORS FOR 7-DAY PREDICTION**
+
+Based on analysis for 7-day prediction capabilities, these indicators are selected for their trend-following and momentum characteristics:
+
+### **1. Average Directional Index (ADX)** - Trend Strength
+
+- **Status**: Not implemented yet
+- **Expected Benefit**: Measures trend strength, crucial for 7-day predictions
+- **Implementation**: Add `calculateADX()` method and integrate
+- **7-Day Relevance**: Strong trends are more likely to continue over longer periods
+
+### **2. Ichimoku Cloud** - Trend & Support/Resistance
+
+- **Status**: Not implemented yet
+- **Expected Benefit**: Comprehensive trend analysis with multiple timeframes
+- **Implementation**: Add `calculateIchimoku()` method and integrate
+- **7-Day Relevance**: Cloud levels provide strong support/resistance for longer predictions
+
+### **3. Volume Weighted Average Price (VWAP)** - Price Action
+
+- **Status**: Not implemented yet
+- **Expected Benefit**: Volume-weighted price levels that act as dynamic support/resistance
+- **Implementation**: Add `calculateVWAP()` method and integrate
+- **7-Day Relevance**: VWAP levels are significant for longer-term price movements
+
+### **4. Fibonacci Retracement** - Support/Resistance
+
+- **Status**: Not implemented yet
+- **Expected Benefit**: Natural support/resistance levels based on Fibonacci ratios
+- **Implementation**: Add `calculateFibonacciLevels()` method and integrate
+- **7-Day Relevance**: Fibonacci levels often act as reversal points over longer periods
+
+### **5. On-Balance Volume (OBV)** - Volume Trend
+
+- **Status**: Not implemented yet
+- **Expected Benefit**: Volume-based trend confirmation, leading indicator
+- **Implementation**: Add `calculateOBV()` method and integrate
+- **7-Day Relevance**: Volume trends often precede price trends by several days
 
 ## 🎯 **EXPERIMENTATION PROCESS**
 
@@ -95,11 +135,11 @@ Keep the new indicator if it meets ANY of these criteria:
 - **Type**: [Momentum/Volatility/Trend/Volume/Advanced]
 - **Calculation**: [Mathematical formula and implementation]
 - **Interpretation**: [How to read the signals]
-- **Expected Benefits**: [Why it might improve our model]
+- **Expected Benefits**: [Why it might improve our 7-day model]
 
 ### **Implementation Details**
 
-- **Feature Name**: [e.g., "williamsR", "donchianPosition", "parabolicSAR"]
+- **Feature Name**: [e.g., "adx", "ichimokuConversion", "vwap"]
 - **Code Changes**: [Files modified and specific changes]
 - **Integration**: [How it fits with existing features]
 
@@ -127,11 +167,11 @@ Keep the new indicator if it meets ANY of these criteria:
 
 **Complete all 5 experiments in sequence:**
 
-1. **Experiment 1**: Williams %R (already implemented)
-2. **Experiment 2**: Donchian Channels
-3. **Experiment 3**: Parabolic SAR
-4. **Experiment 4**: Chaikin Money Flow (CMF)
-5. **Experiment 5**: Rate of Change (ROC)
+1. **Experiment 1**: Average Directional Index (ADX)
+2. **Experiment 2**: Ichimoku Cloud
+3. **Experiment 3**: Volume Weighted Average Price (VWAP)
+4. **Experiment 4**: Fibonacci Retracement
+5. **Experiment 5**: On-Balance Volume (OBV)
 
 **After each experiment:**
 
@@ -144,7 +184,7 @@ Keep the new indicator if it meets ANY of these criteria:
 ```
 Please experiment with [INDICATOR_NAME] for our Bitcoin trading model.
 This is experiment #[X] of 5 in our systematic indicator testing process.
-[Brief description of why this indicator might help]
+[Brief description of why this indicator might help with 7-day predictions]
 ```
 
 ---

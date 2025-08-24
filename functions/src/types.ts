@@ -55,6 +55,8 @@ export interface Indicators {
   aroonOscillator: number;
   donchianPosition: number;
   parabolicSAR: number;
+  adx: number;
+  ichimokuPosition: number;
 }
 
 export interface Probabilities {

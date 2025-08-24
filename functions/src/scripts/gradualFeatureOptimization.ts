@@ -85,6 +85,8 @@ class GradualFeatureOptimizer {
     "aroonOscillator",
     "donchianPosition",
     "parabolicSAR",
+    "adx",
+    "ichimokuPosition",
   ];
 
   public async runOptimization(): Promise<void> {

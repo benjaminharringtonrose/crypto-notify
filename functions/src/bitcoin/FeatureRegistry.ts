@@ -222,6 +222,20 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
     experimentAdded: "Experiment #3 - Parabolic SAR",
     importance: "medium",
   },
+  {
+    name: "adx",
+    description: "Average Directional Index (ADX)",
+    category: "microstructure",
+    experimentAdded: "Experiment #1 - ADX",
+    importance: "medium",
+  },
+  {
+    name: "ichimokuPosition",
+    description: "Ichimoku Cloud position",
+    category: "microstructure",
+    experimentAdded: "Experiment #2 - Ichimoku",
+    importance: "medium",
+  },
 ];
 
 /**

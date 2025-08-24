@@ -90,6 +90,9 @@ class GradualFeatureOptimizer {
     "tsi",
     "pmo",
     "bollingerBandWidth",
+    "historicalVolatility",
+    "camarillaPivots",
+    "acceleratorOscillator",
   ];
 
   public async runOptimization(): Promise<void> {

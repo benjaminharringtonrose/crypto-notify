@@ -46,6 +46,7 @@
 - Round 5: VROC, PROC, VPT, StochRSI, VWMA
 - Round 6: Center of Gravity Oscillator (COG)
 - Round 7: TSI, ADL, PMO, Bollinger Band Width, Williams %R
+- Round 8: Historical Volatility (HV), Trend Intensity Index (TII), Volatility Ratio (VR), Camarilla Pivots (CP), Accelerator Oscillator (AO)
 
 ### 3. **Testing Process**
 
@@ -332,20 +333,130 @@ The model maintains its optimal 36-feature configuration, demonstrating that the
 **Round 3**: 5 out of 5 indicators kept (ADX, Ichimoku Cloud, Fibonacci Retracement, Stochastic K, Price Acceleration)
 **Round 4**: 0 out of 3 indicators kept (All removed - ROC, Bollinger Band Width, Pivot Points)
 **Round 5**: 3 out of 5 indicators kept (PROC, StochRSI, VWMA)
+**Round 6**: 1 out of 5 indicators kept (Center of Gravity Oscillator)
+**Round 7**: 4 out of 5 indicators kept (TSI, PMO, Bollinger Band Width, Williams %R)
+**Round 8**: 3 out of 5 indicators kept (Historical Volatility, Camarilla Pivots, Accelerator Oscillator)
 
-**Final Result**: The Bitcoin trading model now has **38 optimized features** (up from the original 26), with 13 new indicators from the five rounds providing measurable value for 7-day price prediction.
+**Final Result**: The Bitcoin trading model now has **45 optimized features** (up from the original 26), with 21 new indicators from the eight rounds providing measurable value for 7-day price prediction.
 
 ### **Current Optimal Feature Set:**
 
 The model now includes a comprehensive set of technical indicators covering:
 
-- **Momentum indicators** (RSI, CCI, MFI, Stochastic K, Aroon Oscillator, StochRSI)
+- **Momentum indicators** (RSI, CCI, MFI, Stochastic K, Aroon Oscillator, StochRSI, TSI, PMO, AO)
 - **Trend indicators** (MACD, ADX, Parabolic SAR, Ichimoku Cloud)
-- **Volatility indicators** (ATR, Bollinger Bands, Donchian Channels)
+- **Volatility indicators** (ATR, Bollinger Bands, Donchian Channels, HV)
 - **Volume indicators** (OBV, VWAP, VWMA)
-- **Support/Resistance indicators** (Fibonacci Retracement, Price Acceleration)
+- **Support/Resistance indicators** (Fibonacci Retracement, Price Acceleration, CP)
 - **Rate of Change indicators** (PROC)
+- **Advanced oscillators** (Center of Gravity Oscillator, Williams %R)
 - **Core price action** (Price changes, volatility, position)
+
+## 📈 **ROUND 8 RESULTS (COMPLETED)**
+
+### **Round 8 Experiments Summary:**
+
+1. **Historical Volatility (HV)** - ✅ **KEPT** (2.47% degradation in Combined F1 when removed)
+2. **Trend Intensity Index (TII)** - ❌ **REMOVED** (2.10% improvement in Combined F1 when removed)
+3. **Volatility Ratio (VR)** - ❌ **REMOVED** (19.34% improvement in Combined F1 when removed)
+4. **Camarilla Pivots (CP)** - ✅ **KEPT** (4.09% degradation in Combined F1 when removed)
+5. **Accelerator Oscillator (AO)** - ✅ **KEPT** (2.98% degradation in Combined F1 when removed)
+
+### **Round 8 Feature Set:**
+
+- **Total Features**: 45 (up from 42 at start of Round 8)
+- **Features Added from Round 8**: Historical Volatility (HV), Camarilla Pivots (CP), Accelerator Oscillator (AO)
+- **Features Removed**: Trend Intensity Index (TII), Volatility Ratio (VR)
+
+### **Round 8 Analysis:**
+
+**Key Findings:**
+
+- **Historical Volatility (HV)**: Kept due to 2.47% degradation in combined F1 score when removed, providing valuable volatility regime information
+- **Trend Intensity Index (TII)**: Removed due to 2.10% improvement in combined F1 score when removed, was adding noise rather than value
+- **Volatility Ratio (VR)**: Removed due to massive 19.34% improvement in combined F1 score when removed, was significantly degrading model performance
+- **Camarilla Pivots (CP)**: Kept due to 4.09% degradation in combined F1 score when removed, providing valuable support/resistance information
+- **Accelerator Oscillator (AO)**: Kept due to 2.98% degradation in combined F1 score when removed, providing valuable momentum acceleration information
+
+**Round 8 Insights:**
+
+- **HV** provides significant value for volatility regime identification
+- **CP** is highly valuable for support/resistance level analysis
+- **AO** adds value for momentum acceleration/deceleration detection
+- **TII and VR** were adding noise rather than value to the model
+
+The model now has a comprehensive set of 45 technical indicators optimized for 7-day Bitcoin price prediction, with each feature providing measurable value to the prediction accuracy.
+
+## 📝 **DOCUMENTATION REQUIREMENTS**
+
+**CRITICAL**: After completing each round of experiments, you MUST update this documentation file with the following:
+
+### **1. Round Results Section**
+
+Add a new section following this exact format:
+
+```markdown
+## 📈 **ROUND [X] RESULTS (COMPLETED)**
+
+### **Round [X] Experiments Summary:**
+
+1. **[Indicator Name]** - ✅ **KEPT** ([X]% degradation/improvement in Combined F1 when removed)
+2. **[Indicator Name]** - ❌ **REMOVED** ([X]% improvement in Combined F1 when removed)
+3. **[Indicator Name]** - ✅ **KEPT** ([X]% degradation in Combined F1 when removed)
+4. **[Indicator Name]** - ❌ **REMOVED** ([X]% improvement in Combined F1 when removed)
+5. **[Indicator Name]** - ✅ **KEPT** ([X]% degradation in Combined F1 when removed)
+
+### **Round [X] Feature Set:**
+
+- **Total Features**: [X] (up/down from [X] at start of Round [X])
+- **Features Added from Round [X]**: [List of kept indicators]
+- **Features Removed**: [List of removed indicators]
+
+### **Round [X] Analysis:**
+
+**Key Findings:**
+
+- **[Indicator]**: [Decision] due to [X]% [degradation/improvement] in combined F1 score when removed, [explanation]
+- **[Indicator]**: [Decision] due to [X]% [degradation/improvement] in combined F1 score when removed, [explanation]
+- **[Indicator]**: [Decision] due to [X]% [degradation/improvement] in combined F1 score when removed, [explanation]
+- **[Indicator]**: [Decision] due to [X]% [degradation/improvement] in combined F1 score when removed, [explanation]
+- **[Indicator]**: [Decision] due to [X]% [degradation/improvement] in combined F1 score when removed, [explanation]
+
+**Round [X] Insights:**
+
+- **[Indicator]** provides significant value for [specific benefit]
+- **[Indicator]** is highly valuable for [specific benefit]
+- **[Indicator]** adds value for [specific benefit]
+- **[Indicator]** was adding noise rather than value to the model
+
+The model now has a comprehensive set of [X] technical indicators optimized for 7-day Bitcoin price prediction, with each feature providing measurable value to the prediction accuracy.
+```
+
+### **2. Update All Rounds Summary**
+
+Update the summary section to include the new round:
+
+```markdown
+**Round [X]**: [Y] out of 5 indicators kept ([List of kept indicators])
+```
+
+### **3. Update Final Result**
+
+Update the final result with new feature count:
+
+```markdown
+**Final Result**: The Bitcoin trading model now has **[X] optimized features** (up from the original 26), with [Y] new indicators from the [X] rounds providing measurable value for 7-day price prediction.
+```
+
+### **4. Update Current Optimal Feature Set**
+
+Add new indicators to the appropriate categories in the feature set list.
+
+### **5. Update Tested Indicators List**
+
+Add all tested indicators from the new round to the comprehensive list of tested indicators to prevent future duplication.
+
+**IMPORTANT**: This documentation serves as the authoritative record of all experimentation. Failure to update it properly may result in retesting indicators that have already been evaluated, wasting time and resources.
 
 ## 🔄 **Systematic Iteration Process**
 

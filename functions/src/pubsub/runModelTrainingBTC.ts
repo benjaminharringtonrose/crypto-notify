@@ -4,7 +4,7 @@ import { onRequest } from "firebase-functions/https";
 
 const runTraining = async () => {
   console.log("Bitcoin model training started...");
-  const trainer = new TradeModelTrainer();
+  const trainer = new TradeModelTrainer(42); // Use fixed seed for consistency
   try {
     await trainer.train();
     console.log("Bitcoin model training completed successfully.");

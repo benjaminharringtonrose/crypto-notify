@@ -98,7 +98,7 @@ async function runMultipleTrainingSessions() {
       // Set deterministic seed for this run
       tf.randomUniform([1, 1], 0, 1, "float32", seed);
 
-      const trainer = new TradeModelTrainer();
+      const trainer = new TradeModelTrainer(seed);
       const startTime = Date.now();
 
       try {

@@ -65,6 +65,9 @@ export interface Indicators {
   tsi: number;
   pmo: number;
   bollingerBandWidth: number;
+  historicalVolatility: number;
+  camarillaPivots: number;
+  acceleratorOscillator: number;
 }
 
 export interface Probabilities {

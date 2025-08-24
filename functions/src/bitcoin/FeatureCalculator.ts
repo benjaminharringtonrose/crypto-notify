@@ -761,6 +761,114 @@ export default class FeatureCalculator {
     return sma > 0 ? ((upperBand - lowerBand) / sma) * 100 : 0;
   }
 
+  // EXPERIMENT #8-1: Historical Volatility (HV)
+  public calculateHistoricalVolatility(
+    prices: number[],
+    period: number = 20
+  ): number {
+    if (prices.length < period + 1) return 0;
+
+    // Calculate logarithmic returns
+    const logReturns = [];
+    for (let i = 1; i < prices.length; i++) {
+      logReturns.push(Math.log(prices[i] / prices[i - 1]));
+    }
+
+    // Get recent log returns
+    const recentLogReturns = logReturns.slice(-period);
+
+    // Calculate mean of log returns
+    const meanReturn =
+      recentLogReturns.reduce((sum, ret) => sum + ret, 0) / period;
+
+    // Calculate variance
+    const variance =
+      recentLogReturns.reduce((sum, ret) => {
+        return sum + Math.pow(ret - meanReturn, 2);
+      }, 0) / period;
+
+    // Calculate standard deviation
+    const stdDev = Math.sqrt(variance);
+
+    // Annualize volatility (assuming daily data, multiply by sqrt(365))
+    const annualizedVolatility = stdDev * Math.sqrt(365) * 100; // Convert to percentage
+
+    return annualizedVolatility;
+  }
+
+  // EXPERIMENT #8-4: Camarilla Pivots (CP)
+  public calculateCamarillaPivots(
+    prices: number[],
+    period: number = 20
+  ): number {
+    if (prices.length < period + 1) return 0;
+
+    // Get the previous day's high, low, and close
+    const prevHigh = Math.max(...prices.slice(-period, -1));
+    const prevLow = Math.min(...prices.slice(-period, -1));
+    const prevClose = prices[prices.length - 2];
+    const currentPrice = prices[prices.length - 1];
+
+    // Calculate Camarilla pivot levels
+    const range = prevHigh - prevLow;
+
+    // H3 and L3 are the key reversal levels
+    const h3 = prevClose + (range * 1.1) / 4;
+    const l3 = prevClose - (range * 1.1) / 4;
+
+    // H4 and L4 are extreme levels
+    const h4 = prevClose + (range * 1.1) / 2;
+    const l4 = prevClose - (range * 1.1) / 2;
+
+    // Calculate position relative to Camarilla levels
+    let position = 0;
+
+    if (currentPrice > h4) {
+      position = 1.0; // Above extreme resistance
+    } else if (currentPrice > h3) {
+      position = 0.75; // Above key resistance
+    } else if (currentPrice > prevClose) {
+      position = 0.5; // Above previous close
+    } else if (currentPrice > l3) {
+      position = 0.25; // Above key support
+    } else if (currentPrice > l4) {
+      position = 0.0; // Above extreme support
+    } else {
+      position = -0.25; // Below extreme support
+    }
+
+    return position;
+  }
+
+  // EXPERIMENT #8-5: Accelerator Oscillator (AO)
+  public calculateAcceleratorOscillator(
+    prices: number[],
+    shortPeriod: number = 5,
+    longPeriod: number = 34
+  ): number {
+    if (prices.length < longPeriod) return 0;
+
+    // Calculate midpoints (high + low) / 2
+    // Since we only have close prices, we'll use close prices as approximation
+    const midpoints = prices.map((price) => price);
+
+    // Calculate short-term SMA of midpoints
+    const shortSMA =
+      midpoints.slice(-shortPeriod).reduce((sum, price) => sum + price, 0) /
+      shortPeriod;
+
+    // Calculate long-term SMA of midpoints
+    const longSMA =
+      midpoints.slice(-longPeriod).reduce((sum, price) => sum + price, 0) /
+      longPeriod;
+
+    // Calculate Accelerator Oscillator
+    const ao = shortSMA - longSMA;
+
+    // Normalize by the long-term SMA to get a percentage
+    return longSMA > 0 ? (ao / longSMA) * 100 : 0;
+  }
+
   public calculateSlice(data: number[], periods: number, offset = 0): number[] {
     return data.slice(-periods - offset, offset === 0 ? undefined : -offset);
   }
@@ -1651,6 +1759,15 @@ export default class FeatureCalculator {
       bollingerBandWidth: this.calculateBollingerBandWidth(
         prices.slice(0, dayIndex + 1)
       ),
+      historicalVolatility: this.calculateHistoricalVolatility(
+        prices.slice(0, dayIndex + 1)
+      ),
+      camarillaPivots: this.calculateCamarillaPivots(
+        prices.slice(0, dayIndex + 1)
+      ),
+      acceleratorOscillator: this.calculateAcceleratorOscillator(
+        prices.slice(0, dayIndex + 1)
+      ),
     };
   }
 
@@ -1752,6 +1869,9 @@ export default class FeatureCalculator {
       indicators.tsi, // True Strength Index (TSI) - EXPERIMENT #7-1
       indicators.pmo, // Price Momentum Oscillator (PMO) - EXPERIMENT #7-3
       indicators.bollingerBandWidth, // Bollinger Band Width - EXPERIMENT #7-4
+      indicators.historicalVolatility, // Historical Volatility (HV) - EXPERIMENT #8-1
+      indicators.camarillaPivots, // Camarilla Pivots (CP) - EXPERIMENT #8-4
+      indicators.acceleratorOscillator, // Accelerator Oscillator (AO) - EXPERIMENT #8-5
     ];
 
     return optimizedFeatures;

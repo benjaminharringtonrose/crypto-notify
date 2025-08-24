@@ -295,9 +295,33 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
   },
   {
     name: "bollingerBandWidth",
-    description: "Bollinger Band Width",
-    category: "microstructure",
-    experimentAdded: "Experiment #7-4 - Bollinger Band Width",
+    description: "Bollinger Band Width - percentage width of Bollinger Bands",
+    category: "technical",
+    experimentAdded: "Experiment #7-4",
+    importance: "medium",
+  },
+  {
+    name: "historicalVolatility",
+    description:
+      "Historical Volatility - annualized volatility based on log returns",
+    category: "technical",
+    experimentAdded: "Experiment #8-1",
+    importance: "medium",
+  },
+  {
+    name: "camarillaPivots",
+    description:
+      "Camarilla Pivots - support/resistance levels based on previous day's range",
+    category: "technical",
+    experimentAdded: "Experiment #8-4",
+    importance: "medium",
+  },
+  {
+    name: "acceleratorOscillator",
+    description:
+      "Accelerator Oscillator - momentum acceleration/deceleration indicator",
+    category: "technical",
+    experimentAdded: "Experiment #8-5",
     importance: "medium",
   },
 ];

@@ -48,7 +48,6 @@ export interface Indicators {
   ichimokuKijunSen: number;
   ichimokuCloudPosition: number;
   williamsR: number;
-  stochasticK: number;
   vpt: number;
   cci: number;
   mfi: number;
@@ -57,6 +56,9 @@ export interface Indicators {
   parabolicSAR: number;
   adx: number;
   ichimokuPosition: number;
+  fibonacciPosition: number;
+  stochasticK: number;
+  priceAcceleration: number;
 }
 
 export interface Probabilities {

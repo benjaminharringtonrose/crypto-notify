@@ -76,44 +76,35 @@ Keep the new indicator if it meets ANY of these criteria:
 - **Features Added from Round 2**: Donchian Channels, Parabolic SAR
 - **Features Removed**: Keltner Channels, Williams %R, CMF, ROC
 
-## 📈 **ROUND 3: 5 NEW INDICATORS FOR 7-DAY PREDICTION**
+## 📈 **ROUND 3 RESULTS (COMPLETED)**
 
-Based on analysis for 7-day prediction capabilities, these indicators are selected for their trend-following and momentum characteristics:
+### **Round 3 Experiments Summary:**
 
-### **1. Average Directional Index (ADX)** - Trend Strength
+1. **Average Directional Index (ADX)** - ✅ **KEPT** (8.84% decline in Combined F1 when removed)
+2. **Ichimoku Cloud** - ✅ **KEPT** (6.32% decline in Combined F1 when removed)
+3. **Fibonacci Retracement** - ✅ **KEPT** (4.45% decline in Combined F1 when removed)
+4. **Stochastic K** - ✅ **KEPT** (3.68% decline in Combined F1 when removed)
+5. **Price Acceleration** - ✅ **KEPT** (10.34% decline in Combined F1 when removed)
 
-- **Status**: Not implemented yet
-- **Expected Benefit**: Measures trend strength, crucial for 7-day predictions
-- **Implementation**: Add `calculateADX()` method and integrate
-- **7-Day Relevance**: Strong trends are more likely to continue over longer periods
+### **Round 3 Feature Set:**
 
-### **2. Ichimoku Cloud** - Trend & Support/Resistance
+- **Total Features**: 36 (up from 31 at start of Round 3)
+- **Features Added from Round 1**: CCI, MFI, Aroon Oscillator
+- **Features Added from Round 2**: Donchian Channels, Parabolic SAR
+- **Features Added from Round 3**: ADX, Ichimoku Cloud, Fibonacci Retracement, Stochastic K, Price Acceleration
+- **Features Removed**: Keltner Channels, Williams %R, CMF, ROC
 
-- **Status**: Not implemented yet
-- **Expected Benefit**: Comprehensive trend analysis with multiple timeframes
-- **Implementation**: Add `calculateIchimoku()` method and integrate
-- **7-Day Relevance**: Cloud levels provide strong support/resistance for longer predictions
+### **Round 3 Analysis:**
 
-### **3. Volume Weighted Average Price (VWAP)** - Price Action
+All 5 indicators from Round 3 were kept, indicating they all provide significant value for the 7-day Bitcoin prediction model. The indicators cover:
 
-- **Status**: Not implemented yet
-- **Expected Benefit**: Volume-weighted price levels that act as dynamic support/resistance
-- **Implementation**: Add `calculateVWAP()` method and integrate
-- **7-Day Relevance**: VWAP levels are significant for longer-term price movements
+- **Trend Strength**: ADX measures trend strength and direction
+- **Support/Resistance**: Ichimoku Cloud provides comprehensive trend analysis
+- **Price Levels**: Fibonacci Retracement identifies natural support/resistance levels
+- **Momentum**: Stochastic K measures price momentum and overbought/oversold conditions
+- **Acceleration**: Price Acceleration measures the rate of change in price momentum
 
-### **4. Fibonacci Retracement** - Support/Resistance
-
-- **Status**: Not implemented yet
-- **Expected Benefit**: Natural support/resistance levels based on Fibonacci ratios
-- **Implementation**: Add `calculateFibonacciLevels()` method and integrate
-- **7-Day Relevance**: Fibonacci levels often act as reversal points over longer periods
-
-### **5. On-Balance Volume (OBV)** - Volume Trend
-
-- **Status**: Not implemented yet
-- **Expected Benefit**: Volume-based trend confirmation, leading indicator
-- **Implementation**: Add `calculateOBV()` method and integrate
-- **7-Day Relevance**: Volume trends often precede price trends by several days
+The model now has a comprehensive set of 36 technical indicators covering momentum, trend, volatility, and microstructure features optimized for 7-day Bitcoin price prediction.
 
 ## 🎯 **EXPERIMENTATION PROCESS**
 

@@ -87,6 +87,9 @@ class GradualFeatureOptimizer {
     "parabolicSAR",
     "adx",
     "ichimokuPosition",
+    "fibonacciPosition",
+    "stochasticK",
+    "priceAcceleration",
   ];
 
   public async runOptimization(): Promise<void> {

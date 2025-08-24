@@ -236,6 +236,27 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
     experimentAdded: "Experiment #2 - Ichimoku",
     importance: "medium",
   },
+  {
+    name: "fibonacciPosition",
+    description: "Fibonacci Retracement position",
+    category: "microstructure",
+    experimentAdded: "Experiment #3 - Fibonacci",
+    importance: "medium",
+  },
+  {
+    name: "stochasticK",
+    description: "Stochastic K oscillator",
+    category: "microstructure",
+    experimentAdded: "Experiment #4 - Stochastic",
+    importance: "medium",
+  },
+  {
+    name: "priceAcceleration",
+    description: "Price acceleration indicator",
+    category: "microstructure",
+    experimentAdded: "Experiment #5 - Price Acceleration",
+    importance: "medium",
+  },
 ];
 
 /**

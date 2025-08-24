@@ -127,7 +127,13 @@ export default class FeatureCalculator {
     high: number[],
     low: number[],
     close: number[]
-  ): { conversion: number; base: number; spanA: number; spanB: number; position: number } {
+  ): {
+    conversion: number;
+    base: number;
+    spanA: number;
+    spanB: number;
+    position: number;
+  } {
     if (high.length < 52 || low.length < 52 || close.length < 52) {
       return { conversion: 0, base: 0, spanA: 0, spanB: 0, position: 0 };
     }
@@ -149,14 +155,15 @@ export default class FeatureCalculator {
     // Calculate position relative to cloud
     const cloudTop = Math.max(senkouSpanA, senkouSpanB);
     const cloudBottom = Math.min(senkouSpanA, senkouSpanB);
-    const position = currentPrice > cloudTop ? 1 : currentPrice < cloudBottom ? -1 : 0;
+    const position =
+      currentPrice > cloudTop ? 1 : currentPrice < cloudBottom ? -1 : 0;
 
     return {
       conversion: tenkanSen,
       base: kijunSen,
       spanA: senkouSpanA,
       spanB: senkouSpanB,
-      position: position
+      position: position,
     };
   }
 
@@ -169,6 +176,74 @@ export default class FeatureCalculator {
 
     if (highest === lowest) return -50;
     return ((highest - currentPrice) / (highest - lowest)) * -100;
+  }
+
+  public calculateFibonacciRetracement(
+    high: number[],
+    low: number[],
+    close: number[],
+    period: number = 20
+  ): {
+    level236: number;
+    level382: number;
+    level500: number;
+    level618: number;
+    position: number;
+  } {
+    if (high.length < period || low.length < period || close.length < period) {
+      return {
+        level236: 0,
+        level382: 0,
+        level500: 0,
+        level618: 0,
+        position: 0,
+      };
+    }
+
+    const recentHighs = high.slice(-period);
+    const recentLows = low.slice(-period);
+    const currentPrice = close[close.length - 1];
+
+    // Find swing high and swing low
+    const swingHigh = Math.max(...recentHighs);
+    const swingLow = Math.min(...recentLows);
+    const range = swingHigh - swingLow;
+
+    if (range === 0) {
+      return {
+        level236: swingHigh,
+        level382: swingHigh,
+        level500: swingHigh,
+        level618: swingHigh,
+        position: 0,
+      };
+    }
+
+    // Calculate Fibonacci retracement levels
+    const level236 = swingHigh - range * 0.236;
+    const level382 = swingHigh - range * 0.382;
+    const level500 = swingHigh - range * 0.5;
+    const level618 = swingHigh - range * 0.618;
+
+    // Calculate position relative to Fibonacci levels
+    let position = 0;
+    if (currentPrice > swingHigh) {
+      position = 1; // Above swing high
+    } else if (currentPrice > level236) {
+      position = 0.8; // Between swing high and 23.6%
+    } else if (currentPrice > level382) {
+      position = 0.6; // Between 23.6% and 38.2%
+    } else if (currentPrice > level500) {
+      position = 0.4; // Between 38.2% and 50%
+    } else if (currentPrice > level618) {
+      position = 0.2; // Between 50% and 61.8%
+    } else if (currentPrice > swingLow) {
+      position = -0.2; // Between 61.8% and swing low
+    } else {
+      position = -1; // Below swing low
+    }
+
+    return { level236, level382, level500, level618, position };
   }
 
   public calculateCCI(
@@ -487,10 +562,6 @@ export default class FeatureCalculator {
     return totalVolume > 0 ? moneyFlowVolume / totalVolume : 0;
   }
 
-
-
-
-
   public calculateStochasticK(prices: number[], period: number = 14): number {
     if (prices.length < period) return 50;
     const recentPrices = prices.slice(-period);
@@ -515,6 +586,30 @@ export default class FeatureCalculator {
     // Normalize by average volume to make it scale-independent
     const avgVolume = volumes.reduce((a, b) => a + b, 0) / volumes.length;
     return avgVolume > 0 ? vpt / avgVolume : 0;
+  }
+
+  public calculatePriceAcceleration(
+    prices: number[],
+    period: number = 7
+  ): number {
+    if (prices.length < period + 2) return 0;
+
+    // Calculate first derivative (velocity) - rate of change
+    const velocity =
+      (prices[prices.length - 1] - prices[prices.length - 1 - period]) / period;
+
+    // Calculate second derivative (acceleration) - change in velocity
+    const prevVelocity =
+      (prices[prices.length - 1 - period] -
+        prices[prices.length - 1 - 2 * period]) /
+      period;
+
+    // Acceleration is the change in velocity
+    const acceleration = velocity - prevVelocity;
+
+    // Normalize by current price to make it scale-independent
+    const currentPrice = prices[prices.length - 1];
+    return currentPrice > 0 ? acceleration / currentPrice : 0;
   }
 
   public calculateSlice(data: number[], periods: number, offset = 0): number[] {
@@ -1386,6 +1481,14 @@ export default class FeatureCalculator {
         prices.slice(0, dayIndex + 1),
         prices.slice(0, dayIndex + 1)
       ).position,
+      fibonacciPosition: this.calculateFibonacciRetracement(
+        prices.slice(0, dayIndex + 1),
+        prices.slice(0, dayIndex + 1),
+        prices.slice(0, dayIndex + 1)
+      ).position,
+      priceAcceleration: this.calculatePriceAcceleration(
+        prices.slice(0, dayIndex + 1)
+      ),
     };
   }
 
@@ -1478,6 +1581,9 @@ export default class FeatureCalculator {
       indicators.parabolicSAR, // Parabolic SAR trend
       indicators.adx, // Average Directional Index (ADX)
       indicators.ichimokuPosition, // Ichimoku Cloud position
+      indicators.fibonacciPosition, // Fibonacci Retracement position
+      indicators.stochasticK, // Stochastic K oscillator
+      indicators.priceAcceleration, // Price acceleration indicator
     ];
 
     return optimizedFeatures;

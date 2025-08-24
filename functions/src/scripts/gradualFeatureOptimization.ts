@@ -46,21 +46,16 @@ class GradualFeatureOptimizer {
 
   // Exact feature names from FeatureCalculator.ts optimizedFeatures array
   private readonly featureNames = [
-    // 1-5: Core Price Action & Volatility (5 features)
     "priceChangePct",
     "highLowRange",
     "priceVolatility",
     "pricePosition",
     "relativeVolume",
-
-    // 6-10: Technical Indicators (5 features)
     "rsi",
     "signalLine",
     "vwapRatio",
     "atr",
     "obv",
-
-    // 11-15: Enhanced Indicators (5 features)
     "momentum",
     "macdHistogram",
     "priceSMA7Ratio",
@@ -73,8 +68,6 @@ class GradualFeatureOptimizer {
     "ichimokuTenkanSen",
     "ichimokuKijunSen",
     "ichimokuCloudPosition",
-
-    // 21-27: Advanced Microstructure Features (7 features)
     "williamsR",
     "volumeMA20",
     "volumeOscillator",
@@ -93,7 +86,10 @@ class GradualFeatureOptimizer {
     "proc",
     "stochRsi",
     "vwma",
-    "centerOfGravityOscillator", // EXPERIMENT #4: Center of Gravity Oscillator (COG)
+    "centerOfGravityOscillator",
+    "tsi",
+    "pmo",
+    "bollingerBandWidth",
   ];
 
   public async runOptimization(): Promise<void> {

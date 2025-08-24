@@ -679,6 +679,88 @@ export default class FeatureCalculator {
     return cogOscillator;
   }
 
+  // EXPERIMENT #7-1: True Strength Index (TSI)
+  public calculateTSI(
+    prices: number[],
+    firstPeriod: number = 25,
+    secondPeriod: number = 13
+  ): number {
+    if (prices.length < firstPeriod + secondPeriod + 1) return 0;
+
+    // Calculate price changes
+    const priceChanges = [];
+    for (let i = 1; i < prices.length; i++) {
+      priceChanges.push(prices[i] - prices[i - 1]);
+    }
+
+    // First smoothing: EMA of price changes
+    const firstEMA = this.calculateEMA(priceChanges, firstPeriod);
+
+    // Second smoothing: EMA of the first EMA
+    const secondEMA = this.calculateEMA([firstEMA], secondPeriod);
+
+    // Calculate absolute price changes
+    const absPriceChanges = priceChanges.map((change) => Math.abs(change));
+
+    // First smoothing: EMA of absolute price changes
+    const firstAbsEMA = this.calculateEMA(absPriceChanges, firstPeriod);
+
+    // Second smoothing: EMA of the first absolute EMA
+    const secondAbsEMA = this.calculateEMA([firstAbsEMA], secondPeriod);
+
+    // Calculate TSI
+    return secondAbsEMA !== 0 ? (secondEMA / secondAbsEMA) * 100 : 0;
+  }
+
+  // EXPERIMENT #7-3: Price Momentum Oscillator (PMO)
+  public calculatePMO(
+    prices: number[],
+    firstPeriod: number = 35,
+    secondPeriod: number = 20
+  ): number {
+    if (prices.length < firstPeriod + secondPeriod + 1) return 0;
+
+    // Calculate rate of change
+    const roc = [];
+    for (let i = 1; i < prices.length; i++) {
+      roc.push(((prices[i] - prices[i - 1]) / prices[i - 1]) * 100);
+    }
+
+    // First smoothing: EMA of ROC
+    const firstEMA = this.calculateEMA(roc, firstPeriod);
+
+    // Second smoothing: EMA of the first EMA
+    const secondEMA = this.calculateEMA([firstEMA], secondPeriod);
+
+    return secondEMA;
+  }
+
+  // EXPERIMENT #7-4: Bollinger Band Width
+  public calculateBollingerBandWidth(
+    prices: number[],
+    period: number = 20,
+    stdDevMultiplier: number = 2
+  ): number {
+    if (prices.length < period) return 0;
+
+    const recentPrices = prices.slice(-period);
+    const sma = recentPrices.reduce((sum, price) => sum + price, 0) / period;
+
+    // Calculate standard deviation
+    const variance =
+      recentPrices.reduce((sum, price) => {
+        return sum + Math.pow(price - sma, 2);
+      }, 0) / period;
+    const stdDev = Math.sqrt(variance);
+
+    // Calculate Bollinger Bands
+    const upperBand = sma + stdDevMultiplier * stdDev;
+    const lowerBand = sma - stdDevMultiplier * stdDev;
+
+    // Calculate Band Width as percentage of middle band
+    return sma > 0 ? ((upperBand - lowerBand) / sma) * 100 : 0;
+  }
+
   public calculateSlice(data: number[], periods: number, offset = 0): number[] {
     return data.slice(-periods - offset, offset === 0 ? undefined : -offset);
   }
@@ -1561,8 +1643,12 @@ export default class FeatureCalculator {
         prices.slice(0, dayIndex + 1),
         volumes.slice(0, dayIndex + 1)
       ),
-      // EXPERIMENT #4: Center of Gravity Oscillator (COG)
       centerOfGravityOscillator: this.calculateCenterOfGravityOscillator(
+        prices.slice(0, dayIndex + 1)
+      ),
+      tsi: this.calculateTSI(prices.slice(0, dayIndex + 1)),
+      pmo: this.calculatePMO(prices.slice(0, dayIndex + 1)),
+      bollingerBandWidth: this.calculateBollingerBandWidth(
         prices.slice(0, dayIndex + 1)
       ),
     };
@@ -1663,6 +1749,9 @@ export default class FeatureCalculator {
       indicators.stochRsi, // Stochastic RSI (StochRSI)
       indicators.vwma, // Volume Weighted Moving Average (VWMA)
       indicators.centerOfGravityOscillator, // Center of Gravity Oscillator (COG) - EXPERIMENT #4
+      indicators.tsi, // True Strength Index (TSI) - EXPERIMENT #7-1
+      indicators.pmo, // Price Momentum Oscillator (PMO) - EXPERIMENT #7-3
+      indicators.bollingerBandWidth, // Bollinger Band Width - EXPERIMENT #7-4
     ];
 
     return optimizedFeatures;

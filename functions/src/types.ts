@@ -62,6 +62,9 @@ export interface Indicators {
   proc: number;
   vwma: number;
   centerOfGravityOscillator: number;
+  tsi: number;
+  pmo: number;
+  bollingerBandWidth: number;
 }
 
 export interface Probabilities {

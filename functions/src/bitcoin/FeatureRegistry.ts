@@ -279,6 +279,27 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
     experimentAdded: "Experiment #4 - Center of Gravity Oscillator",
     importance: "medium",
   },
+  {
+    name: "tsi",
+    description: "True Strength Index (TSI)",
+    category: "microstructure",
+    experimentAdded: "Experiment #7-1 - TSI",
+    importance: "medium",
+  },
+  {
+    name: "pmo",
+    description: "Price Momentum Oscillator (PMO)",
+    category: "microstructure",
+    experimentAdded: "Experiment #7-3 - PMO",
+    importance: "medium",
+  },
+  {
+    name: "bollingerBandWidth",
+    description: "Bollinger Band Width",
+    category: "microstructure",
+    experimentAdded: "Experiment #7-4 - Bollinger Band Width",
+    importance: "medium",
+  },
 ];
 
 /**

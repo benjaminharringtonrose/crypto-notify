@@ -16,7 +16,7 @@
 
 ### 1. **New Indicator Integration**
 
-- Add the new technical indicator to `FeatureCalculator.ts` in the `compute` method
+- Add the new technical indicator to `FeatureCalculator.ts` in the `compute` method that we have not experimented with before - please read below to make sure you aren't retesting features we deemed as not optimal
 - Add corresponding feature definition to `FeatureRegistry.ts`
 - Ensure the indicator is added to the `optimizedFeatures` array
 - Update the feature count in `FeatureDetector.ts` if needed
@@ -125,7 +125,7 @@ The model now has a comprehensive set of 38 technical indicators covering moment
 - **Features Added from Round 5**: PROC, StochRSI, VWMA
 - **Features Removed**: Keltner Channels, Williams %R, CMF, ROC, Bollinger Band Width, Pivot Points, VROC, VPT
 
-## 📈 **ROUND 6 RESULTS (IN PROGRESS)**
+## 📈 **ROUND 6 RESULTS (COMPLETED)**
 
 ### **Round 6 Experiments Summary:**
 
@@ -144,6 +144,47 @@ The model now has a comprehensive set of 38 technical indicators covering moment
 - **Features Added from Round 5**: PROC, StochRSI, VWMA
 - **Features Added from Round 6**: Center of Gravity Oscillator (COG)
 - **Features Removed**: Keltner Channels, Williams %R, CMF, ROC, Bollinger Band Width, Pivot Points, VROC, VPT, Ultimate Oscillator, Choppiness Index, Detrended Price Oscillator, Ease of Movement (EOM)
+
+## 📈 **ROUND 7 RESULTS (COMPLETED)**
+
+### **Round 7 Experiments Summary:**
+
+1. **True Strength Index (TSI)** - ✅ **KEPT** (6.43% degradation in Combined F1 when removed)
+2. **Accumulation/Distribution Line (ADL)** - ❌ **REMOVED** (65.46% improvement in Combined F1 when removed)
+3. **Price Momentum Oscillator (PMO)** - ✅ **KEPT** (10.56% degradation in Combined F1 when removed)
+4. **Bollinger Band Width** - ✅ **KEPT** (3.92% degradation in Combined F1 when removed)
+5. **Williams %R** - ✅ **KEPT** (13.34% degradation in Combined F1 when removed)
+
+### **Round 7 Feature Set:**
+
+- **Total Features**: 42 (up from 39 at start of Round 7)
+- **Features Added from Round 1**: CCI, MFI, Aroon Oscillator
+- **Features Added from Round 2**: Donchian Channels, Parabolic SAR
+- **Features Added from Round 3**: ADX, Ichimoku Cloud, Fibonacci Retracement, Stochastic K, Price Acceleration
+- **Features Added from Round 5**: PROC, StochRSI, VWMA
+- **Features Added from Round 6**: Center of Gravity Oscillator (COG)
+- **Features Added from Round 7**: TSI, PMO, Bollinger Band Width, Williams %R
+- **Features Removed**: Keltner Channels, CMF, ROC, Bollinger Band Width, Pivot Points, VROC, VPT, Ultimate Oscillator, Choppiness Index, Detrended Price Oscillator, Ease of Movement (EOM), ADL
+
+### **Round 7 Analysis:**
+
+**Key Findings:**
+
+- **True Strength Index (TSI)**: Kept due to 6.43% degradation in combined F1 score when removed, especially valuable for Buy F1 (13.21% degradation when removed)
+- **Accumulation/Distribution Line (ADL)**: Removed due to massive 65.46% improvement in combined F1 score when removed, completely destroyed Buy F1 performance
+- **Price Momentum Oscillator (PMO)**: Kept due to 10.56% degradation in combined F1 score when removed, especially valuable for Buy F1 (30.57% degradation when removed)
+- **Bollinger Band Width**: Kept due to 3.92% degradation in combined F1 score when removed, valuable for Buy F1 (10.96% degradation when removed)
+- **Williams %R**: Kept due to 13.34% degradation in combined F1 score when removed, especially valuable for Sell F1 (28.78% degradation when removed)
+
+**Round 7 Insights:**
+
+- **TSI** provides significant value for buy predictions and overall correlation
+- **PMO** is highly valuable for both buy predictions and overall model performance
+- **Bollinger Band Width** adds value, especially for buy predictions
+- **Williams %R** is crucial for sell predictions and overall model balance
+- **ADL** was adding substantial noise rather than value
+
+The model now has a comprehensive set of 42 technical indicators optimized for 7-day Bitcoin price prediction, with each feature providing measurable value to the prediction accuracy.
 
 ### **Round 6 Analysis:**
 

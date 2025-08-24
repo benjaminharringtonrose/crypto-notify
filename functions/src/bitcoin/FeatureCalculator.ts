@@ -2018,7 +2018,7 @@ export default class FeatureCalculator {
       const highLow = high[i] - low[i];
       const closeLow = close[i] - low[i];
       const highClose = high[i] - close[i];
-      
+
       let force = 0;
       if (highLow !== 0) {
         const sv = (closeLow - highClose) / highLow;
@@ -2080,16 +2080,16 @@ export default class FeatureCalculator {
     // Calculate highest high and lowest low over the period
     const recentHighs = high.slice(-period);
     const recentLows = low.slice(-period);
-    
+
     const highestHigh = Math.max(...recentHighs);
     const lowestLow = Math.min(...recentLows);
-    
+
     // Calculate current price position within the channel
     const currentPrice = high[high.length - 1]; // Use current high as proxy for current price
     const channelRange = highestHigh - lowestLow;
-    
+
     if (channelRange === 0) return 0.5; // Middle of channel if no range
-    
+
     // Return position within channel (0 = bottom, 1 = top)
     return (currentPrice - lowestLow) / channelRange;
   }

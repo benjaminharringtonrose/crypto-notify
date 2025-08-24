@@ -334,16 +334,14 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
   },
   {
     name: "elderForceIndex",
-    description:
-      "Elder Force Index - volume-weighted momentum indicator",
+    description: "Elder Force Index - volume-weighted momentum indicator",
     category: "technical",
     experimentAdded: "Experiment #9-2",
     importance: "medium",
   },
   {
     name: "klingerVolumeOscillator",
-    description:
-      "Klinger Volume Oscillator - trend-following volume indicator",
+    description: "Klinger Volume Oscillator - trend-following volume indicator",
     category: "technical",
     experimentAdded: "Experiment #9-3",
     importance: "medium",

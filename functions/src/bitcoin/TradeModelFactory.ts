@@ -10,14 +10,15 @@ export default class TradeModelFactory {
     this.features = features;
   }
 
-  public createModel(): tf.LayersModel {
+  public createModel(seed?: number): tf.LayersModel {
     // REVERTED TO PROVEN BASELINE: Optimal architecture after systematic testing
     console.log(
       "🔄 REVERTED: Back to proven baseline architecture after systematic experiments"
     );
 
     // CRITICAL: Add deterministic seeding for stable training
-    tf.randomUniform([1, 1], 0, 1, "float32", 42);
+    const useSeed = seed || 42;
+    tf.randomUniform([1, 1], 0, 1, "float32", useSeed);
 
     const model = tf.sequential();
 

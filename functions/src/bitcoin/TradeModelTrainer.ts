@@ -32,6 +32,7 @@ export class TradeModelTrainer {
   private bestValF1Buy: number = -Infinity; // Track best F1 Buy
   private bestValLoss: number = Infinity; // Track best validation loss
   private patienceCounter: number = 0; // Early stopping counter
+  private seed: number;
 
   // Final metrics for analysis
   private finalMetrics: {
@@ -58,10 +59,13 @@ export class TradeModelTrainer {
     finalEpoch: 0,
   };
 
-  constructor() {
-    // CRITICAL FIX: Stabilize random initialization to prevent class collapse
-    tf.randomUniform([1, 1], 0, 1, "float32", 42); // Seed TensorFlow random
-    console.log("🔧 RECOVERY-2: Deterministic seeding enabled");
+  constructor(seed?: number) {
+    // Use provided seed or default to 42 for consistency
+    this.seed = seed || 42;
+    tf.randomUniform([1, 1], 0, 1, "float32", this.seed); // Seed TensorFlow random
+    console.log(
+      `🔧 RECOVERY-2: Deterministic seeding enabled with seed: ${this.seed}`
+    );
 
     this.dataProcessor = new DataProcessor(
       this.config,
@@ -186,7 +190,7 @@ export class TradeModelTrainer {
         this.config.timesteps,
         detectedFeatureCount // Dynamic feature count!
       );
-      this.model = factory.createModel();
+      this.model = factory.createModel(this.seed);
 
       // Create centralized training logger
       const trainingLoggerCallback = new TrainingLoggerCallback(

@@ -246,7 +246,20 @@ class GradualFeatureOptimizer {
   ): Promise<PerformanceMetrics> {
     // Set deterministic seed for consistent training across experiments
     const FIXED_SEED = 42; // Use same seed for all experiments
+
+    // CRITICAL: Set seed at the very beginning and ensure it's used consistently
+    tf.setBackend("tensorflow");
     tf.randomUniform([1, 1], 0, 1, "float32", FIXED_SEED);
+
+    // Also set global random seed for any other random operations
+    const originalRandom = Math.random;
+    let randomCounter = 0;
+    Math.random = () => {
+      // Deterministic random function that cycles through predictable values
+      randomCounter++;
+      return (Math.sin(randomCounter * FIXED_SEED) + 1) / 2; // Deterministic but varied
+    };
+
     console.log(`🎲 Using fixed seed: ${FIXED_SEED} for consistent training`);
 
     // Create a custom data processor that uses only specified features
@@ -277,8 +290,8 @@ class GradualFeatureOptimizer {
     );
 
     try {
-      // Create a custom trainer with the filtered data
-      const trainer = new TradeModelTrainer();
+      // Create a custom trainer with the filtered data and consistent seed
+      const trainer = new TradeModelTrainer(FIXED_SEED);
 
       // Override the data processor to use filtered features
       trainer["dataProcessor"].prepareData = async () => {
@@ -302,6 +315,9 @@ class GradualFeatureOptimizer {
       // Restore original feature detection
       FeatureDetector.detectFeatureCount = originalDetectFeatureCount;
       FeatureDetector.getFeatureCount = originalGetFeatureCount;
+
+      // Restore original Math.random function
+      Math.random = originalRandom;
 
       // Get the final metrics from the trainer
       return {

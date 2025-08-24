@@ -13,7 +13,12 @@
     "train": "npx ts-node src/scripts/train.ts",
     "backtest": "TF_CPP_MIN_LOG_LEVEL=1 npx ts-node src/scripts/backtest.ts",
     "clear:weights": "npx ts-node src/scripts/clearWeights.ts",
-    "train:full": "npm run train && npm run backtest"
+    "train:full": "npm run train && npm run backtest",
+    "features:analyze": "npx ts-node src/scripts/analyzeFeatures.ts",
+    "features:ablation": "npx ts-node src/scripts/featureAblationStudy.ts",
+    "features:optimize": "npx ts-node src/scripts/optimizeFeatureSet.ts",
+    "features:fix-registry": "npx ts-node src/scripts/fixFeatureRegistry.ts",
+    "features:all": "npm run features:fix-registry && npm run features:analyze && npm run features:optimize"
   },
   "engines": {
     "node": "20"

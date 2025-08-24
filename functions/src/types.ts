@@ -61,6 +61,7 @@ export interface Indicators {
   priceAcceleration: number;
   proc: number;
   vwma: number;
+  centerOfGravityOscillator: number;
 }
 
 export interface Probabilities {

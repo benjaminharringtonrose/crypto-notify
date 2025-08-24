@@ -642,6 +642,43 @@ export default class FeatureCalculator {
     return vwma;
   }
 
+  // EXPERIMENT #4: Center of Gravity Oscillator (COG)
+  public calculateCenterOfGravityOscillator(
+    prices: number[],
+    period: number = 10
+  ): number {
+    if (prices.length < period) {
+      return 0; // Neutral value if insufficient data
+    }
+
+    const recentPrices = prices.slice(-period);
+
+    // Calculate weighted sum where more recent prices have higher weights
+    let weightedSum = 0;
+    let weightSum = 0;
+
+    for (let i = 0; i < recentPrices.length; i++) {
+      const weight = i + 1; // Weight increases with recency (1, 2, 3, ..., period)
+      weightedSum += recentPrices[i] * weight;
+      weightSum += weight;
+    }
+
+    // Calculate the center of gravity
+    const centerOfGravity = weightedSum / weightSum;
+
+    // Calculate the simple moving average for comparison
+    const simpleAverage =
+      recentPrices.reduce((sum, price) => sum + price, 0) / period;
+
+    // Calculate COG oscillator: difference between COG and SMA, normalized
+    const cogOscillator =
+      simpleAverage > 0
+        ? ((centerOfGravity - simpleAverage) / simpleAverage) * 100
+        : 0;
+
+    return cogOscillator;
+  }
+
   public calculateSlice(data: number[], periods: number, offset = 0): number[] {
     return data.slice(-periods - offset, offset === 0 ? undefined : -offset);
   }
@@ -1524,6 +1561,10 @@ export default class FeatureCalculator {
         prices.slice(0, dayIndex + 1),
         volumes.slice(0, dayIndex + 1)
       ),
+      // EXPERIMENT #4: Center of Gravity Oscillator (COG)
+      centerOfGravityOscillator: this.calculateCenterOfGravityOscillator(
+        prices.slice(0, dayIndex + 1)
+      ),
     };
   }
 
@@ -1621,6 +1662,7 @@ export default class FeatureCalculator {
       indicators.proc, // Price Rate of Change (PROC)
       indicators.stochRsi, // Stochastic RSI (StochRSI)
       indicators.vwma, // Volume Weighted Moving Average (VWMA)
+      indicators.centerOfGravityOscillator, // Center of Gravity Oscillator (COG) - EXPERIMENT #4
     ];
 
     return optimizedFeatures;

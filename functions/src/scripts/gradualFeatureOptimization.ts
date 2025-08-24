@@ -14,6 +14,7 @@
  *   npm run features:gradual -- --feature "rsi"
  */
 
+import * as tf from "@tensorflow/tfjs-node";
 import { DataProcessor } from "../bitcoin/DataProcessor";
 import { FeatureDetector } from "../bitcoin/FeatureDetector";
 import { TradeModelTrainer } from "../bitcoin/TradeModelTrainer";
@@ -92,6 +93,7 @@ class GradualFeatureOptimizer {
     "proc",
     "stochRsi",
     "vwma",
+    "centerOfGravityOscillator", // EXPERIMENT #4: Center of Gravity Oscillator (COG)
   ];
 
   public async runOptimization(): Promise<void> {
@@ -246,6 +248,11 @@ class GradualFeatureOptimizer {
   private async trainAndEvaluateModel(
     featureArray: string[]
   ): Promise<PerformanceMetrics> {
+    // Set deterministic seed for consistent training across experiments
+    const FIXED_SEED = 42; // Use same seed for all experiments
+    tf.randomUniform([1, 1], 0, 1, "float32", FIXED_SEED);
+    console.log(`🎲 Using fixed seed: ${FIXED_SEED} for consistent training`);
+
     // Create a custom data processor that uses only specified features
     const dataProcessor = new DataProcessor(
       {

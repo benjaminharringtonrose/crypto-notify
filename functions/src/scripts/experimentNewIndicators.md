@@ -125,6 +125,40 @@ The model now has a comprehensive set of 38 technical indicators covering moment
 - **Features Added from Round 5**: PROC, StochRSI, VWMA
 - **Features Removed**: Keltner Channels, Williams %R, CMF, ROC, Bollinger Band Width, Pivot Points, VROC, VPT
 
+## 📈 **ROUND 6 RESULTS (IN PROGRESS)**
+
+### **Round 6 Experiments Summary:**
+
+1. **Ultimate Oscillator (UO)** - ❌ **REMOVED** (16.22% improvement in Combined F1 when removed)
+2. **Choppiness Index (CHOP)** - ❌ **REMOVED** (0.75% improvement in Combined F1 when removed, minimal impact)
+3. **Detrended Price Oscillator (DPO)** - ❌ **REMOVED** (7.58% improvement in Combined F1 when removed)
+4. **Center of Gravity Oscillator (COG)** - ✅ **KEPT** (10.74% degradation in Combined F1 when removed)
+5. **Ease of Movement (EOM)** - ❌ **REMOVED** (0.29% improvement in Combined F1 when removed, minimal impact)
+
+### **Round 6 Feature Set:**
+
+- **Total Features**: 39 (down from 40 after removing EOM)
+- **Features Added from Round 1**: CCI, MFI, Aroon Oscillator
+- **Features Added from Round 2**: Donchian Channels, Parabolic SAR
+- **Features Added from Round 3**: ADX, Ichimoku Cloud, Fibonacci Retracement, Stochastic K, Price Acceleration
+- **Features Added from Round 5**: PROC, StochRSI, VWMA
+- **Features Added from Round 6**: Center of Gravity Oscillator (COG)
+- **Features Removed**: Keltner Channels, Williams %R, CMF, ROC, Bollinger Band Width, Pivot Points, VROC, VPT, Ultimate Oscillator, Choppiness Index, Detrended Price Oscillator, Ease of Movement (EOM)
+
+### **Round 6 Analysis:**
+
+**Key Findings:**
+
+- **Ultimate Oscillator (UO)**: Removed due to 16.22% improvement in combined F1 score when removed
+- **Choppiness Index (CHOP)**: Removed due to minimal impact (0.75% improvement in combined F1 when removed)
+- **Detrended Price Oscillator (DPO)**: Removed due to 7.58% improvement in combined F1 score when removed
+- **Center of Gravity Oscillator (COG)**: Kept due to 10.74% degradation in combined F1 score when removed
+- **Ease of Movement (EOM)**: Removed due to minimal impact (0.29% improvement in combined F1 when removed)
+- The COG showed significant value, especially for Buy F1 (25.52% degradation when removed)
+- The EOM showed mixed results - improving Buy F1 by 14.09% but degrading Sell F1 by 14.25%
+- One indicator from Round 6 has been kept (COG), indicating it provides unique value to the model
+- The model now has 39 optimized features with the addition of the Center of Gravity Oscillator
+
 ### **Round 5 Analysis:**
 
 **Key Findings:**

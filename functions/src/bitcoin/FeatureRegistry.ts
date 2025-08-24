@@ -272,6 +272,13 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
     experimentAdded: "Experiment #5 - VWMA",
     importance: "medium",
   },
+  {
+    name: "centerOfGravityOscillator",
+    description: "Center of Gravity Oscillator (COG)",
+    category: "microstructure",
+    experimentAdded: "Experiment #4 - Center of Gravity Oscillator",
+    importance: "medium",
+  },
 ];
 
 /**

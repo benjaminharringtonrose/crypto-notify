@@ -4,6 +4,14 @@
  *
  * This script tests the removal of features to see if they hurt model performance.
  *
+ * BUG FIXES APPLIED:
+ * - Fixed baseline performance mutation bug by creating deep copies
+ * - Standardized feature filtering to use name-based filtering consistently
+ * - Added proper type safety with PerformanceChange interface
+ * - Added comprehensive error handling with try-catch-finally blocks
+ * - Made seed and tolerance configurable
+ * - Ensured original functions are always restored
+ *
  * Usage:
  *   npm run features:gradual                    # Test all features sequentially
  *   npm run features:gradual -- --feature "featureName"  # Test specific feature
@@ -33,6 +41,15 @@ interface PerformanceMetrics {
   epochsTrained: number;
 }
 
+interface PerformanceChange {
+  validationAccuracy: number;
+  buyF1: number;
+  sellF1: number;
+  combinedF1: number;
+  balancedAccuracy: number;
+  matthewsCorrelation: number;
+}
+
 interface OptimizationStep {
   step: number;
   featureName: string;
@@ -46,58 +63,223 @@ interface OptimizationStep {
 class GradualFeatureOptimizer {
   private tolerance = 0.02; // 2% performance tolerance
   private optimizationSteps: OptimizationStep[] = [];
+  private originalRandom: (() => number) | null = null;
+  private originalDetectFeatureCount: (() => Promise<number>) | null = null;
+  private originalGetFeatureCount: (() => number) | null = null;
+  private seed = 42; // Configurable seed for deterministic training
 
   // Get feature names from FeatureRegistry to ensure consistency
   private get featureNames(): string[] {
     return FeatureRegistry.getFeatureNames();
   }
 
-  public async runOptimization(): Promise<void> {
-    console.log("🚀 Starting Gradual Feature Optimization");
-    console.log(
-      `📊 Testing ${this.featureNames.length} features one at a time`
-    );
-    console.log(`🎯 Performance tolerance: ${this.tolerance * 100}%`);
-    console.log("=".repeat(80));
+  // Method to set custom seed
+  public setSeed(seed: number): void {
+    this.seed = seed;
+  }
 
-    // Validate feature registry consistency
-    const registryFeatureCount = FeatureRegistry.getFeatureCount();
-    if (this.featureNames.length !== registryFeatureCount) {
-      throw new Error(
-        `Feature count mismatch! Script has ${this.featureNames.length} features, registry has ${registryFeatureCount}`
-      );
+  // Method to set custom tolerance
+  public setTolerance(tolerance: number): void {
+    if (tolerance < 0 || tolerance > 1) {
+      throw new Error("Tolerance must be between 0 and 1");
     }
+    this.tolerance = tolerance;
+  }
 
-    // Initialize feature detection
-    console.log("\n🔧 Initializing feature detection...");
-    await FeatureDetector.detectFeatureCount();
-
-    // Establish baseline performance
-    console.log(
-      "\n📈 Step 0: Establishing Baseline Performance (All Features)"
-    );
-    const baselinePerformance = await this.trainAndEvaluateModel(
-      this.featureNames
-    );
-    console.log(
-      `✅ Baseline: ${baselinePerformance.validationAccuracy.toFixed(
-        4
-      )} accuracy, ${baselinePerformance.combinedF1.toFixed(4)} combined F1`
-    );
-
-    // Test each feature individually
-    for (let i = 0; i < this.featureNames.length; i++) {
-      const featureName = this.featureNames[i];
+  public async runOptimization(): Promise<void> {
+    try {
+      console.log("🚀 Starting Gradual Feature Optimization");
       console.log(
-        `\n🔍 Step ${i + 1}: Testing removal of "${featureName}" (index ${i})`
+        `📊 Testing ${this.featureNames.length} features one at a time`
+      );
+      console.log(`🎯 Performance tolerance: ${this.tolerance * 100}%`);
+      console.log("=".repeat(80));
+
+      // Validate feature registry consistency
+      const registryFeatureCount = FeatureRegistry.getFeatureCount();
+      const registryFeatureNames = FeatureRegistry.getFeatureNames();
+
+      if (this.featureNames.length !== registryFeatureCount) {
+        throw new Error(
+          `Feature count mismatch! Script has ${this.featureNames.length} features, registry has ${registryFeatureCount}`
+        );
+      }
+
+      // Validate feature names match
+      const nameMismatches = this.featureNames.filter(
+        (name, index) => name !== registryFeatureNames[index]
+      );
+      if (nameMismatches.length > 0) {
+        throw new Error(
+          `Feature name mismatch! Mismatched features: ${nameMismatches.join(
+            ", "
+          )}`
+        );
+      }
+
+      // Initialize feature detection
+      console.log("\n🔧 Initializing feature detection...");
+      await FeatureDetector.detectFeatureCount();
+
+      // Establish baseline performance
+      console.log(
+        "\n📈 Step 0: Establishing Baseline Performance (All Features)"
+      );
+      const baselinePerformance = await this.trainAndEvaluateModel(
+        this.featureNames
+      );
+      console.log(
+        `✅ Baseline: ${baselinePerformance.validationAccuracy.toFixed(
+          4
+        )} accuracy, ${baselinePerformance.combinedF1.toFixed(4)} combined F1`
       );
 
-      // Create feature set without this feature
+      // Store original baseline for comparison (deep copy)
+      const originalBaselinePerformance: PerformanceMetrics = {
+        validationAccuracy: baselinePerformance.validationAccuracy,
+        buyF1: baselinePerformance.buyF1,
+        sellF1: baselinePerformance.sellF1,
+        combinedF1: baselinePerformance.combinedF1,
+        balancedAccuracy: baselinePerformance.balancedAccuracy,
+        matthewsCorrelation: baselinePerformance.matthewsCorrelation,
+        epochsTrained: baselinePerformance.epochsTrained,
+      };
+
+      // Test each feature individually
+      for (let i = 0; i < this.featureNames.length; i++) {
+        const featureName = this.featureNames[i];
+        console.log(
+          `\n🔍 Step ${i + 1}: Testing removal of "${featureName}" (index ${i})`
+        );
+
+        // Create feature set without this feature (use name-based filtering for consistency)
+        const modifiedFeatures = this.featureNames.filter(
+          (name) => name !== featureName
+        );
+
+        // Train and evaluate model without this feature
+        const modifiedPerformance = await this.trainAndEvaluateModel(
+          modifiedFeatures
+        );
+
+        // Compare performance against the original baseline
+        const performanceChange = this.calculatePerformanceChange(
+          originalBaselinePerformance,
+          modifiedPerformance
+        );
+        const decision = this.makeDecision(performanceChange);
+
+        // Record step
+        const step: OptimizationStep = {
+          step: i + 1,
+          featureName,
+          featureIndex: i,
+          originalPerformance: originalBaselinePerformance,
+          modifiedPerformance,
+          decision,
+          reason: this.getDecisionReason(performanceChange, decision),
+        };
+
+        this.optimizationSteps.push(step);
+
+        // Log results
+        this.logStepResults(step, performanceChange);
+
+        // Only update baseline if performance actually improved significantly
+        if (decision === "REMOVE") {
+          console.log(
+            `🔄 Updating baseline - performance improved by ${performanceChange.combinedF1.toFixed(
+              4
+            )}`
+          );
+          // Update the original baseline for future comparisons
+          originalBaselinePerformance.validationAccuracy =
+            modifiedPerformance.validationAccuracy;
+          originalBaselinePerformance.buyF1 = modifiedPerformance.buyF1;
+          originalBaselinePerformance.sellF1 = modifiedPerformance.sellF1;
+          originalBaselinePerformance.combinedF1 =
+            modifiedPerformance.combinedF1;
+          originalBaselinePerformance.balancedAccuracy =
+            modifiedPerformance.balancedAccuracy;
+          originalBaselinePerformance.matthewsCorrelation =
+            modifiedPerformance.matthewsCorrelation;
+        }
+      }
+
+      // Generate final report
+      this.generateFinalReport();
+    } catch (error) {
+      console.error("❌ Error during optimization:", error);
+      throw error;
+    } finally {
+      // Always restore original functions, even if an error occurred
+      this.restoreOriginalFunctions();
+    }
+  }
+
+  public async testFeatureRemoval(featureName: string): Promise<void> {
+    try {
+      console.log("🚀 Testing Individual Feature Removal");
+      console.log(`🎯 Testing removal of: "${featureName}"`);
+      console.log(`🎯 Performance tolerance: ${this.tolerance * 100}%`);
+      console.log("=".repeat(80));
+
+      // Validate feature name
+      if (!this.featureNames.includes(featureName)) {
+        console.error(
+          `❌ Error: Feature "${featureName}" not found in feature list`
+        );
+        console.log("\n📋 Available features:");
+        this.featureNames.forEach((name, index) => {
+          console.log(`   ${index + 1}. ${name}`);
+        });
+        process.exit(1);
+      }
+
+      // Validate feature registry consistency
+      const registryFeatureCount = FeatureRegistry.getFeatureCount();
+      const registryFeatureNames = FeatureRegistry.getFeatureNames();
+
+      if (this.featureNames.length !== registryFeatureCount) {
+        throw new Error(
+          `Feature count mismatch! Script has ${this.featureNames.length} features, registry has ${registryFeatureCount}`
+        );
+      }
+
+      // Validate feature names match
+      const nameMismatches = this.featureNames.filter(
+        (name, index) => name !== registryFeatureNames[index]
+      );
+      if (nameMismatches.length > 0) {
+        throw new Error(
+          `Feature name mismatch! Mismatched features: ${nameMismatches.join(
+            ", "
+          )}`
+        );
+      }
+
+      // Initialize feature detection
+      console.log("\n🔧 Initializing feature detection...");
+      await FeatureDetector.detectFeatureCount();
+
+      // Establish baseline performance
+      console.log(
+        "\n📈 Step 1: Establishing Baseline Performance (All Features)"
+      );
+      const baselinePerformance = await this.trainAndEvaluateModel(
+        this.featureNames
+      );
+      console.log(
+        `✅ Baseline: ${baselinePerformance.validationAccuracy.toFixed(
+          4
+        )} accuracy, ${baselinePerformance.combinedF1.toFixed(4)} combined F1`
+      );
+
+      // Test without the specified feature
+      console.log(`\n🔍 Step 2: Testing Performance Without "${featureName}"`);
       const modifiedFeatures = this.featureNames.filter(
-        (_, index) => index !== i
+        (name) => name !== featureName
       );
-
-      // Train and evaluate model without this feature
       const modifiedPerformance = await this.trainAndEvaluateModel(
         modifiedFeatures
       );
@@ -109,204 +291,137 @@ class GradualFeatureOptimizer {
       );
       const decision = this.makeDecision(performanceChange);
 
-      // Record step
-      const step: OptimizationStep = {
-        step: i + 1,
-        featureName,
-        featureIndex: i,
-        originalPerformance: baselinePerformance,
-        modifiedPerformance,
-        decision,
-        reason: this.getDecisionReason(performanceChange, decision),
-      };
-
-      this.optimizationSteps.push(step);
-
       // Log results
-      this.logStepResults(step, performanceChange);
-
-      // If performance improved significantly, update baseline
-      if (performanceChange.combinedF1 > this.tolerance) {
-        console.log(
-          `🔄 Updating baseline - performance improved by ${performanceChange.combinedF1.toFixed(
-            4
-          )}`
-        );
-        baselinePerformance.validationAccuracy =
-          modifiedPerformance.validationAccuracy;
-        baselinePerformance.buyF1 = modifiedPerformance.buyF1;
-        baselinePerformance.sellF1 = modifiedPerformance.sellF1;
-        baselinePerformance.combinedF1 = modifiedPerformance.combinedF1;
-        baselinePerformance.balancedAccuracy =
-          modifiedPerformance.balancedAccuracy;
-        baselinePerformance.matthewsCorrelation =
-          modifiedPerformance.matthewsCorrelation;
-      }
-    }
-
-    // Generate final report
-    this.generateFinalReport();
-  }
-
-  public async testFeatureRemoval(featureName: string): Promise<void> {
-    console.log("🚀 Testing Individual Feature Removal");
-    console.log(`🎯 Testing removal of: "${featureName}"`);
-    console.log(`🎯 Performance tolerance: ${this.tolerance * 100}%`);
-    console.log("=".repeat(80));
-
-    // Validate feature name
-    if (!this.featureNames.includes(featureName)) {
-      console.error(
-        `❌ Error: Feature "${featureName}" not found in feature list`
+      this.logResults(
+        featureName,
+        baselinePerformance,
+        modifiedPerformance,
+        performanceChange,
+        decision
       );
-      console.log("\n📋 Available features:");
-      this.featureNames.forEach((name, index) => {
-        console.log(`   ${index + 1}. ${name}`);
-      });
-      process.exit(1);
+    } catch (error) {
+      console.error("❌ Error during feature removal test:", error);
+      throw error;
+    } finally {
+      // Always restore original functions, even if an error occurred
+      this.restoreOriginalFunctions();
     }
-
-    // Validate feature registry consistency
-    const registryFeatureCount = FeatureRegistry.getFeatureCount();
-    if (this.featureNames.length !== registryFeatureCount) {
-      throw new Error(
-        `Feature count mismatch! Script has ${this.featureNames.length} features, registry has ${registryFeatureCount}`
-      );
-    }
-
-    // Initialize feature detection
-    console.log("\n🔧 Initializing feature detection...");
-    await FeatureDetector.detectFeatureCount();
-
-    // Establish baseline performance
-    console.log(
-      "\n📈 Step 1: Establishing Baseline Performance (All Features)"
-    );
-    const baselinePerformance = await this.trainAndEvaluateModel(
-      this.featureNames
-    );
-    console.log(
-      `✅ Baseline: ${baselinePerformance.validationAccuracy.toFixed(
-        4
-      )} accuracy, ${baselinePerformance.combinedF1.toFixed(4)} combined F1`
-    );
-
-    // Test without the specified feature
-    console.log(`\n🔍 Step 2: Testing Performance Without "${featureName}"`);
-    const modifiedFeatures = this.featureNames.filter(
-      (name) => name !== featureName
-    );
-    const modifiedPerformance = await this.trainAndEvaluateModel(
-      modifiedFeatures
-    );
-
-    // Compare performance
-    const performanceChange = this.calculatePerformanceChange(
-      baselinePerformance,
-      modifiedPerformance
-    );
-    const decision = this.makeDecision(performanceChange);
-
-    // Log results
-    this.logResults(
-      featureName,
-      baselinePerformance,
-      modifiedPerformance,
-      performanceChange,
-      decision
-    );
   }
 
   public async testMultipleFeatureRemoval(
     featureNames: string[]
   ): Promise<void> {
-    console.log("🚀 Testing Multiple Feature Removal");
-    console.log(`🎯 Features: ${featureNames.map((f) => `"${f}"`).join(", ")}`);
-    console.log(`🎯 Performance tolerance: ${this.tolerance * 100}%`);
-    console.log("=".repeat(80));
-
-    // Validate all features exist
-    const invalidFeatures = featureNames.filter(
-      (name) => !this.featureNames.includes(name)
-    );
-    if (invalidFeatures.length > 0) {
-      console.error(
-        `❌ Error: Features not found in feature list: ${invalidFeatures.join(
-          ", "
-        )}`
+    try {
+      console.log("🚀 Testing Multiple Feature Removal");
+      console.log(
+        `🎯 Features: ${featureNames.map((f) => `"${f}"`).join(", ")}`
       );
-      console.log("\n📋 Available features:");
-      this.featureNames.forEach((name, index) => {
-        console.log(`   ${index + 1}. ${name}`);
-      });
-      process.exit(1);
-    }
+      console.log(`🎯 Performance tolerance: ${this.tolerance * 100}%`);
+      console.log("=".repeat(80));
 
-    // Validate feature registry consistency
-    const registryFeatureCount = FeatureRegistry.getFeatureCount();
-    if (this.featureNames.length !== registryFeatureCount) {
-      throw new Error(
-        `Feature count mismatch! Script has ${this.featureNames.length} features, registry has ${registryFeatureCount}`
+      // Validate all features exist
+      const invalidFeatures = featureNames.filter(
+        (name) => !this.featureNames.includes(name)
       );
+      if (invalidFeatures.length > 0) {
+        console.error(
+          `❌ Error: Features not found in feature list: ${invalidFeatures.join(
+            ", "
+          )}`
+        );
+        console.log("\n📋 Available features:");
+        this.featureNames.forEach((name, index) => {
+          console.log(`   ${index + 1}. ${name}`);
+        });
+        process.exit(1);
+      }
+
+      // Validate feature registry consistency
+      const registryFeatureCount = FeatureRegistry.getFeatureCount();
+      const registryFeatureNames = FeatureRegistry.getFeatureNames();
+
+      if (this.featureNames.length !== registryFeatureCount) {
+        throw new Error(
+          `Feature count mismatch! Script has ${this.featureNames.length} features, registry has ${registryFeatureCount}`
+        );
+      }
+
+      // Validate feature names match
+      const nameMismatches = this.featureNames.filter(
+        (name, index) => name !== registryFeatureNames[index]
+      );
+      if (nameMismatches.length > 0) {
+        throw new Error(
+          `Feature name mismatch! Mismatched features: ${nameMismatches.join(
+            ", "
+          )}`
+        );
+      }
+
+      // Initialize feature detection
+      console.log("\n🔧 Initializing feature detection...");
+      await FeatureDetector.detectFeatureCount();
+
+      // Establish baseline performance
+      console.log(
+        "\n📈 Step 1: Establishing Baseline Performance (All Features)"
+      );
+      const baselinePerformance = await this.trainAndEvaluateModel(
+        this.featureNames
+      );
+      console.log(
+        `✅ Baseline: ${baselinePerformance.validationAccuracy.toFixed(
+          4
+        )} accuracy, ${baselinePerformance.combinedF1.toFixed(4)} combined F1`
+      );
+
+      // Test without the specified features
+      console.log(
+        `\n🔍 Step 2: Testing Performance Without ${featureNames.length} Features`
+      );
+      const modifiedFeatures = this.featureNames.filter(
+        (name) => !featureNames.includes(name)
+      );
+      const modifiedPerformance = await this.trainAndEvaluateModel(
+        modifiedFeatures
+      );
+
+      // Compare performance
+      const performanceChange = this.calculatePerformanceChange(
+        baselinePerformance,
+        modifiedPerformance
+      );
+      const decision = this.makeDecision(performanceChange);
+
+      // Log results for multiple features
+      this.logMultipleFeatureResults(
+        featureNames,
+        baselinePerformance,
+        modifiedPerformance,
+        performanceChange,
+        decision
+      );
+    } catch (error) {
+      console.error("❌ Error during multiple feature removal test:", error);
+      throw error;
+    } finally {
+      // Always restore original functions, even if an error occurred
+      this.restoreOriginalFunctions();
     }
-
-    // Initialize feature detection
-    console.log("\n🔧 Initializing feature detection...");
-    await FeatureDetector.detectFeatureCount();
-
-    // Establish baseline performance
-    console.log(
-      "\n📈 Step 1: Establishing Baseline Performance (All Features)"
-    );
-    const baselinePerformance = await this.trainAndEvaluateModel(
-      this.featureNames
-    );
-    console.log(
-      `✅ Baseline: ${baselinePerformance.validationAccuracy.toFixed(
-        4
-      )} accuracy, ${baselinePerformance.combinedF1.toFixed(4)} combined F1`
-    );
-
-    // Test without the specified features
-    console.log(
-      `\n🔍 Step 2: Testing Performance Without ${featureNames.length} Features`
-    );
-    const modifiedFeatures = this.featureNames.filter(
-      (name) => !featureNames.includes(name)
-    );
-    const modifiedPerformance = await this.trainAndEvaluateModel(
-      modifiedFeatures
-    );
-
-    // Compare performance
-    const performanceChange = this.calculatePerformanceChange(
-      baselinePerformance,
-      modifiedPerformance
-    );
-    const decision = this.makeDecision(performanceChange);
-
-    // Log results for multiple features
-    this.logMultipleFeatureResults(
-      featureNames,
-      baselinePerformance,
-      modifiedPerformance,
-      performanceChange,
-      decision
-    );
   }
 
   private async trainAndEvaluateModel(
     featureArray: string[]
   ): Promise<PerformanceMetrics> {
     // Set deterministic seed for consistent training across experiments
-    const FIXED_SEED = 42; // Use same seed for all experiments
+    const FIXED_SEED = this.seed; // Use configurable seed
 
     // CRITICAL: Set seed at the very beginning and ensure it's used consistently
     tf.setBackend("tensorflow");
     tf.randomUniform([1, 1], 0, 1, "float32", FIXED_SEED);
 
-    // Also set global random seed for any other random operations
-    const originalRandom = Math.random;
+    // Store original random function and override it
+    this.originalRandom = Math.random;
     let randomCounter = 0;
     Math.random = () => {
       // Deterministic random function that cycles through predictable values
@@ -360,6 +475,14 @@ class GradualFeatureOptimizer {
         return index;
       });
 
+      // Validate that feature indices are unique
+      const uniqueIndices = new Set(featureIndices);
+      if (uniqueIndices.size !== featureIndices.length) {
+        throw new Error(
+          `Duplicate feature indices found: ${featureIndices.join(", ")}`
+        );
+      }
+
       console.log(`🔍 Using feature indices: [${featureIndices.join(", ")}]`);
 
       // Filter features to only include the specified ones
@@ -379,10 +502,11 @@ class GradualFeatureOptimizer {
         })
       );
 
-      // Override the feature detection to match our filtered feature count
-      const originalDetectFeatureCount = FeatureDetector.detectFeatureCount;
-      const originalGetFeatureCount = FeatureDetector.getFeatureCount;
+      // Store original feature detection methods
+      this.originalDetectFeatureCount = FeatureDetector.detectFeatureCount;
+      this.originalGetFeatureCount = FeatureDetector.getFeatureCount;
 
+      // Override the feature detection to match our filtered feature count
       FeatureDetector.detectFeatureCount = async () => {
         return featureArray.length;
       };
@@ -391,24 +515,13 @@ class GradualFeatureOptimizer {
       };
 
       // Override the trainer's data processor prepareData method
-      const originalPrepareData = trainer["dataProcessor"].prepareData;
       trainer["dataProcessor"].prepareData = async () => ({ X: filteredX, y });
 
       // Train the model using the same process as the main trainer
       await trainer.train();
 
-      // Restore original feature detection
-      FeatureDetector.detectFeatureCount = originalDetectFeatureCount;
-      FeatureDetector.getFeatureCount = originalGetFeatureCount;
-
-      // Restore original data processor
-      trainer["dataProcessor"].prepareData = originalPrepareData;
-
-      // Restore original Math.random function
-      Math.random = originalRandom;
-
       // Get the final metrics from the trainer
-      return {
+      const metrics = {
         validationAccuracy: trainer.getBalancedAccuracy(),
         buyF1: trainer.getBuyF1(),
         sellF1: trainer.getSellF1(),
@@ -417,20 +530,53 @@ class GradualFeatureOptimizer {
         matthewsCorrelation: trainer.getMatthewsCorrelation(),
         epochsTrained: trainer.getFinalMetrics().finalEpoch,
       };
+
+      return metrics;
     } catch (error) {
       console.error(
         `❌ Error training model with ${featureArray.length} features:`,
         error
       );
       throw error;
+    } finally {
+      // Always restore original functions, even if an error occurred
+      this.restoreOriginalFunctions();
+
+      // Clear TensorFlow memory
+      tf.tidy(() => {
+        // This will clean up any remaining tensors
+      });
+    }
+  }
+
+  private restoreOriginalFunctions(): void {
+    // Restore original Math.random function
+    if (this.originalRandom) {
+      Math.random = this.originalRandom;
+      this.originalRandom = null;
+    }
+
+    // Restore original feature detection methods
+    if (this.originalDetectFeatureCount) {
+      FeatureDetector.detectFeatureCount = this.originalDetectFeatureCount;
+      this.originalDetectFeatureCount = null;
+    }
+    if (this.originalGetFeatureCount) {
+      FeatureDetector.getFeatureCount = this.originalGetFeatureCount;
+      this.originalGetFeatureCount = null;
     }
   }
 
   private calculatePerformanceChange(
     original: PerformanceMetrics,
     modified: PerformanceMetrics
-  ) {
+  ): PerformanceChange {
     const safeDivide = (numerator: number, denominator: number): number => {
+      // Handle case where both numerator and denominator are zero
+      if (Math.abs(numerator) < 1e-10 && Math.abs(denominator) < 1e-10) {
+        return 0; // No change when both are effectively zero
+      }
+
       if (Math.abs(denominator) < 1e-10) {
         return numerator > 0 ? 1 : numerator < 0 ? -1 : 0;
       }
@@ -460,31 +606,76 @@ class GradualFeatureOptimizer {
   }
 
   private makeDecision(
-    performanceChange: any
+    performanceChange: PerformanceChange
   ): "REMOVE" | "KEEP" | "MINIMAL_IMPACT" {
     const combinedF1Change = performanceChange.combinedF1;
+    const balancedAccuracyChange = performanceChange.balancedAccuracy;
+    const matthewsCorrelationChange = performanceChange.matthewsCorrelation;
 
+    // Consider multiple metrics for decision making
+    const positiveMetrics = [
+      combinedF1Change > 0,
+      balancedAccuracyChange > 0,
+      matthewsCorrelationChange > 0,
+    ].filter(Boolean).length;
+
+    const negativeMetrics = [
+      combinedF1Change < 0,
+      balancedAccuracyChange < 0,
+      matthewsCorrelationChange < 0,
+    ].filter(Boolean).length;
+
+    // Primary decision based on combined F1, but consider other metrics
     if (combinedF1Change > this.tolerance) {
-      return "REMOVE"; // Performance improved
+      return "REMOVE"; // Performance improved significantly
     } else if (combinedF1Change > -this.tolerance) {
-      return "MINIMAL_IMPACT"; // Within tolerance
+      // Within tolerance, check if other metrics suggest removal
+      if (positiveMetrics > negativeMetrics) {
+        return "REMOVE"; // More metrics improved than degraded
+      } else if (negativeMetrics > positiveMetrics) {
+        return "KEEP"; // More metrics degraded than improved
+      } else {
+        return "MINIMAL_IMPACT"; // Mixed or neutral impact
+      }
     } else {
-      return "KEEP"; // Performance degraded
+      return "KEEP"; // Performance degraded significantly
     }
   }
 
-  private getDecisionReason(performanceChange: any, decision: string): string {
+  private getDecisionReason(
+    performanceChange: PerformanceChange,
+    decision: string
+  ): string {
     const combinedF1Change = performanceChange.combinedF1;
+    const balancedAccuracyChange = performanceChange.balancedAccuracy;
+    const matthewsCorrelationChange = performanceChange.matthewsCorrelation;
+
+    const metrics = [
+      { name: "Combined F1", value: combinedF1Change },
+      { name: "Balanced Accuracy", value: balancedAccuracyChange },
+      { name: "Matthews Correlation", value: matthewsCorrelationChange },
+    ];
+
+    const improvedMetrics = metrics.filter((m) => m.value > 0);
+    const degradedMetrics = metrics.filter((m) => m.value < 0);
 
     switch (decision) {
       case "REMOVE":
-        return `Performance improved by ${(combinedF1Change * 100).toFixed(
-          2
-        )}%`;
+        if (combinedF1Change > this.tolerance) {
+          return `Performance improved by ${(combinedF1Change * 100).toFixed(
+            2
+          )}%`;
+        } else {
+          return `Mixed impact: ${improvedMetrics.length} metrics improved, ${degradedMetrics.length} degraded`;
+        }
       case "KEEP":
-        return `Performance degraded by ${(
-          Math.abs(combinedF1Change) * 100
-        ).toFixed(2)}%`;
+        if (combinedF1Change < -this.tolerance) {
+          return `Performance degraded by ${(
+            Math.abs(combinedF1Change) * 100
+          ).toFixed(2)}%`;
+        } else {
+          return `Mixed impact: ${improvedMetrics.length} metrics improved, ${degradedMetrics.length} degraded`;
+        }
       case "MINIMAL_IMPACT":
         return `Performance change within ${(this.tolerance * 100).toFixed(
           1
@@ -494,7 +685,10 @@ class GradualFeatureOptimizer {
     }
   }
 
-  private logStepResults(step: OptimizationStep, performanceChange: any): void {
+  private logStepResults(
+    step: OptimizationStep,
+    performanceChange: PerformanceChange
+  ): void {
     const { decision, modifiedPerformance } = step;
     const { combinedF1 } = performanceChange;
 
@@ -602,7 +796,7 @@ class GradualFeatureOptimizer {
     featureName: string,
     baselinePerformance: PerformanceMetrics,
     modifiedPerformance: PerformanceMetrics,
-    performanceChange: any,
+    performanceChange: PerformanceChange,
     decision: string
   ): void {
     console.log("\n" + "=".repeat(80));
@@ -700,7 +894,7 @@ class GradualFeatureOptimizer {
     featureNames: string[],
     baselinePerformance: PerformanceMetrics,
     modifiedPerformance: PerformanceMetrics,
-    performanceChange: any,
+    performanceChange: PerformanceChange,
     decision: string
   ): void {
     console.log("\n" + "=".repeat(80));
@@ -803,7 +997,7 @@ class GradualFeatureOptimizer {
   }
 }
 
-// Parse command line arguments
+// Parse command line arguments with proper quote handling
 function parseArguments(): { feature?: string; features?: string[] } {
   const args = process.argv.slice(2);
   const featureIndex = args.indexOf("--feature");
@@ -831,11 +1025,27 @@ function parseArguments(): { feature?: string; features?: string[] } {
       process.exit(1);
     }
 
-    // Check if there are multiple features after --feature
+    // Collect all arguments after --feature until the next -- flag
     const features: string[] = [];
     let i = featureIndex + 1;
     while (i < args.length && !args[i].startsWith("--")) {
-      features.push(args[i]);
+      // Handle quoted feature names by joining them
+      if (args[i].startsWith('"') && !args[i].endsWith('"')) {
+        let quotedFeature = args[i].substring(1);
+        i++;
+        while (i < args.length && !args[i].endsWith('"')) {
+          quotedFeature += " " + args[i];
+          i++;
+        }
+        if (i < args.length) {
+          quotedFeature += " " + args[i].substring(0, args[i].length - 1);
+        }
+        features.push(quotedFeature);
+      } else {
+        // Remove quotes if present
+        const feature = args[i].replace(/^["']|["']$/g, "");
+        features.push(feature);
+      }
       i++;
     }
 

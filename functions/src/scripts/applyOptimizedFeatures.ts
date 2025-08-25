@@ -27,13 +27,31 @@ const OPTIMIZATION_RESULTS = {
     "feature_30",
   ],
   keptFeatures: [
-    "feature_24",
+    "feature_0",
+    "feature_2",
+    "feature_3",
+    "feature_5",
+    "feature_7",
+    "feature_8",
+    "feature_10",
     "feature_12",
     "feature_13",
-    "feature_10",
+    "feature_14",
+    "feature_15",
+    "feature_17",
     "feature_21",
-    "feature_3",
-    "feature_0",
+    "feature_22",
+    "feature_24",
+    "feature_25",
+    "feature_26",
+    "feature_27",
+    "feature_28",
+    "feature_29",
+    "feature_31",
+    "feature_32",
+    "feature_33",
+    "feature_34",
+    "feature_35",
   ],
   performanceImprovement: "40.54%",
 };
@@ -124,11 +142,23 @@ class OptimizedFeatureApplier {
    */
   private mapFeatureIndicesToNames(featureIndices: string[]): string[] {
     return featureIndices.map((featureIndex) => {
+      // Add validation for feature index format
+      if (!featureIndex.startsWith("feature_")) {
+        console.warn(`⚠️  Invalid feature index format: ${featureIndex}`);
+        return featureIndex;
+      }
+
       const index = parseInt(featureIndex.replace("feature_", ""));
-      return (
-        FEATURE_INDEX_MAP[index as keyof typeof FEATURE_INDEX_MAP] ||
-        featureIndex
-      );
+
+      // Validate index exists in the map
+      if (!(index in FEATURE_INDEX_MAP)) {
+        console.warn(
+          `⚠️  Feature index ${index} not found in FEATURE_INDEX_MAP`
+        );
+        return featureIndex;
+      }
+
+      return FEATURE_INDEX_MAP[index as keyof typeof FEATURE_INDEX_MAP];
     });
   }
 
@@ -136,16 +166,23 @@ class OptimizedFeatureApplier {
    * Generate the optimized feature array for FeatureCalculator
    */
   private generateOptimizedFeatureArray(): string[] {
-    // Features to keep (25 features) - based on gradual optimization results
-    const keptIndices = [
-      0, 2, 3, 5, 7, 8, 10, 12, 13, 14, 15, 17, 20, 21, 22, 24, 25, 26, 27, 28,
-      29, 31, 32, 33, 34, 35,
-    ];
+    // Use the keptFeatures from optimization results instead of hardcoded indices
+    return OPTIMIZATION_RESULTS.keptFeatures.map((featureIndex) => {
+      if (!featureIndex.startsWith("feature_")) {
+        console.warn(`⚠️  Invalid feature index format: ${featureIndex}`);
+        return featureIndex;
+      }
 
-    return keptIndices.map((index) => {
-      const featureName =
-        FEATURE_INDEX_MAP[index as keyof typeof FEATURE_INDEX_MAP];
-      return featureName || `feature_${index}`;
+      const index = parseInt(featureIndex.replace("feature_", ""));
+
+      if (!(index in FEATURE_INDEX_MAP)) {
+        console.warn(
+          `⚠️  Feature index ${index} not found in FEATURE_INDEX_MAP`
+        );
+        return featureIndex;
+      }
+
+      return FEATURE_INDEX_MAP[index as keyof typeof FEATURE_INDEX_MAP];
     });
   }
 
@@ -207,12 +244,12 @@ class OptimizedFeatureApplier {
       `Performance improvement: ${OPTIMIZATION_RESULTS.performanceImprovement}`
     );
 
-    console.log(`\n✅ FEATURES REMOVED (${removedFeatureNames.length}):`);
+    console.log(`\n❌ FEATURES REMOVED (${removedFeatureNames.length}):`);
     removedFeatureNames.forEach((feature, idx) => {
       console.log(`  ${idx + 1}. ${feature}`);
     });
 
-    console.log(`\n❌ FEATURES KEPT (${keptFeatureNames.length}):`);
+    console.log(`\n✅ FEATURES KEPT (${keptFeatureNames.length}):`);
     keptFeatureNames.forEach((feature, idx) => {
       console.log(`  ${idx + 1}. ${feature}`);
     });

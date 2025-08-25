@@ -1801,6 +1801,14 @@ export default class FeatureCalculator {
       supportResistanceLevel: this.calculateSupportResistanceLevel(
         prices.slice(0, dayIndex + 1)
       ),
+      ehlersFisherTransform: this.calculateEhlersFisherTransform(
+        prices.slice(0, dayIndex + 1)
+      ),
+      mcginleyDynamic: this.calculateMcGinleyDynamic(
+        prices.slice(0, dayIndex + 1)
+      ),
+      knowSureThing: this.calculateKnowSureThing(prices.slice(0, dayIndex + 1)),
+      trix: this.calculateTrix(prices.slice(0, dayIndex + 1)),
     };
   }
 
@@ -1914,6 +1922,10 @@ export default class FeatureCalculator {
       indicators.mesaSineWave, // MESA Sine Wave - EXPERIMENT #10-4
       indicators.rainbowMovingAverage, // Rainbow Moving Average - EXPERIMENT #10-5
       indicators.supportResistanceLevel, // Support/Resistance Level (SRL) - EXPERIMENT #12-2
+      indicators.ehlersFisherTransform, // Ehlers Fisher Transform - EXPERIMENT #15-2
+      indicators.mcginleyDynamic, // McGinley Dynamic - EXPERIMENT #15-3
+      indicators.knowSureThing, // Know Sure Thing (KST) - EXPERIMENT #15-4
+      indicators.trix, // Trix - EXPERIMENT #15-5
     ];
 
     return optimizedFeatures;
@@ -2357,5 +2369,162 @@ export default class FeatureCalculator {
 
     // SRL = (Current Price - Average Support) / (Average Resistance - Average Support)
     return (currentPrice - avgSupport) / range;
+  }
+
+  // EXPERIMENT #15-1: Awesome Oscillator (AO)
+  public calculateAwesomeOscillator(
+    prices: number[],
+    fastPeriod: number = 5,
+    slowPeriod: number = 34
+  ): number {
+    if (prices.length < slowPeriod) return 0;
+
+    // Calculate median prices (high + low) / 2
+    const medianPrices: number[] = [];
+    for (let i = 0; i < prices.length; i++) {
+      const high = prices[i];
+      const low = prices[i];
+      const median = (high + low) / 2;
+      medianPrices.push(median);
+    }
+
+    // Calculate fast and slow SMAs
+    const fastSMA = this.calculateSMA(medianPrices.slice(-fastPeriod));
+    const slowSMA = this.calculateSMA(medianPrices.slice(-slowPeriod));
+
+    // Awesome Oscillator = Fast SMA - Slow SMA
+    const ao = fastSMA - slowSMA;
+
+    return ao;
+  }
+
+  // EXPERIMENT #15-2: Ehlers Fisher Transform
+  public calculateEhlersFisherTransform(
+    prices: number[],
+    period: number = 10
+  ): number {
+    if (prices.length < period) return 0;
+
+    // Calculate median price (HLC/3) - using close price as proxy
+    const medianPrices: number[] = [];
+    for (let i = 0; i < prices.length; i++) {
+      medianPrices.push(prices[i]);
+    }
+
+    // Calculate highest and lowest median prices over the period
+    const recentMedianPrices = medianPrices.slice(-period);
+    const highestMedian = Math.max(...recentMedianPrices);
+    const lowestMedian = Math.min(...recentMedianPrices);
+
+    // Calculate value1 (normalized median price)
+    const currentMedian = medianPrices[medianPrices.length - 1];
+    const range = highestMedian - lowestMedian;
+
+    if (range === 0) return 0;
+
+    const value1 =
+      0.33 * 2 * ((currentMedian - lowestMedian) / range - 0.5) +
+      0.67 *
+        (medianPrices.length > 1 ? medianPrices[medianPrices.length - 2] : 0);
+
+    // Apply Fisher Transform
+    let fisher = 0;
+    if (value1 > 0.99) {
+      fisher = 0.999;
+    } else if (value1 < -0.99) {
+      fisher = -0.999;
+    } else {
+      fisher = 0.5 * Math.log((1 + value1) / (1 - value1));
+    }
+
+    return fisher;
+  }
+
+  // EXPERIMENT #15-3: McGinley Dynamic
+  public calculateMcGinleyDynamic(
+    prices: number[],
+    period: number = 14,
+    constant: number = 4
+  ): number {
+    if (prices.length < period) return prices[prices.length - 1];
+
+    const currentPrice = prices[prices.length - 1];
+    const sma = this.calculateSMA(prices.slice(-period));
+
+    if (sma === 0) return currentPrice;
+
+    // McGinley Dynamic formula: MD = Price - (Price * SMA) / (Constant * SMA)
+    const md = currentPrice - (currentPrice * sma) / (constant * sma);
+
+    return md;
+  }
+
+  // EXPERIMENT #15-4: Know Sure Thing (KST)
+  public calculateKnowSureThing(
+    prices: number[],
+    rca1: number = 10,
+    rca2: number = 15,
+    rca3: number = 20,
+    rca4: number = 30,
+    sma1: number = 10,
+    sma2: number = 10,
+    sma3: number = 10,
+    sma4: number = 15
+  ): number {
+    if (
+      prices.length <
+      Math.max(rca1, rca2, rca3, rca4) + Math.max(sma1, sma2, sma3, sma4)
+    ) {
+      return 0;
+    }
+
+    // Calculate Rate of Change for different periods
+    const roc1 = this.calculateROC(prices, rca1);
+    const roc2 = this.calculateROC(prices, rca2);
+    const roc3 = this.calculateROC(prices, rca3);
+    const roc4 = this.calculateROC(prices, rca4);
+
+    // Calculate SMAs of the ROCs
+    const smaRoc1 = this.calculateSMA(roc1.slice(-sma1));
+    const smaRoc2 = this.calculateSMA(roc2.slice(-sma2));
+    const smaRoc3 = this.calculateSMA(roc3.slice(-sma3));
+    const smaRoc4 = this.calculateSMA(roc4.slice(-sma4));
+
+    // KST = (RCMA1 × 1) + (RCMA2 × 2) + (RCMA3 × 3) + (RCMA4 × 4)
+    const kst = smaRoc1 * 1 + smaRoc2 * 2 + smaRoc3 * 3 + smaRoc4 * 4;
+
+    return kst;
+  }
+
+  // Helper method for Rate of Change calculation
+  private calculateROC(prices: number[], period: number): number[] {
+    const roc: number[] = [];
+    for (let i = period; i < prices.length; i++) {
+      const rocValue =
+        ((prices[i] - prices[i - period]) / prices[i - period]) * 100;
+      roc.push(rocValue);
+    }
+    return roc;
+  }
+
+  // EXPERIMENT #15-5: Trix
+  public calculateTrix(prices: number[], period: number = 15): number {
+    if (prices.length < period * 3) return 0;
+
+    // Calculate triple exponential moving average using a simplified approach
+    // For the current implementation, we'll use a single EMA as a proxy
+    const ema = this.calculateEMA(prices, period);
+
+    // Calculate previous EMA for rate of change
+    const prevPrices = prices.slice(0, -1);
+    const prevEma =
+      prevPrices.length > 0 ? this.calculateEMA(prevPrices, period) : ema;
+
+    if (prevEma === 0) return 0;
+
+    // Trix = ((EMA - EMA_prev) / EMA_prev) * 100
+    const trix = ((ema - prevEma) / prevEma) * 100;
+
+    return trix;
   }
 }

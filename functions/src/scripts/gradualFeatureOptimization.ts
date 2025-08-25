@@ -217,6 +217,84 @@ class GradualFeatureOptimizer {
     );
   }
 
+  public async testMultipleFeatureRemoval(
+    featureNames: string[]
+  ): Promise<void> {
+    console.log("🚀 Testing Multiple Feature Removal");
+    console.log(`🎯 Features: ${featureNames.map((f) => `"${f}"`).join(", ")}`);
+    console.log(`🎯 Performance tolerance: ${this.tolerance * 100}%`);
+    console.log("=".repeat(80));
+
+    // Validate all features exist
+    const invalidFeatures = featureNames.filter(
+      (name) => !this.featureNames.includes(name)
+    );
+    if (invalidFeatures.length > 0) {
+      console.error(
+        `❌ Error: Features not found in feature list: ${invalidFeatures.join(
+          ", "
+        )}`
+      );
+      console.log("\n📋 Available features:");
+      this.featureNames.forEach((name, index) => {
+        console.log(`   ${index + 1}. ${name}`);
+      });
+      process.exit(1);
+    }
+
+    // Validate feature registry consistency
+    const registryFeatureCount = FeatureRegistry.getFeatureCount();
+    if (this.featureNames.length !== registryFeatureCount) {
+      throw new Error(
+        `Feature count mismatch! Script has ${this.featureNames.length} features, registry has ${registryFeatureCount}`
+      );
+    }
+
+    // Initialize feature detection
+    console.log("\n🔧 Initializing feature detection...");
+    await FeatureDetector.detectFeatureCount();
+
+    // Establish baseline performance
+    console.log(
+      "\n📈 Step 1: Establishing Baseline Performance (All Features)"
+    );
+    const baselinePerformance = await this.trainAndEvaluateModel(
+      this.featureNames
+    );
+    console.log(
+      `✅ Baseline: ${baselinePerformance.validationAccuracy.toFixed(
+        4
+      )} accuracy, ${baselinePerformance.combinedF1.toFixed(4)} combined F1`
+    );
+
+    // Test without the specified features
+    console.log(
+      `\n🔍 Step 2: Testing Performance Without ${featureNames.length} Features`
+    );
+    const modifiedFeatures = this.featureNames.filter(
+      (name) => !featureNames.includes(name)
+    );
+    const modifiedPerformance = await this.trainAndEvaluateModel(
+      modifiedFeatures
+    );
+
+    // Compare performance
+    const performanceChange = this.calculatePerformanceChange(
+      baselinePerformance,
+      modifiedPerformance
+    );
+    const decision = this.makeDecision(performanceChange);
+
+    // Log results for multiple features
+    this.logMultipleFeatureResults(
+      featureNames,
+      baselinePerformance,
+      modifiedPerformance,
+      performanceChange,
+      decision
+    );
+  }
+
   private async trainAndEvaluateModel(
     featureArray: string[]
   ): Promise<PerformanceMetrics> {
@@ -617,16 +695,122 @@ class GradualFeatureOptimizer {
       ).toFixed(1)}%)`
     );
   }
+
+  private logMultipleFeatureResults(
+    featureNames: string[],
+    baselinePerformance: PerformanceMetrics,
+    modifiedPerformance: PerformanceMetrics,
+    performanceChange: any,
+    decision: string
+  ): void {
+    console.log("\n" + "=".repeat(80));
+    console.log("📋 MULTIPLE FEATURE REMOVAL TEST RESULTS");
+    console.log("=".repeat(80));
+
+    console.log(
+      `\n🎯 Features Tested: ${featureNames.map((f) => `"${f}"`).join(", ")}`
+    );
+    console.log(
+      `📊 Features Count: ${featureNames.length} features removed from ${this.featureNames.length} total`
+    );
+
+    console.log(`\n📈 PERFORMANCE COMPARISON:`);
+    console.log(`   Metric              | Baseline | Modified | Change`);
+    console.log(`   --------------------|----------|----------|--------`);
+    console.log(
+      `   Validation Accuracy | ${baselinePerformance.validationAccuracy.toFixed(
+        4
+      )} | ${modifiedPerformance.validationAccuracy.toFixed(4)} | ${(
+        performanceChange.validationAccuracy * 100
+      ).toFixed(2)}%`
+    );
+    console.log(
+      `   Buy F1 Score        | ${baselinePerformance.buyF1.toFixed(
+        4
+      )} | ${modifiedPerformance.buyF1.toFixed(4)} | ${(
+        performanceChange.buyF1 * 100
+      ).toFixed(2)}%`
+    );
+    console.log(
+      `   Sell F1 Score       | ${baselinePerformance.sellF1.toFixed(
+        4
+      )} | ${modifiedPerformance.sellF1.toFixed(4)} | ${(
+        performanceChange.sellF1 * 100
+      ).toFixed(2)}%`
+    );
+    console.log(
+      `   Combined F1 Score   | ${baselinePerformance.combinedF1.toFixed(
+        4
+      )} | ${modifiedPerformance.combinedF1.toFixed(4)} | ${(
+        performanceChange.combinedF1 * 100
+      ).toFixed(2)}%`
+    );
+    console.log(
+      `   Balanced Accuracy   | ${baselinePerformance.balancedAccuracy.toFixed(
+        4
+      )} | ${modifiedPerformance.balancedAccuracy.toFixed(4)} | ${(
+        performanceChange.balancedAccuracy * 100
+      ).toFixed(2)}%`
+    );
+    console.log(
+      `   Matthews Correlation| ${baselinePerformance.matthewsCorrelation.toFixed(
+        4
+      )} | ${modifiedPerformance.matthewsCorrelation.toFixed(4)} | ${(
+        performanceChange.matthewsCorrelation * 100
+      ).toFixed(2)}%`
+    );
+
+    console.log(`\n🎯 DECISION: ${decision}`);
+
+    const combinedF1Change = performanceChange.combinedF1;
+    if (decision === "REMOVE") {
+      console.log(
+        `✅ RECOMMENDATION: Remove ${
+          featureNames.length
+        } features - Performance improved by ${(combinedF1Change * 100).toFixed(
+          2
+        )}%`
+      );
+    } else if (decision === "KEEP") {
+      console.log(
+        `🔒 RECOMMENDATION: Keep ${
+          featureNames.length
+        } features - Performance degraded by ${(
+          Math.abs(combinedF1Change) * 100
+        ).toFixed(2)}%`
+      );
+    } else {
+      console.log(
+        `⚠️  RECOMMENDATION: ${
+          featureNames.length
+        } features have minimal impact (within ${(this.tolerance * 100).toFixed(
+          1
+        )}% tolerance)`
+      );
+    }
+
+    console.log(`\n📊 FEATURE COUNT:`);
+    console.log(`   Original: ${this.featureNames.length} features`);
+    console.log(
+      `   Modified: ${this.featureNames.length - featureNames.length} features`
+    );
+    console.log(
+      `   Reduction: ${featureNames.length} features (${(
+        (featureNames.length / this.featureNames.length) *
+        100
+      ).toFixed(1)}%)`
+    );
+  }
 }
 
 // Parse command line arguments
-function parseArguments(): { feature?: string } {
+function parseArguments(): { feature?: string; features?: string[] } {
   const args = process.argv.slice(2);
   const featureIndex = args.indexOf("--feature");
 
   if (featureIndex !== -1) {
     if (featureIndex + 1 >= args.length) {
-      console.error("❌ Error: Please specify a feature name after --feature");
+      console.error("❌ Error: Please specify feature name(s) after --feature");
       console.log("\n📋 Usage:");
       console.log(
         "   npm run features:gradual                    # Test all features"
@@ -634,13 +818,35 @@ function parseArguments(): { feature?: string } {
       console.log(
         '   npm run features:gradual -- --feature "featureName"  # Test specific feature'
       );
+      console.log(
+        '   npm run features:gradual -- --feature "feature1" "feature2" "feature3"  # Test multiple features'
+      );
       console.log("\n📋 Examples:");
       console.log('   npm run features:gradual -- --feature "priceChangePct"');
       console.log('   npm run features:gradual -- --feature "rsi"');
       console.log('   npm run features:gradual -- --feature "macdHistogram"');
+      console.log(
+        '   npm run features:gradual -- --feature "rsi" "macdHistogram" "priceChangePct"'
+      );
       process.exit(1);
     }
-    return { feature: args[featureIndex + 1] };
+
+    // Check if there are multiple features after --feature
+    const features: string[] = [];
+    let i = featureIndex + 1;
+    while (i < args.length && !args[i].startsWith("--")) {
+      features.push(args[i]);
+      i++;
+    }
+
+    if (features.length === 1) {
+      return { feature: features[0] };
+    } else if (features.length > 1) {
+      return { features: features };
+    } else {
+      console.error("❌ Error: No feature names specified after --feature");
+      process.exit(1);
+    }
   }
 
   return {}; // No feature specified, will test all features
@@ -652,7 +858,10 @@ async function main() {
     const args = parseArguments();
     const optimizer = new GradualFeatureOptimizer();
 
-    if (args.feature) {
+    if (args.features) {
+      // Test multiple specific features
+      await optimizer.testMultipleFeatureRemoval(args.features);
+    } else if (args.feature) {
       // Test specific feature
       await optimizer.testFeatureRemoval(args.feature);
     } else {

@@ -67,9 +67,7 @@ export interface Indicators {
   historicalVolatility: number;
   camarillaPivots: number;
   acceleratorOscillator: number;
-  // EXPERIMENT #9-1: Chaikin Oscillator (CO) - Advanced Volume Indicator
   chaikinOscillator: number;
-  // EXPERIMENT #9-3: Klinger Volume Oscillator (KVO) - Advanced Volume Indicator
   klingerVolumeOscillator: number;
   massIndex: number;
   priceChannel: number;
@@ -79,6 +77,10 @@ export interface Indicators {
   mesaSineWave: number;
   rainbowMovingAverage: number;
   supportResistanceLevel: number;
+  ehlersFisherTransform: number;
+  mcginleyDynamic: number;
+  knowSureThing: number;
+  trix: number;
 }
 
 export interface Probabilities {

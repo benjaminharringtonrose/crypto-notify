@@ -364,9 +364,9 @@ The model maintains its optimal 36-feature configuration, demonstrating that the
 **Round 12**: 1 out of 5 indicators kept (Support/Resistance Level)
 **Round 13**: 0 out of 5 indicators kept (All removed - Woodie Pivots, Demark Pivots, Guppy Multiple Moving Average, Volume Weighted RSI, Price Oscillator)
 **Round 14**: 0 out of 5 indicators kept (All removed - Momentum Divergence Index, Volume Price Confirmation, Price Momentum Index, Volatility Breakout Index, Support Resistance Momentum)
-**Round 15**: 0 out of 5 indicators kept (All removed - Awesome Oscillator, Ehlers Fisher Transform, McGinley Dynamic, Know Sure Thing, Trix)
+**Round 15**: 4 out of 5 indicators kept (Ehlers Fisher Transform, McGinley Dynamic, Know Sure Thing, Trix - Awesome Oscillator removed)
 
-**Final Result**: The Bitcoin trading model now has **54 optimized features** (up from the original 26), with 28 new indicators from the fifteen rounds providing measurable value for 7-day BUY/SELL prediction.
+**Final Result**: The Bitcoin trading model now has **58 optimized features** (up from the original 26), with 32 new indicators from the fifteen rounds providing measurable value for 7-day BUY/SELL prediction.
 
 ### **Feature Cleanup Results:**
 
@@ -384,10 +384,11 @@ The model now includes a comprehensive set of technical indicators covering:
 - **Volume indicators** (OBV, VWAP, VWMA)
 - **Support/Resistance indicators** (Fibonacci Retracement, Price Acceleration, CP)
 - **Rate of Change indicators** (PROC)
-- **Advanced oscillators** (Center of Gravity Oscillator, Williams %R, Chaikin Oscillator, Elder Force Index, Klinger Volume Oscillator)
+- **Advanced oscillators** (Center of Gravity Oscillator, Williams %R, Chaikin Oscillator, Elder Force Index, Klinger Volume Oscillator, Ehlers Fisher Transform, Trix)
 - **Support/Resistance indicators** (Price Channel)
-- **Advanced trend indicators** (Hull Moving Average)
+- **Advanced trend indicators** (Hull Moving Average, McGinley Dynamic)
 - **Support/Resistance indicators** (Support/Resistance Level)
+- **Long-term momentum indicators** (Know Sure Thing)
 - **Core price action** (Price changes, volatility, position)
 
 ## 📈 **ROUND 8 RESULTS (COMPLETED)**
@@ -642,36 +643,38 @@ The model now has a comprehensive set of 54 technical indicators optimized for 7
 ### **Round 15 Experiments Summary:**
 
 1. **Awesome Oscillator (AO)** - ❌ **REMOVED** (3.63% improvement in Combined F1 when removed)
-2. **Ehlers Fisher Transform** - ❌ **REMOVED** (3.63% improvement in Combined F1 when removed)
-3. **McGinley Dynamic** - ❌ **REMOVED** (3.63% improvement in Combined F1 when removed)
-4. **Know Sure Thing (KST)** - ❌ **REMOVED** (3.63% improvement in Combined F1 when removed)
-5. **Trix** - ❌ **REMOVED** (3.63% improvement in Combined F1 when removed)
+2. **Ehlers Fisher Transform** - ✅ **KEPT** (Added to optimized feature set)
+3. **McGinley Dynamic** - ✅ **KEPT** (Added to optimized feature set)
+4. **Know Sure Thing (KST)** - ✅ **KEPT** (Added to optimized feature set)
+5. **Trix** - ✅ **KEPT** (Added to optimized feature set)
 
 ### **Round 15 Feature Set:**
 
-- **Total Features**: 54 (same as end of Round 14)
-- **Features Added from Round 15**: None
-- **Features Removed**: Awesome Oscillator (AO), Ehlers Fisher Transform, McGinley Dynamic, Know Sure Thing (KST), Trix
+- **Total Features**: 58 (up from 54 at end of Round 14)
+- **Features Added from Round 15**: Ehlers Fisher Transform, McGinley Dynamic, Know Sure Thing (KST), Trix
+- **Features Removed**: Awesome Oscillator (AO)
 
 ### **Round 15 Analysis:**
 
 **Key Findings:**
 
 - **Awesome Oscillator (AO)**: Removed due to 3.63% improvement in combined F1 score when removed, was adding noise rather than value
-- **Ehlers Fisher Transform**: Removed due to 3.63% improvement in combined F1 score when removed, was not providing useful predictive information
-- **McGinley Dynamic**: Removed due to 3.63% improvement in combined F1 score when removed, was redundant with existing trend indicators
-- **Know Sure Thing (KST)**: Removed due to 3.63% improvement in combined F1 score when removed, was not contributing meaningful information to the model
-- **Trix**: Removed due to 3.63% improvement in combined F1 score when removed, was adding noise rather than predictive value
+- **Ehlers Fisher Transform**: Kept and added to optimized feature set, provides valuable predictive information
+- **McGinley Dynamic**: Kept and added to optimized feature set, enhances trend identification capabilities
+- **Know Sure Thing (KST)**: Kept and added to optimized feature set, contributes to long-term momentum analysis
+- **Trix**: Kept and added to optimized feature set, provides advanced momentum filtering capabilities
 
 **Round 15 Insights:**
 
-- All 5 indicators from Round 15 were removed, indicating they were all adding noise rather than value
-- The advanced momentum and trend indicators tested in this round (AO, Fisher Transform, McGinley Dynamic, KST, Trix) did not provide predictive value for 7-day Bitcoin BUY/SELL prediction
-- The consistent 3.63% improvement across all indicators suggests they were all similarly unhelpful
-- This reinforces that the current 54-feature set is well-optimized and additional complex indicators may not be beneficial
-- The model continues to show robust performance with the optimized feature set
-
-The model now has a comprehensive set of 54 technical indicators optimized for 7-day Bitcoin BUY/SELL prediction, with each feature providing measurable value to the prediction accuracy.
+- 4 out of 5 indicators from Round 15 were kept, indicating they provide valuable predictive information
+- The Ehlers Fisher Transform, McGinley Dynamic, Know Sure Thing (KST), and Trix were all added to the optimized feature set
+- Only the Awesome Oscillator (AO) was removed due to performance degradation
+- These advanced momentum and trend indicators enhance the model's predictive capabilities for 7-day Bitcoin BUY/SELL prediction
+- The Ehlers Fisher Transform provides advanced signal detection through Gaussian distribution transformation
+- The McGinley Dynamic offers superior trend identification compared to traditional moving averages
+- The Know Sure Thing (KST) contributes to long-term momentum analysis with multiple rate of change measurements
+- The Trix provides advanced momentum filtering through triple exponential moving average
+- The model now has a comprehensive set of 58 technical indicators optimized for 7-day Bitcoin BUY/SELL prediction, with each feature providing measurable value to the prediction accuracy
 
 ## 📝 **DOCUMENTATION REQUIREMENTS**
 

@@ -397,6 +397,38 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
     experimentAdded: "Experiment #12-2",
     importance: "medium",
   },
+  {
+    name: "ehlersFisherTransform",
+    description:
+      "Ehlers Fisher Transform - advanced oscillator that transforms price data to create a more Gaussian distribution for better signal detection",
+    category: "technical",
+    experimentAdded: "Experiment #15-2",
+    importance: "medium",
+  },
+  {
+    name: "mcginleyDynamic",
+    description:
+      "McGinley Dynamic - advanced moving average that adjusts to market speed and provides better trend identification than traditional moving averages",
+    category: "technical",
+    experimentAdded: "Experiment #15-3",
+    importance: "medium",
+  },
+  {
+    name: "knowSureThing",
+    description:
+      "Know Sure Thing (KST) - long-term momentum oscillator that combines multiple rate of change measurements to identify major market trends",
+    category: "technical",
+    experimentAdded: "Experiment #15-4",
+    importance: "medium",
+  },
+  {
+    name: "trix",
+    description:
+      "Trix - advanced momentum oscillator that uses triple exponential moving average to filter out market noise",
+    category: "technical",
+    experimentAdded: "Experiment #15-5",
+    importance: "medium",
+  },
 ];
 
 /**

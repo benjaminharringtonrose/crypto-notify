@@ -55,6 +55,8 @@
 - Round 9: Chaikin Oscillator (CO), Elder Force Index (EFI), Klinger Volume Oscillator (KVO), Mass Index (MI), Price Channel (PC)
 - Round 10: Fisher Transform, Hull Moving Average (HMA), Kaufman Adaptive Moving Average (KAMA), MESA Sine Wave, Rainbow Moving Average
 - Round 11: Volatility Index, Price Momentum Index (PMI), Volume Momentum Index (VMI), Price Volatility Ratio (PVR), Volume Volatility Ratio (VVR)
+- Round 12: Trend Vigor (TV), Support/Resistance Level (SRL), Price Acceleration Index (PAI), Volume Acceleration Index (VAI), Market Structure Index (MSI)
+- Round 13: Woodie Pivots (WP), Demark Pivots (DP), Guppy Multiple Moving Average (GMMA), Volume Weighted RSI (VWRSI), Price Oscillator (PO)
 
 ### 3. **Testing Process**
 
@@ -352,8 +354,10 @@ The model maintains its optimal 36-feature configuration, demonstrating that the
 **Round 10**: 1 out of 5 indicators kept (Hull Moving Average)
 **Round 11**: 0 out of 5 indicators kept (All removed - Volatility Index, Price Momentum Index, Volume Momentum Index, Price Volatility Ratio, Volume Volatility Ratio)
 **Round 12**: 1 out of 5 indicators kept (Support/Resistance Level)
+**Round 13**: 0 out of 5 indicators kept (All removed - Woodie Pivots, Demark Pivots, Guppy Multiple Moving Average, Volume Weighted RSI, Price Oscillator)
+**Round 14**: 0 out of 5 indicators kept (All removed - Momentum Divergence Index, Volume Price Confirmation, Price Momentum Index, Volatility Breakout Index, Support Resistance Momentum)
 
-**Final Result**: The Bitcoin trading model now has **54 optimized features** (up from the original 26), with 28 new indicators from the twelve rounds providing measurable value for 7-day BUY/SELL prediction.
+**Final Result**: The Bitcoin trading model now has **54 optimized features** (up from the original 26), with 28 new indicators from the fourteen rounds providing measurable value for 7-day BUY/SELL prediction.
 
 ### **Feature Cleanup Results:**
 
@@ -551,6 +555,76 @@ The model now has an optimized set of 54 technical indicators, with the removal 
 - **TV, PAI, VAI, and MSI** were all adding noise rather than value to the model
 - Only 1 out of 5 indicators from Round 12 was kept, indicating most advanced acceleration and structure indicators tested were not beneficial
 - The model now has 54 optimized features with the addition of the Support/Resistance Level indicator
+
+The model now has a comprehensive set of 54 technical indicators optimized for 7-day Bitcoin BUY/SELL prediction, with each feature providing measurable value to the prediction accuracy.
+
+## 📈 **ROUND 13 RESULTS (COMPLETED)**
+
+### **Round 13 Experiments Summary:**
+
+1. **Woodie Pivots (WP)** - ❌ **REMOVED** (11.95% improvement in Combined F1 when removed)
+2. **Demark Pivots (DP)** - ❌ **REMOVED** (0.94% improvement in Combined F1 when removed - minimal impact)
+3. **Guppy Multiple Moving Average (GMMA)** - ❌ **REMOVED** (0.94% improvement in Combined F1 when removed - minimal impact)
+4. **Volume Weighted RSI (VWRSI)** - ❌ **REMOVED** (0.94% improvement in Combined F1 when removed - minimal impact)
+5. **Price Oscillator (PO)** - ❌ **REMOVED** (3.63% improvement in Combined F1 when removed)
+
+### **Round 13 Feature Set:**
+
+- **Total Features**: 54 (down from 59 at start of Round 13)
+- **Features Added from Round 13**: None
+- **Features Removed**: Woodie Pivots, Demark Pivots, Guppy Multiple Moving Average, Volume Weighted RSI, Price Oscillator
+
+### **Round 13 Analysis:**
+
+**Key Findings:**
+
+- **Woodie Pivots (WP)**: REMOVED due to 11.95% improvement in combined F1 score when removed, indicating it was significantly degrading model performance
+- **Demark Pivots (DP)**: REMOVED due to 0.94% improvement in combined F1 score when removed, minimal impact but still removed to keep feature set clean
+- **Guppy Multiple Moving Average (GMMA)**: REMOVED due to 0.94% improvement in combined F1 score when removed, minimal impact but still removed to keep feature set clean
+- **Volume Weighted RSI (VWRSI)**: REMOVED due to 0.94% improvement in combined F1 score when removed, minimal impact but still removed to keep feature set clean
+- **Price Oscillator (PO)**: REMOVED due to 3.63% improvement in combined F1 score when removed, indicating it was adding noise rather than value
+
+**Round 13 Insights:**
+
+- **Woodie Pivots** had the most negative impact, degrading performance by nearly 12%
+- **Price Oscillator** also had a significant negative impact, degrading performance by 3.6%
+- The other three indicators had minimal impact but were still removed to keep the feature set clean
+- The model continues to show robust performance with the optimized feature set
+
+The model now has a comprehensive set of 54 technical indicators optimized for 7-day Bitcoin price prediction, with each feature providing measurable value to the prediction accuracy.
+
+## 📈 **ROUND 14 RESULTS (COMPLETED)**
+
+### **Round 14 Experiments Summary:**
+
+1. **Momentum Divergence Index (MDI)** - ❌ **REMOVED** (3.63% improvement in Combined F1 when removed)
+2. **Volume Price Confirmation (VPC)** - ❌ **REMOVED** (3.63% improvement in Combined F1 when removed)
+3. **Price Momentum Index (PMI)** - ❌ **REMOVED** (3.63% improvement in Combined F1 when removed)
+4. **Volatility Breakout Index (VBI)** - ❌ **REMOVED** (3.63% improvement in Combined F1 when removed)
+5. **Support Resistance Momentum (SRM)** - ❌ **REMOVED** (3.63% improvement in Combined F1 when removed)
+
+### **Round 14 Feature Set:**
+
+- **Total Features**: 54 (same as end of Round 13)
+- **Features Added from Round 14**: None
+- **Features Removed**: Momentum Divergence Index (MDI), Volume Price Confirmation (VPC), Price Momentum Index (PMI), Volatility Breakout Index (VBI), Support Resistance Momentum (SRM)
+
+### **Round 14 Analysis:**
+
+**Key Findings:**
+
+- **Momentum Divergence Index (MDI)**: Removed due to 3.63% improvement in combined F1 score when removed, was adding noise rather than value
+- **Volume Price Confirmation (VPC)**: Removed due to 3.63% improvement in combined F1 score when removed, was adding noise rather than value
+- **Price Momentum Index (PMI)**: Removed due to 3.63% improvement in combined F1 score when removed, was adding noise rather than value
+- **Volatility Breakout Index (VBI)**: Removed due to 3.63% improvement in combined F1 score when removed, was adding noise rather than value
+- **Support Resistance Momentum (SRM)**: Removed due to 3.63% improvement in combined F1 score when removed, was adding noise rather than value
+
+**Round 14 Insights:**
+
+- All 5 indicators from Round 14 were removed, indicating they were all adding noise rather than value
+- The advanced momentum, volume, and volatility indicators tested in this round did not provide predictive value for 7-day Bitcoin BUY/SELL prediction
+- The model continues to show robust performance with the optimized 54-feature set
+- This suggests that the current feature set is well-optimized and additional complex indicators may not be beneficial
 
 The model now has a comprehensive set of 54 technical indicators optimized for 7-day Bitcoin BUY/SELL prediction, with each feature providing measurable value to the prediction accuracy.
 

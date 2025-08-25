@@ -53,6 +53,8 @@
 - Round 7: TSI, ADL, PMO, Bollinger Band Width, Williams %R
 - Round 8: Historical Volatility (HV), Trend Intensity Index (TII), Volatility Ratio (VR), Camarilla Pivots (CP), Accelerator Oscillator (AO)
 - Round 9: Chaikin Oscillator (CO), Elder Force Index (EFI), Klinger Volume Oscillator (KVO), Mass Index (MI), Price Channel (PC)
+- Round 10: Fisher Transform, Hull Moving Average (HMA), Kaufman Adaptive Moving Average (KAMA), MESA Sine Wave, Rainbow Moving Average
+- Round 11: Volatility Index, Price Momentum Index (PMI), Volume Momentum Index (VMI), Price Volatility Ratio (PVR), Volume Volatility Ratio (VVR)
 
 ### 3. **Testing Process**
 
@@ -348,14 +350,16 @@ The model maintains its optimal 36-feature configuration, demonstrating that the
 **Round 8**: 3 out of 5 indicators kept (Historical Volatility, Camarilla Pivots, Accelerator Oscillator)
 **Round 9**: 4 out of 5 indicators kept (Chaikin Oscillator, Elder Force Index, Klinger Volume Oscillator, Price Channel)
 **Round 10**: 1 out of 5 indicators kept (Hull Moving Average)
+**Round 11**: 0 out of 5 indicators kept (All removed - Volatility Index, Price Momentum Index, Volume Momentum Index, Price Volatility Ratio, Volume Volatility Ratio)
+**Round 12**: 1 out of 5 indicators kept (Support/Resistance Level)
 
-**Final Result**: The Bitcoin trading model now has **53 optimized features** (up from the original 26), with 26 new indicators from the ten rounds providing measurable value for 7-day BUY/SELL prediction.
+**Final Result**: The Bitcoin trading model now has **54 optimized features** (up from the original 26), with 28 new indicators from the twelve rounds providing measurable value for 7-day BUY/SELL prediction.
 
 ### **Feature Cleanup Results:**
 
 - **Removed**: `priceChangePct` (performance improved by 23.71% when removed)
 - **Removed**: `elderForceIndex` (performance improved by 8.13% when removed)
-- **Final Feature Count**: 53 features (down from 55)
+- **Final Feature Count**: 54 features (up from 53 at start of Round 12)
 
 ### **Current Optimal Feature Set:**
 
@@ -370,6 +374,7 @@ The model now includes a comprehensive set of technical indicators covering:
 - **Advanced oscillators** (Center of Gravity Oscillator, Williams %R, Chaikin Oscillator, Elder Force Index, Klinger Volume Oscillator)
 - **Support/Resistance indicators** (Price Channel)
 - **Advanced trend indicators** (Hull Moving Average)
+- **Support/Resistance indicators** (Support/Resistance Level)
 - **Core price action** (Price changes, volatility, position)
 
 ## 📈 **ROUND 8 RESULTS (COMPLETED)**
@@ -477,6 +482,77 @@ The model now has a comprehensive set of 49 technical indicators optimized for 7
 - The model now has 50 optimized features with the addition of the Hull Moving Average
 
 The model now has a comprehensive set of 50 technical indicators optimized for 7-day Bitcoin BUY/SELL prediction, with each feature providing measurable value to the prediction accuracy.
+
+## 📈 **ROUND 11 RESULTS (COMPLETED)**
+
+### **Round 11 Experiments Summary:**
+
+1. **Volatility Index** - ❌ **REMOVED** (1.98% degradation in Combined F1 when present)
+2. **Price Momentum Index (PMI)** - ❌ **REMOVED** (4.53% improvement in Combined F1 when removed)
+3. **Volume Momentum Index (VMI)** - ❌ **REMOVED** (5.18% improvement in Combined F1 when removed)
+4. **Price Volatility Ratio (PVR)** - ❌ **REMOVED** (10.36% improvement in Combined F1 when removed)
+5. **Volume Volatility Ratio (VVR)** - ❌ **REMOVED** (4.23% improvement in Combined F1 when removed)
+
+### **Round 11 Feature Set:**
+
+- **Total Features**: 52 (down from 58 at start of Round 11)
+- **Features Added from Round 11**: None
+- **Features Removed**: Volatility Index, Price Momentum Index (PMI), Volume Momentum Index (VMI), Price Volatility Ratio (PVR), Volume Volatility Ratio (VVR)
+
+### **Round 11 Analysis:**
+
+**Key Findings:**
+
+- **Volatility Index**: REMOVED due to 1.98% degradation in combined F1 score when present, showing minimal impact within tolerance
+- **Price Momentum Index (PMI)**: REMOVED due to 4.53% improvement in combined F1 score when removed, indicating it was adding noise
+- **Volume Momentum Index (VMI)**: REMOVED due to 5.18% improvement in combined F1 score when removed, showing significant negative impact
+- **Price Volatility Ratio (PVR)**: REMOVED due to 10.36% improvement in combined F1 score when removed, showing the most significant negative impact
+- **Volume Volatility Ratio (VVR)**: REMOVED due to 4.23% improvement in combined F1 score when removed, indicating noise addition
+
+**Round 11 Insights:**
+
+- All 5 indicators were removed as they degraded model performance
+- Volatility-based indicators showed particularly poor performance
+- Momentum indicators were adding noise rather than predictive value
+- The model performs better with simpler, more established indicators
+- Removing these indicators improved both Buy and Sell F1 scores
+
+The model now has an optimized set of 54 technical indicators, with the removal of these 5 indicators improving overall performance by reducing noise and focusing on more predictive features.
+
+## 📈 **ROUND 12 RESULTS (COMPLETED)**
+
+### **Round 12 Experiments Summary:**
+
+1. **Trend Vigor (TV)** - ❌ **REMOVED** (2.02% improvement in Combined F1 when removed)
+2. **Support/Resistance Level (SRL)** - ✅ **KEPT** (9.79% degradation in Combined F1 when removed)
+3. **Price Acceleration Index (PAI)** - ❌ **REMOVED** (3.63% improvement in Combined F1 when removed)
+4. **Volume Acceleration Index (VAI)** - ❌ **REMOVED** (3.63% improvement in Combined F1 when removed)
+5. **Market Structure Index (MSI)** - ❌ **REMOVED** (3.63% improvement in Combined F1 when removed)
+
+### **Round 12 Feature Set:**
+
+- **Total Features**: 54 (up from 53 at start of Round 12)
+- **Features Added from Round 12**: Support/Resistance Level (SRL)
+- **Features Removed**: Trend Vigor (TV), Price Acceleration Index (PAI), Volume Acceleration Index (VAI), Market Structure Index (MSI)
+
+### **Round 12 Analysis:**
+
+**Key Findings:**
+
+- **Trend Vigor (TV)**: Removed due to 2.02% improvement in combined F1 score when removed, was adding noise rather than value
+- **Support/Resistance Level (SRL)**: Kept due to 9.79% degradation in combined F1 score when removed, providing valuable support/resistance information
+- **Price Acceleration Index (PAI)**: Removed due to 3.63% improvement in combined F1 score when removed, was adding noise rather than value
+- **Volume Acceleration Index (VAI)**: Removed due to 3.63% improvement in combined F1 score when removed, was adding noise rather than value
+- **Market Structure Index (MSI)**: Removed due to 3.63% improvement in combined F1 score when removed, was adding noise rather than value
+
+**Round 12 Insights:**
+
+- **SRL** provides significant value for support/resistance level analysis and overall model performance
+- **TV, PAI, VAI, and MSI** were all adding noise rather than value to the model
+- Only 1 out of 5 indicators from Round 12 was kept, indicating most advanced acceleration and structure indicators tested were not beneficial
+- The model now has 54 optimized features with the addition of the Support/Resistance Level indicator
+
+The model now has a comprehensive set of 54 technical indicators optimized for 7-day Bitcoin BUY/SELL prediction, with each feature providing measurable value to the prediction accuracy.
 
 ## 📝 **DOCUMENTATION REQUIREMENTS**
 

@@ -78,6 +78,7 @@ export interface Indicators {
   kaufmanAdaptiveMovingAverage: number;
   mesaSineWave: number;
   rainbowMovingAverage: number;
+  supportResistanceLevel: number;
 }
 
 export interface Probabilities {

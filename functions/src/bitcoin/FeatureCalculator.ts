@@ -1798,6 +1798,9 @@ export default class FeatureCalculator {
       rainbowMovingAverage: this.calculateRainbowMovingAverage(
         prices.slice(0, dayIndex + 1)
       ),
+      supportResistanceLevel: this.calculateSupportResistanceLevel(
+        prices.slice(0, dayIndex + 1)
+      ),
     };
   }
 
@@ -1818,7 +1821,7 @@ export default class FeatureCalculator {
       currentPrice,
     });
 
-    // OPTIMIZED FEATURE SET: 53 Most Important Features (Based on Gradual Optimization)
+    // OPTIMIZED FEATURE SET: 54 Most Important Features (Based on Gradual Optimization)
     // Selected features that provide maximum trading performance with minimal redundancy
     const optimizedFeatures = [
       // 1-4: Core Price Action & Volatility (4 features)
@@ -1910,6 +1913,7 @@ export default class FeatureCalculator {
       indicators.kaufmanAdaptiveMovingAverage, // Kaufman Adaptive Moving Average (KAMA) - EXPERIMENT #10-3
       indicators.mesaSineWave, // MESA Sine Wave - EXPERIMENT #10-4
       indicators.rainbowMovingAverage, // Rainbow Moving Average - EXPERIMENT #10-5
+      indicators.supportResistanceLevel, // Support/Resistance Level (SRL) - EXPERIMENT #12-2
     ];
 
     return optimizedFeatures;
@@ -2310,5 +2314,48 @@ export default class FeatureCalculator {
     const rainbowPosition = (aboveCount - belowCount) / totalLines;
 
     return rainbowPosition;
+  }
+
+  // EXPERIMENT #12-2: Support/Resistance Level (SRL) - Advanced Support/Resistance Indicator
+  public calculateSupportResistanceLevel(
+    prices: number[],
+    period: number = 20
+  ): number {
+    if (prices.length < period) return 0;
+
+    const recentPrices = prices.slice(-period);
+    const highs = [];
+    const lows = [];
+
+    // Find local highs and lows
+    for (let i = 1; i < recentPrices.length - 1; i++) {
+      if (
+        recentPrices[i] > recentPrices[i - 1] &&
+        recentPrices[i] > recentPrices[i + 1]
+      ) {
+        highs.push(recentPrices[i]);
+      }
+      if (
+        recentPrices[i] < recentPrices[i - 1] &&
+        recentPrices[i] < recentPrices[i + 1]
+      ) {
+        lows.push(recentPrices[i]);
+      }
+    }
+
+    if (highs.length === 0 || lows.length === 0) return 0;
+
+    // Calculate average resistance and support levels
+    const avgResistance =
+      highs.reduce((sum, high) => sum + high, 0) / highs.length;
+    const avgSupport = lows.reduce((sum, low) => sum + low, 0) / lows.length;
+
+    const currentPrice = recentPrices[recentPrices.length - 1];
+    const range = avgResistance - avgSupport;
+
+    if (range === 0) return 0;
+
+    // SRL = (Current Price - Average Support) / (Average Resistance - Average Support)
+    return (currentPrice - avgSupport) / range;
   }
 }

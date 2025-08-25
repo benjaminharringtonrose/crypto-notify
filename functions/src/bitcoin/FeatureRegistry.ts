@@ -389,6 +389,14 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
     experimentAdded: "Experiment #10-5",
     importance: "medium",
   },
+  {
+    name: "supportResistanceLevel",
+    description:
+      "Support/Resistance Level (SRL) - advanced support/resistance indicator measuring price position relative to local highs and lows",
+    category: "technical",
+    experimentAdded: "Experiment #12-2",
+    importance: "medium",
+  },
 ];
 
 /**

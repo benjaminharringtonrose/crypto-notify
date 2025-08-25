@@ -1,16 +1,6 @@
 #!/usr/bin/env ts-node
+
 /**
- * Gradual Feature Optimization - Test individual feature removal
- *
- * This script tests the removal of features to see if they hurt model performance.
- *
- * BUG FIXES APPLIED:
- * - Fixed baseline performance mutation bug by creating deep copies
- * - Standardized feature filtering to use name-based filtering consistently
- * - Added proper type safety with PerformanceChange interface
- * - Added comprehensive error handling with try-catch-finally blocks
- * - Made seed and tolerance configurable
- * - Ensured original functions are always restored
  *
  * Usage:
  *   npm run features:gradual                    # Test all features sequentially
@@ -21,8 +11,6 @@
  *   npm run features:gradual -- --feature "priceChangePct"
  *   npm run features:gradual -- --feature "rsi"
  */
-
-// gradualFeatureOptimization.ts
 
 import * as tf from "@tensorflow/tfjs-node";
 import { DataProcessor } from "../bitcoin/DataProcessor";
@@ -61,21 +49,34 @@ interface OptimizationStep {
 }
 
 class GradualFeatureOptimizer {
-  private tolerance = 0.02; // 2% performance tolerance
+  private tolerance = 0.02;
   private optimizationSteps: OptimizationStep[] = [];
   private originalRandom: (() => number) | null = null;
   private originalDetectFeatureCount: (() => Promise<number>) | null = null;
   private originalGetFeatureCount: (() => number) | null = null;
-  private seed = 42; // Configurable seed for deterministic training
+  private seed = 42;
+  private randomCounter = 0;
+  private maxOptimizationSteps = 1000;
+  private lcgState = 0;
 
-  // Get feature names from FeatureRegistry to ensure consistency
-  private get featureNames(): string[] {
-    return FeatureRegistry.getFeatureNames();
+  constructor() {
+    this.storeOriginalFunctions();
   }
 
-  // Method to set custom seed
+  private get featureNames(): string[] {
+    try {
+      return FeatureRegistry.getFeatureNames();
+    } catch (error) {
+      throw new Error(`Failed to get feature names from registry: ${error}`);
+    }
+  }
+
   public setSeed(seed: number): void {
+    if (!Number.isInteger(seed) || seed < 0) {
+      throw new Error("Seed must be a non-negative integer");
+    }
     this.seed = seed;
+    this.randomCounter = 0;
   }
 
   // Method to set custom tolerance
@@ -86,6 +87,99 @@ class GradualFeatureOptimizer {
     this.tolerance = tolerance;
   }
 
+  public setMaxOptimizationSteps(maxSteps: number): void {
+    if (!Number.isInteger(maxSteps) || maxSteps < 1) {
+      throw new Error("Max optimization steps must be a positive integer");
+    }
+    this.maxOptimizationSteps = maxSteps;
+  }
+
+  private deepCopyPerformanceMetrics(
+    metrics: PerformanceMetrics
+  ): PerformanceMetrics {
+    return {
+      validationAccuracy: metrics.validationAccuracy,
+      buyF1: metrics.buyF1,
+      sellF1: metrics.sellF1,
+      combinedF1: metrics.combinedF1,
+      balancedAccuracy: metrics.balancedAccuracy,
+      matthewsCorrelation: metrics.matthewsCorrelation,
+      epochsTrained: metrics.epochsTrained,
+    };
+  }
+
+  private filterFeaturesEfficiently(
+    originalX: number[][][],
+    featureIndices: number[]
+  ): number[][][] {
+    const filteredX: number[][][] = [];
+
+    for (let i = 0; i < originalX.length; i++) {
+      const sequence = originalX[i];
+      const filteredSequence: number[][] = [];
+
+      for (let j = 0; j < sequence.length; j++) {
+        const timestep = sequence[j];
+        const filteredTimestep = new Array(featureIndices.length);
+
+        for (let k = 0; k < featureIndices.length; k++) {
+          filteredTimestep[k] = timestep[featureIndices[k]];
+        }
+
+        filteredSequence.push(filteredTimestep);
+      }
+
+      filteredX.push(filteredSequence);
+    }
+
+    return filteredX;
+  }
+
+  private storeOriginalFunctions(): void {
+    try {
+      if (!this.originalDetectFeatureCount) {
+        this.originalDetectFeatureCount = FeatureDetector.detectFeatureCount;
+      }
+      if (!this.originalGetFeatureCount) {
+        this.originalGetFeatureCount = FeatureDetector.getFeatureCount;
+      }
+    } catch (error) {
+      console.warn(
+        "⚠️  Failed to store original FeatureDetector functions:",
+        error
+      );
+    }
+  }
+
+  private initializeDeterministicRandom(): void {
+    this.originalRandom = Math.random;
+    this.randomCounter = 0;
+
+    if (this.seed === 0) {
+      this.seed = 42;
+      console.warn("⚠️  Seed was 0, using default seed 42");
+    }
+
+    const a = 1664525;
+    const c = 1013904223;
+    const m = Math.pow(2, 32);
+    this.lcgState = (this.seed || 42) >>> 0;
+    Math.random = () => {
+      this.randomCounter++;
+      this.lcgState = (a * this.lcgState + c) % m;
+      return this.lcgState / m;
+    };
+
+    try {
+      tf.setBackend("tensorflow");
+      tf.tidy(() => {
+        tf.randomUniform([1, 1], 0, 1, "float32", this.seed);
+      });
+    } catch (error) {
+      console.warn("⚠️  Failed to set TensorFlow seed:", error);
+    }
+  }
+
   public async runOptimization(): Promise<void> {
     try {
       console.log("🚀 Starting Gradual Feature Optimization");
@@ -93,29 +187,14 @@ class GradualFeatureOptimizer {
         `📊 Testing ${this.featureNames.length} features one at a time`
       );
       console.log(`🎯 Performance tolerance: ${this.tolerance * 100}%`);
+      console.log(`🎲 Using seed: ${this.seed}`);
       console.log("=".repeat(80));
 
+      // Initialize deterministic random behavior
+      this.initializeDeterministicRandom();
+
       // Validate feature registry consistency
-      const registryFeatureCount = FeatureRegistry.getFeatureCount();
-      const registryFeatureNames = FeatureRegistry.getFeatureNames();
-
-      if (this.featureNames.length !== registryFeatureCount) {
-        throw new Error(
-          `Feature count mismatch! Script has ${this.featureNames.length} features, registry has ${registryFeatureCount}`
-        );
-      }
-
-      // Validate feature names match
-      const nameMismatches = this.featureNames.filter(
-        (name, index) => name !== registryFeatureNames[index]
-      );
-      if (nameMismatches.length > 0) {
-        throw new Error(
-          `Feature name mismatch! Mismatched features: ${nameMismatches.join(
-            ", "
-          )}`
-        );
-      }
+      await this.validateFeatureRegistry();
 
       // Initialize feature detection
       console.log("\n🔧 Initializing feature detection...");
@@ -134,86 +213,66 @@ class GradualFeatureOptimizer {
         )} accuracy, ${baselinePerformance.combinedF1.toFixed(4)} combined F1`
       );
 
-      // Store original baseline for comparison (deep copy)
-      const originalBaselinePerformance: PerformanceMetrics = {
-        validationAccuracy: baselinePerformance.validationAccuracy,
-        buyF1: baselinePerformance.buyF1,
-        sellF1: baselinePerformance.sellF1,
-        combinedF1: baselinePerformance.combinedF1,
-        balancedAccuracy: baselinePerformance.balancedAccuracy,
-        matthewsCorrelation: baselinePerformance.matthewsCorrelation,
-        epochsTrained: baselinePerformance.epochsTrained,
-      };
+      const originalBaselinePerformance =
+        this.deepCopyPerformanceMetrics(baselinePerformance);
 
-      // Test each feature individually
       for (let i = 0; i < this.featureNames.length; i++) {
         const featureName = this.featureNames[i];
         console.log(
           `\n🔍 Step ${i + 1}: Testing removal of "${featureName}" (index ${i})`
         );
 
-        // Create feature set without this feature (use name-based filtering for consistency)
         const modifiedFeatures = this.featureNames.filter(
           (name) => name !== featureName
         );
 
-        // Train and evaluate model without this feature
         const modifiedPerformance = await this.trainAndEvaluateModel(
           modifiedFeatures
         );
 
-        // Compare performance against the original baseline
         const performanceChange = this.calculatePerformanceChange(
           originalBaselinePerformance,
           modifiedPerformance
         );
         const decision = this.makeDecision(performanceChange);
 
-        // Record step
         const step: OptimizationStep = {
           step: i + 1,
           featureName,
           featureIndex: i,
-          originalPerformance: originalBaselinePerformance,
-          modifiedPerformance,
+          originalPerformance: this.deepCopyPerformanceMetrics(
+            originalBaselinePerformance
+          ),
+          modifiedPerformance:
+            this.deepCopyPerformanceMetrics(modifiedPerformance),
           decision,
           reason: this.getDecisionReason(performanceChange, decision),
         };
 
+        if (this.optimizationSteps.length >= this.maxOptimizationSteps) {
+          console.warn(
+            `⚠️  Reached maximum optimization steps (${this.maxOptimizationSteps}), clearing older steps`
+          );
+          this.optimizationSteps = this.optimizationSteps.slice(
+            -this.maxOptimizationSteps / 2
+          );
+        }
+
         this.optimizationSteps.push(step);
 
-        // Log results
         this.logStepResults(step, performanceChange);
 
-        // Only update baseline if performance actually improved significantly
-        if (decision === "REMOVE") {
-          console.log(
-            `🔄 Updating baseline - performance improved by ${performanceChange.combinedF1.toFixed(
-              4
-            )}`
-          );
-          // Update the original baseline for future comparisons
-          originalBaselinePerformance.validationAccuracy =
-            modifiedPerformance.validationAccuracy;
-          originalBaselinePerformance.buyF1 = modifiedPerformance.buyF1;
-          originalBaselinePerformance.sellF1 = modifiedPerformance.sellF1;
-          originalBaselinePerformance.combinedF1 =
-            modifiedPerformance.combinedF1;
-          originalBaselinePerformance.balancedAccuracy =
-            modifiedPerformance.balancedAccuracy;
-          originalBaselinePerformance.matthewsCorrelation =
-            modifiedPerformance.matthewsCorrelation;
-        }
+        // This ensures consistent comparison across all feature tests
       }
 
-      // Generate final report
       this.generateFinalReport();
     } catch (error) {
       console.error("❌ Error during optimization:", error);
       throw error;
     } finally {
-      // Always restore original functions, even if an error occurred
       this.restoreOriginalFunctions();
+      // Clean up TensorFlow memory
+      this.cleanupTensorFlowMemory();
     }
   }
 
@@ -222,41 +281,25 @@ class GradualFeatureOptimizer {
       console.log("🚀 Testing Individual Feature Removal");
       console.log(`🎯 Testing removal of: "${featureName}"`);
       console.log(`🎯 Performance tolerance: ${this.tolerance * 100}%`);
+      console.log(`🎲 Using seed: ${this.seed}`);
       console.log("=".repeat(80));
 
       // Validate feature name
       if (!this.featureNames.includes(featureName)) {
-        console.error(
-          `❌ Error: Feature "${featureName}" not found in feature list`
-        );
+        const error = `Feature "${featureName}" not found in feature list`;
+        console.error(`❌ Error: ${error}`);
         console.log("\n📋 Available features:");
         this.featureNames.forEach((name, index) => {
           console.log(`   ${index + 1}. ${name}`);
         });
-        process.exit(1);
+        throw new Error(error); // FIXED: Use throw instead of process.exit()
       }
+
+      // Initialize deterministic random behavior
+      this.initializeDeterministicRandom();
 
       // Validate feature registry consistency
-      const registryFeatureCount = FeatureRegistry.getFeatureCount();
-      const registryFeatureNames = FeatureRegistry.getFeatureNames();
-
-      if (this.featureNames.length !== registryFeatureCount) {
-        throw new Error(
-          `Feature count mismatch! Script has ${this.featureNames.length} features, registry has ${registryFeatureCount}`
-        );
-      }
-
-      // Validate feature names match
-      const nameMismatches = this.featureNames.filter(
-        (name, index) => name !== registryFeatureNames[index]
-      );
-      if (nameMismatches.length > 0) {
-        throw new Error(
-          `Feature name mismatch! Mismatched features: ${nameMismatches.join(
-            ", "
-          )}`
-        );
-      }
+      await this.validateFeatureRegistry();
 
       // Initialize feature detection
       console.log("\n🔧 Initializing feature detection...");
@@ -305,6 +348,8 @@ class GradualFeatureOptimizer {
     } finally {
       // Always restore original functions, even if an error occurred
       this.restoreOriginalFunctions();
+      // Clean up TensorFlow memory
+      this.cleanupTensorFlowMemory();
     }
   }
 
@@ -317,6 +362,7 @@ class GradualFeatureOptimizer {
         `🎯 Features: ${featureNames.map((f) => `"${f}"`).join(", ")}`
       );
       console.log(`🎯 Performance tolerance: ${this.tolerance * 100}%`);
+      console.log(`🎲 Using seed: ${this.seed}`);
       console.log("=".repeat(80));
 
       // Validate all features exist
@@ -324,39 +370,22 @@ class GradualFeatureOptimizer {
         (name) => !this.featureNames.includes(name)
       );
       if (invalidFeatures.length > 0) {
-        console.error(
-          `❌ Error: Features not found in feature list: ${invalidFeatures.join(
-            ", "
-          )}`
-        );
+        const error = `Features not found in feature list: ${invalidFeatures.join(
+          ", "
+        )}`;
+        console.error(`❌ Error: ${error}`);
         console.log("\n📋 Available features:");
         this.featureNames.forEach((name, index) => {
           console.log(`   ${index + 1}. ${name}`);
         });
-        process.exit(1);
+        throw new Error(error); // FIXED: Use throw instead of process.exit()
       }
+
+      // Initialize deterministic random behavior
+      this.initializeDeterministicRandom();
 
       // Validate feature registry consistency
-      const registryFeatureCount = FeatureRegistry.getFeatureCount();
-      const registryFeatureNames = FeatureRegistry.getFeatureNames();
-
-      if (this.featureNames.length !== registryFeatureCount) {
-        throw new Error(
-          `Feature count mismatch! Script has ${this.featureNames.length} features, registry has ${registryFeatureCount}`
-        );
-      }
-
-      // Validate feature names match
-      const nameMismatches = this.featureNames.filter(
-        (name, index) => name !== registryFeatureNames[index]
-      );
-      if (nameMismatches.length > 0) {
-        throw new Error(
-          `Feature name mismatch! Mismatched features: ${nameMismatches.join(
-            ", "
-          )}`
-        );
-      }
+      await this.validateFeatureRegistry();
 
       // Initialize feature detection
       console.log("\n🔧 Initializing feature detection...");
@@ -405,40 +434,76 @@ class GradualFeatureOptimizer {
       console.error("❌ Error during multiple feature removal test:", error);
       throw error;
     } finally {
-      // Always restore original functions, even if an error occurred
       this.restoreOriginalFunctions();
+      this.cleanupTensorFlowMemory();
+    }
+  }
+
+  private async validateFeatureRegistry(): Promise<void> {
+    try {
+      const registryFeatureCount = FeatureRegistry.getFeatureCount();
+      const registryFeatureNames = FeatureRegistry.getFeatureNames();
+
+      if (this.featureNames.length !== registryFeatureCount) {
+        throw new Error(
+          `Feature count mismatch! Script has ${this.featureNames.length} features, registry has ${registryFeatureCount}`
+        );
+      }
+
+      const scriptFeatureSet = new Set(this.featureNames);
+      const registryFeatureSet = new Set(registryFeatureNames);
+
+      if (scriptFeatureSet.size !== registryFeatureSet.size) {
+        throw new Error(
+          `Feature count mismatch in sets! Script has ${scriptFeatureSet.size} unique features, registry has ${registryFeatureSet.size}`
+        );
+      }
+
+      // Check for any differences between the sets
+      const missingInRegistry = this.featureNames.filter(
+        (name) => !registryFeatureSet.has(name)
+      );
+      const missingInScript = registryFeatureNames.filter(
+        (name) => !scriptFeatureSet.has(name)
+      );
+
+      if (missingInRegistry.length > 0 || missingInScript.length > 0) {
+        const differences = [];
+        if (missingInRegistry.length > 0) {
+          differences.push(
+            `Missing in registry: ${missingInRegistry.join(", ")}`
+          );
+        }
+        if (missingInScript.length > 0) {
+          differences.push(`Missing in script: ${missingInScript.join(", ")}`);
+        }
+        throw new Error(`Feature name mismatch! ${differences.join("; ")}`);
+      }
+
+      for (let i = 0; i < registryFeatureNames.length; i++) {
+        if (this.featureNames[i] !== registryFeatureNames[i]) {
+          throw new Error(
+            `Feature order mismatch at index ${i}: script has "${this.featureNames[i]}", registry has "${registryFeatureNames[i]}"`
+          );
+        }
+      }
+    } catch (error) {
+      throw new Error(`Feature registry validation failed: ${error}`);
     }
   }
 
   private async trainAndEvaluateModel(
     featureArray: string[]
   ): Promise<PerformanceMetrics> {
-    // Set deterministic seed for consistent training across experiments
-    const FIXED_SEED = this.seed; // Use configurable seed
-
-    // CRITICAL: Set seed at the very beginning and ensure it's used consistently
-    tf.setBackend("tensorflow");
-    tf.randomUniform([1, 1], 0, 1, "float32", FIXED_SEED);
-
-    // Store original random function and override it
-    this.originalRandom = Math.random;
-    let randomCounter = 0;
-    Math.random = () => {
-      // Deterministic random function that cycles through predictable values
-      randomCounter++;
-      return (Math.sin(randomCounter * FIXED_SEED) + 1) / 2; // Deterministic but varied
-    };
+    const FIXED_SEED = this.seed;
 
     console.log(`🎲 Using fixed seed: ${FIXED_SEED} for consistent training`);
 
     try {
-      // Create a custom trainer with the consistent seed
       const trainer = new TradeModelTrainer(FIXED_SEED);
 
-      // Set the current feature name for logging purposes
       trainer.setCurrentFeatureName(featureArray.join(", "));
 
-      // Get the original data to understand the feature structure
       const originalDataProcessor = new DataProcessor(
         {
           timesteps: MODEL_CONFIG.TIMESTEPS,
@@ -451,20 +516,17 @@ class GradualFeatureOptimizer {
 
       const { X: originalX, y } = await originalDataProcessor.prepareData();
 
-      // Get the actual feature names from FeatureRegistry to ensure correct mapping
       const actualFeatureNames = FeatureRegistry.getFeatureNames();
 
       console.log(`📊 Original data has ${originalX[0][0].length} features`);
       console.log(`🎯 Requested ${featureArray.length} features`);
 
-      // Validate that we have the expected number of features
       if (originalX[0][0].length !== actualFeatureNames.length) {
         throw new Error(
           `Feature count mismatch! Expected ${actualFeatureNames.length} features, got ${originalX[0][0].length}`
         );
       }
 
-      // Create feature mapping: which indices to keep
       const featureIndices = featureArray.map((featureName) => {
         const index = actualFeatureNames.indexOf(featureName);
         if (index === -1) {
@@ -475,7 +537,6 @@ class GradualFeatureOptimizer {
         return index;
       });
 
-      // Validate that feature indices are unique
       const uniqueIndices = new Set(featureIndices);
       if (uniqueIndices.size !== featureIndices.length) {
         throw new Error(
@@ -483,44 +544,38 @@ class GradualFeatureOptimizer {
         );
       }
 
+      const maxIndex = Math.max(...featureIndices);
+      if (maxIndex >= originalX[0][0].length) {
+        throw new Error(
+          `Feature index ${maxIndex} out of bounds for timestep length ${originalX[0][0].length}`
+        );
+      }
+
       console.log(`🔍 Using feature indices: [${featureIndices.join(", ")}]`);
 
-      // Filter features to only include the specified ones
-      const filteredX = originalX.map((sequence) =>
-        sequence.map((timestep) => {
-          const filteredTimestep: number[] = [];
-          featureIndices.forEach((index) => {
-            if (index >= 0 && index < timestep.length) {
-              filteredTimestep.push(timestep[index]);
-            } else {
-              throw new Error(
-                `Feature index ${index} out of bounds for timestep length ${timestep.length}`
-              );
-            }
-          });
-          return filteredTimestep;
-        })
+      const filteredX = this.filterFeaturesEfficiently(
+        originalX,
+        featureIndices
       );
 
-      // Store original feature detection methods
-      this.originalDetectFeatureCount = FeatureDetector.detectFeatureCount;
-      this.originalGetFeatureCount = FeatureDetector.getFeatureCount;
+      try {
+        FeatureDetector.detectFeatureCount = async () => {
+          return featureArray.length;
+        };
+        FeatureDetector.getFeatureCount = () => {
+          return featureArray.length;
+        };
+      } catch (error) {
+        console.warn(
+          "⚠️  Failed to override feature detection methods:",
+          error
+        );
+      }
 
-      // Override the feature detection to match our filtered feature count
-      FeatureDetector.detectFeatureCount = async () => {
-        return featureArray.length;
-      };
-      FeatureDetector.getFeatureCount = () => {
-        return featureArray.length;
-      };
-
-      // Override the trainer's data processor prepareData method
       trainer["dataProcessor"].prepareData = async () => ({ X: filteredX, y });
 
-      // Train the model using the same process as the main trainer
       await trainer.train();
 
-      // Get the final metrics from the trainer
       const metrics = {
         validationAccuracy: trainer.getBalancedAccuracy(),
         buyF1: trainer.getBuyF1(),
@@ -538,32 +593,52 @@ class GradualFeatureOptimizer {
         error
       );
       throw error;
-    } finally {
-      // Always restore original functions, even if an error occurred
-      this.restoreOriginalFunctions();
-
-      // Clear TensorFlow memory
-      tf.tidy(() => {
-        // This will clean up any remaining tensors
-      });
     }
   }
 
   private restoreOriginalFunctions(): void {
-    // Restore original Math.random function
-    if (this.originalRandom) {
-      Math.random = this.originalRandom;
-      this.originalRandom = null;
-    }
+    try {
+      if (this.originalRandom) {
+        Math.random = this.originalRandom;
+        this.originalRandom = null;
+      }
 
-    // Restore original feature detection methods
-    if (this.originalDetectFeatureCount) {
-      FeatureDetector.detectFeatureCount = this.originalDetectFeatureCount;
-      this.originalDetectFeatureCount = null;
+      if (this.originalDetectFeatureCount) {
+        try {
+          FeatureDetector.detectFeatureCount = this.originalDetectFeatureCount;
+        } catch (error) {
+          console.warn("⚠️  Failed to restore detectFeatureCount:", error);
+        }
+        this.originalDetectFeatureCount = null;
+      }
+
+      if (this.originalGetFeatureCount) {
+        try {
+          FeatureDetector.getFeatureCount = this.originalGetFeatureCount;
+        } catch (error) {
+          console.warn("⚠️  Failed to restore getFeatureCount:", error);
+        }
+        this.originalGetFeatureCount = null;
+      }
+    } catch (error) {
+      console.error("❌ Error restoring original functions:", error);
     }
-    if (this.originalGetFeatureCount) {
-      FeatureDetector.getFeatureCount = this.originalGetFeatureCount;
-      this.originalGetFeatureCount = null;
+  }
+
+  private cleanupTensorFlowMemory(): void {
+    try {
+      tf.tidy(() => {
+        const dummyTensor = tf.zeros([1, 1]);
+        dummyTensor.dispose();
+      });
+
+      tf.disposeVariables();
+
+      if (global.gc) {
+        global.gc();
+      }
+    } catch (error) {
+      console.error("❌ Error cleaning up TensorFlow memory:", error);
     }
   }
 
@@ -572,15 +647,25 @@ class GradualFeatureOptimizer {
     modified: PerformanceMetrics
   ): PerformanceChange {
     const safeDivide = (numerator: number, denominator: number): number => {
-      // Handle case where both numerator and denominator are zero
-      if (Math.abs(numerator) < 1e-10 && Math.abs(denominator) < 1e-10) {
-        return 0; // No change when both are effectively zero
+      if (
+        isNaN(numerator) ||
+        isNaN(denominator) ||
+        !isFinite(numerator) ||
+        !isFinite(denominator)
+      ) {
+        return 0;
       }
 
-      if (Math.abs(denominator) < 1e-10) {
-        return numerator > 0 ? 1 : numerator < 0 ? -1 : 0;
+      if (Math.abs(denominator) < 1e-8) {
+        return 0;
       }
-      return numerator / denominator;
+
+      if (Math.abs(numerator) < 1e-8 && Math.abs(denominator) < 1e-8) {
+        return 0;
+      }
+
+      const result = numerator / denominator;
+      return isFinite(result) ? result : 0;
     };
 
     return {
@@ -612,7 +697,13 @@ class GradualFeatureOptimizer {
     const balancedAccuracyChange = performanceChange.balancedAccuracy;
     const matthewsCorrelationChange = performanceChange.matthewsCorrelation;
 
-    // Consider multiple metrics for decision making
+    if (isNaN(combinedF1Change) || !isFinite(combinedF1Change)) {
+      console.warn(
+        "⚠️  Invalid combined F1 change detected, defaulting to MINIMAL_IMPACT"
+      );
+      return "MINIMAL_IMPACT";
+    }
+
     const positiveMetrics = [
       combinedF1Change > 0,
       balancedAccuracyChange > 0,
@@ -625,20 +716,18 @@ class GradualFeatureOptimizer {
       matthewsCorrelationChange < 0,
     ].filter(Boolean).length;
 
-    // Primary decision based on combined F1, but consider other metrics
     if (combinedF1Change > this.tolerance) {
-      return "REMOVE"; // Performance improved significantly
+      return "REMOVE";
     } else if (combinedF1Change > -this.tolerance) {
-      // Within tolerance, check if other metrics suggest removal
       if (positiveMetrics > negativeMetrics) {
-        return "REMOVE"; // More metrics improved than degraded
+        return "REMOVE";
       } else if (negativeMetrics > positiveMetrics) {
-        return "KEEP"; // More metrics degraded than improved
+        return "KEEP";
       } else {
-        return "MINIMAL_IMPACT"; // Mixed or neutral impact
+        return "MINIMAL_IMPACT";
       }
     } else {
-      return "KEEP"; // Performance degraded significantly
+      return "KEEP";
     }
   }
 
@@ -997,7 +1086,7 @@ class GradualFeatureOptimizer {
   }
 }
 
-// Parse command line arguments with proper quote handling
+// Parse command line arguments with proper quote handling and validation
 function parseArguments(): { feature?: string; features?: string[] } {
   const args = process.argv.slice(2);
   const featureIndex = args.indexOf("--feature");
@@ -1022,65 +1111,85 @@ function parseArguments(): { feature?: string; features?: string[] } {
       console.log(
         '   npm run features:gradual -- --feature "rsi" "macdHistogram" "priceChangePct"'
       );
-      process.exit(1);
+      throw new Error("Missing feature name(s) after --feature");
     }
 
     // Collect all arguments after --feature until the next -- flag
     const features: string[] = [];
     let i = featureIndex + 1;
-    while (i < args.length && !args[i].startsWith("--")) {
-      // Handle quoted feature names by joining them
-      if (args[i].startsWith('"') && !args[i].endsWith('"')) {
-        let quotedFeature = args[i].substring(1);
-        i++;
-        while (i < args.length && !args[i].endsWith('"')) {
-          quotedFeature += " " + args[i];
-          i++;
-        }
-        if (i < args.length) {
-          quotedFeature += " " + args[i].substring(0, args[i].length - 1);
-        }
-        features.push(quotedFeature);
-      } else {
-        // Remove quotes if present
-        const feature = args[i].replace(/^["']|["']$/g, "");
-        features.push(feature);
-      }
-      i++;
-    }
 
-    if (features.length === 1) {
-      return { feature: features[0] };
-    } else if (features.length > 1) {
-      return { features: features };
-    } else {
-      console.error("❌ Error: No feature names specified after --feature");
-      process.exit(1);
+    try {
+      while (i < args.length && !args[i].startsWith("--")) {
+        // Handle quoted feature names by joining them
+        if (args[i].startsWith('"') && !args[i].endsWith('"')) {
+          let quotedFeature = args[i].substring(1);
+          i++;
+          while (i < args.length && !args[i].endsWith('"')) {
+            quotedFeature += " " + args[i];
+            i++;
+          }
+          if (i < args.length) {
+            quotedFeature += " " + args[i].substring(0, args[i].length - 1);
+          }
+          features.push(quotedFeature);
+        } else {
+          // Remove quotes if present and validate
+          const feature = args[i].replace(/^["']|["']$/g, "");
+          if (feature.trim() === "") {
+            throw new Error("Empty feature name detected");
+          }
+          features.push(feature);
+        }
+        i++;
+      }
+
+      // Validate feature names
+      if (features.length === 0) {
+        throw new Error("No valid feature names specified after --feature");
+      }
+
+      // Check for duplicate features
+      const uniqueFeatures = new Set(features);
+      if (uniqueFeatures.size !== features.length) {
+        const duplicates = features.filter(
+          (f, index) => features.indexOf(f) !== index
+        );
+        throw new Error(
+          `Duplicate feature names detected: ${duplicates.join(", ")}`
+        );
+      }
+
+      if (features.length === 1) {
+        return { feature: features[0] };
+      } else if (features.length > 1) {
+        return { features: features };
+      } else {
+        throw new Error("No feature names specified after --feature");
+      }
+    } catch (error) {
+      console.error(`❌ Error parsing feature arguments: ${error}`);
+      throw error;
     }
   }
 
-  return {}; // No feature specified, will test all features
+  return {};
 }
 
-// Run optimization
 async function main() {
   try {
     const args = parseArguments();
     const optimizer = new GradualFeatureOptimizer();
 
     if (args.features) {
-      // Test multiple specific features
       await optimizer.testMultipleFeatureRemoval(args.features);
     } else if (args.feature) {
-      // Test specific feature
       await optimizer.testFeatureRemoval(args.feature);
     } else {
-      // Test all features sequentially
       await optimizer.runOptimization();
     }
   } catch (error) {
     console.error("❌ Optimization failed:", error);
-    process.exit(1);
+    throw error;
   }
 }
 

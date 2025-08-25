@@ -3,8 +3,8 @@
 /**
  *
  * Usage:
- *   npm run features:gradual                    # Test all features sequentially
- *   npm run features:gradual -- --feature "featureName"  # Test specific feature
+ *   npm run features:gradual                                    # Test all features sequentially
+ *   npm run features:gradual -- --feature "featureName"        # Test specific feature
  *
  * Examples:
  *   npm run features:gradual
@@ -268,7 +268,8 @@ class GradualFeatureOptimizer {
       console.log(baselineMsg);
       this.writeToFile(baselineMsg);
       const baselinePerformance = await this.trainAndEvaluateModel(
-        this.featureNames
+        this.featureNames,
+        0
       );
       const baselineResult = `✅ Baseline: ${baselinePerformance.validationAccuracy.toFixed(
         4
@@ -278,6 +279,8 @@ class GradualFeatureOptimizer {
 
       const originalBaselinePerformance =
         this.deepCopyPerformanceMetrics(baselinePerformance);
+
+      console.log(`🔍 Testing ${this.featureNames.length} features`);
 
       for (let i = 0; i < this.featureNames.length; i++) {
         const featureName = this.featureNames[i];
@@ -292,7 +295,8 @@ class GradualFeatureOptimizer {
         );
 
         const modifiedPerformance = await this.trainAndEvaluateModel(
-          modifiedFeatures
+          modifiedFeatures,
+          i + 1
         );
 
         const performanceChange = this.calculatePerformanceChange(
@@ -385,7 +389,8 @@ class GradualFeatureOptimizer {
       console.log(baselineMsg);
       this.writeToFile(baselineMsg);
       const baselinePerformance = await this.trainAndEvaluateModel(
-        this.featureNames
+        this.featureNames,
+        1
       );
       const baselineResult = `✅ Baseline: ${baselinePerformance.validationAccuracy.toFixed(
         4
@@ -401,7 +406,8 @@ class GradualFeatureOptimizer {
         (name) => name !== featureName
       );
       const modifiedPerformance = await this.trainAndEvaluateModel(
-        modifiedFeatures
+        modifiedFeatures,
+        2
       );
 
       // Compare performance
@@ -478,7 +484,8 @@ class GradualFeatureOptimizer {
         "\n📈 Step 1: Establishing Baseline Performance (All Features)"
       );
       const baselinePerformance = await this.trainAndEvaluateModel(
-        this.featureNames
+        this.featureNames,
+        1
       );
       console.log(
         `✅ Baseline: ${baselinePerformance.validationAccuracy.toFixed(
@@ -494,7 +501,8 @@ class GradualFeatureOptimizer {
         (name) => !featureNames.includes(name)
       );
       const modifiedPerformance = await this.trainAndEvaluateModel(
-        modifiedFeatures
+        modifiedFeatures,
+        2
       );
 
       // Compare performance
@@ -575,7 +583,8 @@ class GradualFeatureOptimizer {
   }
 
   private async trainAndEvaluateModel(
-    featureArray: string[]
+    featureArray: string[],
+    step: number
   ): Promise<PerformanceMetrics> {
     const FIXED_SEED = this.seed;
 
@@ -585,7 +594,15 @@ class GradualFeatureOptimizer {
       // Reset training state before each training session
       this.resetTrainingState();
 
-      const trainer = new TradeModelTrainer(FIXED_SEED);
+      // Create a completely fresh trainer instance to avoid state contamination
+      let trainer: TradeModelTrainer;
+      try {
+        trainer = new TradeModelTrainer(FIXED_SEED);
+        console.log("🔄 Created fresh TradeModelTrainer instance");
+      } catch (error) {
+        console.error("❌ Failed to create trainer:", error);
+        throw new Error(`Failed to create trainer: ${error}`);
+      }
 
       trainer.setCurrentFeatureName(featureArray.join(", "));
 
@@ -722,27 +739,6 @@ class GradualFeatureOptimizer {
         featureIndices
       );
 
-      // Validate filtered data
-      if (!filteredX || !Array.isArray(filteredX) || filteredX.length === 0) {
-        throw new Error(
-          `Failed to filter features: filteredX is ${
-            filteredX ? "empty" : "undefined"
-          }`
-        );
-      }
-
-      if (
-        !filteredX[0] ||
-        !Array.isArray(filteredX[0]) ||
-        filteredX[0].length === 0
-      ) {
-        throw new Error(
-          `Failed to filter features: filteredX[0] is ${
-            filteredX[0] ? "empty" : "undefined"
-          }`
-        );
-      }
-
       console.log(`✅ Filtered data has ${filteredX[0][0].length} features`);
 
       // Override the FeatureDetector to return the correct feature count
@@ -867,6 +863,23 @@ class GradualFeatureOptimizer {
 
       // Re-initialize deterministic random behavior
       this.initializeDeterministicRandom();
+
+      // Force garbage collection if available
+      if (global.gc) {
+        global.gc();
+      }
+
+      // Additional TensorFlow backend reset
+      try {
+        const backend = tf.getBackend();
+        if (backend === "tensorflow") {
+          // Force backend reset
+          tf.engine().reset();
+          console.log("🔄 Reset TensorFlow backend");
+        }
+      } catch (error) {
+        console.warn("⚠️  Could not reset TensorFlow backend:", error);
+      }
 
       console.log("✅ Training state reset completed");
     } catch (error) {
@@ -1345,7 +1358,10 @@ class GradualFeatureOptimizer {
 }
 
 // Parse command line arguments with proper quote handling and validation
-function parseArguments(): { feature?: string; features?: string[] } {
+function parseArguments(): {
+  feature?: string;
+  features?: string[];
+} {
   const args = process.argv.slice(2);
   const featureIndex = args.indexOf("--feature");
 
@@ -1418,9 +1434,13 @@ function parseArguments(): { feature?: string; features?: string[] } {
       }
 
       if (features.length === 1) {
-        return { feature: features[0] };
+        return {
+          feature: features[0],
+        };
       } else if (features.length > 1) {
-        return { features: features };
+        return {
+          features,
+        };
       } else {
         throw new Error("No feature names specified after --feature");
       }

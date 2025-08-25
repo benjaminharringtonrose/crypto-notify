@@ -77,7 +77,6 @@ export interface Indicators {
   mesaSineWave: number;
   rainbowMovingAverage: number;
   supportResistanceLevel: number;
-  ehlersFisherTransform: number;
   mcginleyDynamic: number;
   knowSureThing: number;
   trix: number;

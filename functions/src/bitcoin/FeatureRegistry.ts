@@ -398,14 +398,6 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
     importance: "medium",
   },
   {
-    name: "ehlersFisherTransform",
-    description:
-      "Ehlers Fisher Transform - advanced oscillator that transforms price data to create a more Gaussian distribution for better signal detection",
-    category: "technical",
-    experimentAdded: "Experiment #15-2",
-    importance: "medium",
-  },
-  {
     name: "mcginleyDynamic",
     description:
       "McGinley Dynamic - advanced moving average that adjusts to market speed and provides better trend identification than traditional moving averages",

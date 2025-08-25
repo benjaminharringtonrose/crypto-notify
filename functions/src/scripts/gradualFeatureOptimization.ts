@@ -13,6 +13,8 @@
  */
 
 import * as tf from "@tensorflow/tfjs-node";
+import * as fs from "fs";
+import * as path from "path";
 import { DataProcessor } from "../bitcoin/DataProcessor";
 import { FeatureDetector } from "../bitcoin/FeatureDetector";
 import { TradeModelTrainer } from "../bitcoin/TradeModelTrainer";
@@ -58,9 +60,14 @@ class GradualFeatureOptimizer {
   private randomCounter = 0;
   private maxOptimizationSteps = 1000;
   private lcgState = 0;
+  private outputFilePath: string;
 
   constructor() {
     this.storeOriginalFunctions();
+    this.outputFilePath = path.join(
+      process.cwd(),
+      "gradual-feature-optimization-results.txt"
+    );
   }
 
   private get featureNames(): string[] {
@@ -94,6 +101,29 @@ class GradualFeatureOptimizer {
     this.maxOptimizationSteps = maxSteps;
   }
 
+  private writeToFile(content: string): void {
+    try {
+      fs.appendFileSync(this.outputFilePath, content + "\n");
+    } catch (error) {
+      console.warn(
+        `⚠️  Failed to write to file ${this.outputFilePath}:`,
+        error
+      );
+    }
+  }
+
+  private clearOutputFile(): void {
+    try {
+      fs.writeFileSync(this.outputFilePath, "");
+      console.log(`📄 Results will be saved to: ${this.outputFilePath}`);
+    } catch (error) {
+      console.warn(
+        `⚠️  Failed to clear output file ${this.outputFilePath}:`,
+        error
+      );
+    }
+  }
+
   private deepCopyPerformanceMetrics(
     metrics: PerformanceMetrics
   ): PerformanceMetrics {
@@ -112,18 +142,42 @@ class GradualFeatureOptimizer {
     originalX: number[][][],
     featureIndices: number[]
   ): number[][][] {
+    console.log(
+      `🔧 Filtering ${originalX.length} sequences with ${featureIndices.length} features`
+    );
+
+    if (!originalX || originalX.length === 0) {
+      throw new Error("Original data is empty or undefined");
+    }
+
     const filteredX: number[][][] = [];
 
     for (let i = 0; i < originalX.length; i++) {
       const sequence = originalX[i];
+      if (!sequence || !Array.isArray(sequence)) {
+        throw new Error(`Invalid sequence at index ${i}: ${sequence}`);
+      }
+
       const filteredSequence: number[][] = [];
 
       for (let j = 0; j < sequence.length; j++) {
         const timestep = sequence[j];
+        if (!timestep || !Array.isArray(timestep)) {
+          throw new Error(
+            `Invalid timestep at sequence ${i}, timestep ${j}: ${timestep}`
+          );
+        }
+
         const filteredTimestep = new Array(featureIndices.length);
 
         for (let k = 0; k < featureIndices.length; k++) {
-          filteredTimestep[k] = timestep[featureIndices[k]];
+          const featureIndex = featureIndices[k];
+          if (featureIndex < 0 || featureIndex >= timestep.length) {
+            throw new Error(
+              `Feature index ${featureIndex} out of bounds for timestep length ${timestep.length}`
+            );
+          }
+          filteredTimestep[k] = timestep[featureIndex];
         }
 
         filteredSequence.push(filteredTimestep);
@@ -132,6 +186,7 @@ class GradualFeatureOptimizer {
       filteredX.push(filteredSequence);
     }
 
+    console.log(`✅ Filtered data has ${filteredX.length} sequences`);
     return filteredX;
   }
 
@@ -182,13 +237,18 @@ class GradualFeatureOptimizer {
 
   public async runOptimization(): Promise<void> {
     try {
-      console.log("🚀 Starting Gradual Feature Optimization");
-      console.log(
-        `📊 Testing ${this.featureNames.length} features one at a time`
-      );
-      console.log(`🎯 Performance tolerance: ${this.tolerance * 100}%`);
-      console.log(`🎲 Using seed: ${this.seed}`);
-      console.log("=".repeat(80));
+      this.clearOutputFile();
+
+      const header = [
+        "🚀 Starting Gradual Feature Optimization",
+        `📊 Testing ${this.featureNames.length} features one at a time`,
+        `🎯 Performance tolerance: ${this.tolerance * 100}%`,
+        `🎲 Using seed: ${this.seed}`,
+        "=".repeat(80),
+      ].join("\n");
+
+      console.log(header);
+      this.writeToFile(header);
 
       // Initialize deterministic random behavior
       this.initializeDeterministicRandom();
@@ -197,30 +257,35 @@ class GradualFeatureOptimizer {
       await this.validateFeatureRegistry();
 
       // Initialize feature detection
-      console.log("\n🔧 Initializing feature detection...");
+      const initMsg = "\n🔧 Initializing feature detection...";
+      console.log(initMsg);
+      this.writeToFile(initMsg);
       await FeatureDetector.detectFeatureCount();
 
       // Establish baseline performance
-      console.log(
-        "\n📈 Step 0: Establishing Baseline Performance (All Features)"
-      );
+      const baselineMsg =
+        "\n📈 Step 0: Establishing Baseline Performance (All Features)";
+      console.log(baselineMsg);
+      this.writeToFile(baselineMsg);
       const baselinePerformance = await this.trainAndEvaluateModel(
         this.featureNames
       );
-      console.log(
-        `✅ Baseline: ${baselinePerformance.validationAccuracy.toFixed(
-          4
-        )} accuracy, ${baselinePerformance.combinedF1.toFixed(4)} combined F1`
-      );
+      const baselineResult = `✅ Baseline: ${baselinePerformance.validationAccuracy.toFixed(
+        4
+      )} accuracy, ${baselinePerformance.combinedF1.toFixed(4)} combined F1`;
+      console.log(baselineResult);
+      this.writeToFile(baselineResult);
 
       const originalBaselinePerformance =
         this.deepCopyPerformanceMetrics(baselinePerformance);
 
       for (let i = 0; i < this.featureNames.length; i++) {
         const featureName = this.featureNames[i];
-        console.log(
-          `\n🔍 Step ${i + 1}: Testing removal of "${featureName}" (index ${i})`
-        );
+        const stepMsg = `\n🔍 Step ${
+          i + 1
+        }: Testing removal of "${featureName}" (index ${i})`;
+        console.log(stepMsg);
+        this.writeToFile(stepMsg);
 
         const modifiedFeatures = this.featureNames.filter(
           (name) => name !== featureName
@@ -278,11 +343,18 @@ class GradualFeatureOptimizer {
 
   public async testFeatureRemoval(featureName: string): Promise<void> {
     try {
-      console.log("🚀 Testing Individual Feature Removal");
-      console.log(`🎯 Testing removal of: "${featureName}"`);
-      console.log(`🎯 Performance tolerance: ${this.tolerance * 100}%`);
-      console.log(`🎲 Using seed: ${this.seed}`);
-      console.log("=".repeat(80));
+      this.clearOutputFile();
+
+      const header = [
+        "🚀 Testing Individual Feature Removal",
+        `🎯 Testing removal of: "${featureName}"`,
+        `🎯 Performance tolerance: ${this.tolerance * 100}%`,
+        `🎲 Using seed: ${this.seed}`,
+        "=".repeat(80),
+      ].join("\n");
+
+      console.log(header);
+      this.writeToFile(header);
 
       // Validate feature name
       if (!this.featureNames.includes(featureName)) {
@@ -302,24 +374,29 @@ class GradualFeatureOptimizer {
       await this.validateFeatureRegistry();
 
       // Initialize feature detection
-      console.log("\n🔧 Initializing feature detection...");
+      const initMsg = "\n🔧 Initializing feature detection...";
+      console.log(initMsg);
+      this.writeToFile(initMsg);
       await FeatureDetector.detectFeatureCount();
 
       // Establish baseline performance
-      console.log(
-        "\n📈 Step 1: Establishing Baseline Performance (All Features)"
-      );
+      const baselineMsg =
+        "\n📈 Step 1: Establishing Baseline Performance (All Features)";
+      console.log(baselineMsg);
+      this.writeToFile(baselineMsg);
       const baselinePerformance = await this.trainAndEvaluateModel(
         this.featureNames
       );
-      console.log(
-        `✅ Baseline: ${baselinePerformance.validationAccuracy.toFixed(
-          4
-        )} accuracy, ${baselinePerformance.combinedF1.toFixed(4)} combined F1`
-      );
+      const baselineResult = `✅ Baseline: ${baselinePerformance.validationAccuracy.toFixed(
+        4
+      )} accuracy, ${baselinePerformance.combinedF1.toFixed(4)} combined F1`;
+      console.log(baselineResult);
+      this.writeToFile(baselineResult);
 
       // Test without the specified feature
-      console.log(`\n🔍 Step 2: Testing Performance Without "${featureName}"`);
+      const testMsg = `\n🔍 Step 2: Testing Performance Without "${featureName}"`;
+      console.log(testMsg);
+      this.writeToFile(testMsg);
       const modifiedFeatures = this.featureNames.filter(
         (name) => name !== featureName
       );
@@ -357,13 +434,18 @@ class GradualFeatureOptimizer {
     featureNames: string[]
   ): Promise<void> {
     try {
-      console.log("🚀 Testing Multiple Feature Removal");
-      console.log(
-        `🎯 Features: ${featureNames.map((f) => `"${f}"`).join(", ")}`
-      );
-      console.log(`🎯 Performance tolerance: ${this.tolerance * 100}%`);
-      console.log(`🎲 Using seed: ${this.seed}`);
-      console.log("=".repeat(80));
+      this.clearOutputFile();
+
+      const header = [
+        "🚀 Testing Multiple Feature Removal",
+        `🎯 Features: ${featureNames.map((f) => `"${f}"`).join(", ")}`,
+        `🎯 Performance tolerance: ${this.tolerance * 100}%`,
+        `🎲 Using seed: ${this.seed}`,
+        "=".repeat(80),
+      ].join("\n");
+
+      console.log(header);
+      this.writeToFile(header);
 
       // Validate all features exist
       const invalidFeatures = featureNames.filter(
@@ -500,10 +582,14 @@ class GradualFeatureOptimizer {
     console.log(`🎲 Using fixed seed: ${FIXED_SEED} for consistent training`);
 
     try {
+      // Reset training state before each training session
+      this.resetTrainingState();
+
       const trainer = new TradeModelTrainer(FIXED_SEED);
 
       trainer.setCurrentFeatureName(featureArray.join(", "));
 
+      // Create a fresh DataProcessor for each test to avoid state contamination
       const originalDataProcessor = new DataProcessor(
         {
           timesteps: MODEL_CONFIG.TIMESTEPS,
@@ -514,7 +600,71 @@ class GradualFeatureOptimizer {
         TRAINING_CONFIG.START_DAYS_AGO
       );
 
+      console.log("🔄 Created fresh DataProcessor instance");
+
+      // Force a complete reset of the feature calculation system
+      try {
+        // Clear any cached feature data using type assertion
+        const processor = originalDataProcessor as any;
+        if (processor.featureCache) {
+          processor.featureCache = null;
+        }
+        if (processor.processedData) {
+          processor.processedData = null;
+        }
+        console.log("🧹 Cleared DataProcessor cache");
+      } catch (error) {
+        console.warn("⚠️  Could not clear DataProcessor cache:", error);
+      }
+
       const { X: originalX, y } = await originalDataProcessor.prepareData();
+
+      // Validate that data was loaded successfully
+      if (!originalX || !Array.isArray(originalX) || originalX.length === 0) {
+        throw new Error(
+          `Failed to load training data: originalX is ${
+            originalX ? "empty" : "undefined"
+          }`
+        );
+      }
+
+      if (
+        !originalX[0] ||
+        !Array.isArray(originalX[0]) ||
+        originalX[0].length === 0
+      ) {
+        throw new Error(
+          `Failed to load training data: originalX[0] is ${
+            originalX[0] ? "empty" : "undefined"
+          }`
+        );
+      }
+
+      if (!originalX[0][0] || !Array.isArray(originalX[0][0])) {
+        throw new Error(
+          `Failed to load training data: originalX[0][0] is ${
+            originalX[0][0] ? "not an array" : "undefined"
+          }`
+        );
+      }
+
+      // Additional validation to ensure data integrity
+      console.log(
+        `📊 Data validation: ${originalX.length} sequences, ${originalX[0].length} timesteps, ${originalX[0][0].length} features`
+      );
+
+      // Check if y data is also valid
+      if (!y || !Array.isArray(y) || y.length === 0) {
+        throw new Error(
+          `Failed to load training data: y is ${y ? "empty" : "undefined"}`
+        );
+      }
+
+      if (originalX.length !== y.length) {
+        throw new Error(
+          `Data mismatch: X has ${originalX.length} samples, y has ${y.length} samples`
+        );
+      }
 
       const actualFeatureNames = FeatureRegistry.getFeatureNames();
 
@@ -537,6 +687,9 @@ class GradualFeatureOptimizer {
         return index;
       });
 
+      console.log(`🔍 Feature indices: [${featureIndices.join(", ")}]`);
+      console.log(`📊 Original feature count: ${originalX[0][0].length}`);
+
       const uniqueIndices = new Set(featureIndices);
       if (uniqueIndices.size !== featureIndices.length) {
         throw new Error(
@@ -551,6 +704,17 @@ class GradualFeatureOptimizer {
         );
       }
 
+      // Validate that all indices are valid
+      for (const index of featureIndices) {
+        if (index < 0 || index >= originalX[0][0].length) {
+          throw new Error(
+            `Invalid feature index: ${index} (valid range: 0-${
+              originalX[0][0].length - 1
+            })`
+          );
+        }
+      }
+
       console.log(`🔍 Using feature indices: [${featureIndices.join(", ")}]`);
 
       const filteredX = this.filterFeaturesEfficiently(
@@ -558,24 +722,52 @@ class GradualFeatureOptimizer {
         featureIndices
       );
 
-      try {
-        FeatureDetector.detectFeatureCount = async () => {
-          return featureArray.length;
-        };
-        FeatureDetector.getFeatureCount = () => {
-          return featureArray.length;
-        };
-      } catch (error) {
-        console.warn(
-          "⚠️  Failed to override feature detection methods:",
-          error
+      // Validate filtered data
+      if (!filteredX || !Array.isArray(filteredX) || filteredX.length === 0) {
+        throw new Error(
+          `Failed to filter features: filteredX is ${
+            filteredX ? "empty" : "undefined"
+          }`
         );
       }
 
+      if (
+        !filteredX[0] ||
+        !Array.isArray(filteredX[0]) ||
+        filteredX[0].length === 0
+      ) {
+        throw new Error(
+          `Failed to filter features: filteredX[0] is ${
+            filteredX[0] ? "empty" : "undefined"
+          }`
+        );
+      }
+
+      console.log(`✅ Filtered data has ${filteredX[0][0].length} features`);
+
+      // Override the FeatureDetector to return the correct feature count
+      const originalGetFeatureCount = FeatureDetector.getFeatureCount;
+      FeatureDetector.getFeatureCount = () => featureArray.length;
+
+      // Override the trainer's data processor prepareData method
+      const originalPrepareData = trainer["dataProcessor"].prepareData;
       trainer["dataProcessor"].prepareData = async () => ({ X: filteredX, y });
 
+      console.log(
+        `✅ Overrode data processor with ${featureArray.length} features`
+      );
+      console.log(
+        `📊 Training data: ${filteredX.length} sequences, ${filteredX[0].length} timesteps, ${filteredX[0][0].length} features`
+      );
+
+      // Train the model using the same process as the main trainer
       await trainer.train();
 
+      // Restore original methods
+      trainer["dataProcessor"].prepareData = originalPrepareData;
+      FeatureDetector.getFeatureCount = originalGetFeatureCount;
+
+      // Get the final metrics from the trainer
       const metrics = {
         validationAccuracy: trainer.getBalancedAccuracy(),
         buyF1: trainer.getBuyF1(),
@@ -627,18 +819,58 @@ class GradualFeatureOptimizer {
 
   private cleanupTensorFlowMemory(): void {
     try {
+      console.log("🧹 Cleaning up TensorFlow memory...");
+
+      // Dispose all tensors in memory
       tf.tidy(() => {
+        // Create and immediately dispose a dummy tensor to trigger cleanup
         const dummyTensor = tf.zeros([1, 1]);
         dummyTensor.dispose();
       });
 
+      // Dispose all variables
       tf.disposeVariables();
 
+      // Clear the backend memory
+      const backend = tf.getBackend();
+      if (backend) {
+        try {
+          // Force garbage collection on the backend
+          tf.engine().startScope();
+          tf.engine().endScope();
+        } catch (error) {
+          console.warn("⚠️  Backend cleanup warning:", error);
+        }
+      }
+
+      // Force garbage collection if available
       if (global.gc) {
         global.gc();
       }
+
+      console.log("✅ TensorFlow memory cleanup completed");
     } catch (error) {
       console.error("❌ Error cleaning up TensorFlow memory:", error);
+    }
+  }
+
+  private resetTrainingState(): void {
+    try {
+      console.log("🔄 Resetting training state...");
+
+      // Clean up TensorFlow memory
+      this.cleanupTensorFlowMemory();
+
+      // Reset the random state to ensure deterministic behavior
+      this.randomCounter = 0;
+      this.lcgState = (this.seed || 42) >>> 0;
+
+      // Re-initialize deterministic random behavior
+      this.initializeDeterministicRandom();
+
+      console.log("✅ Training state reset completed");
+    } catch (error) {
+      console.error("❌ Error resetting training state:", error);
     }
   }
 
@@ -781,24 +1013,31 @@ class GradualFeatureOptimizer {
     const { decision, modifiedPerformance } = step;
     const { combinedF1 } = performanceChange;
 
-    console.log(`   📊 Modified Performance:`);
-    console.log(
-      `      Accuracy: ${modifiedPerformance.validationAccuracy.toFixed(4)}`
-    );
-    console.log(`      Buy F1: ${modifiedPerformance.buyF1.toFixed(4)}`);
-    console.log(`      Sell F1: ${modifiedPerformance.sellF1.toFixed(4)}`);
-    console.log(
-      `      Combined F1: ${modifiedPerformance.combinedF1.toFixed(4)}`
-    );
-    console.log(`   📈 Performance Change: ${(combinedF1 * 100).toFixed(2)}%`);
-    console.log(`   🎯 Decision: ${decision}`);
-    console.log(`   💡 Reason: ${step.reason}`);
+    const stepResults = [
+      `   📊 Modified Performance:`,
+      `      Accuracy: ${modifiedPerformance.validationAccuracy.toFixed(4)}`,
+      `      Buy F1: ${modifiedPerformance.buyF1.toFixed(4)}`,
+      `      Sell F1: ${modifiedPerformance.sellF1.toFixed(4)}`,
+      `      Combined F1: ${modifiedPerformance.combinedF1.toFixed(4)}`,
+      `   📈 Performance Change: ${(combinedF1 * 100).toFixed(2)}%`,
+      `   🎯 Decision: ${decision}`,
+      `   💡 Reason: ${step.reason}`,
+    ].join("\n");
+
+    console.log(stepResults);
+    this.writeToFile(stepResults);
   }
 
   private generateFinalReport(): void {
-    console.log("\n" + "=".repeat(80));
-    console.log("📋 GRADUAL FEATURE OPTIMIZATION FINAL REPORT");
-    console.log("=".repeat(80));
+    const reportHeader =
+      "\n" +
+      "=".repeat(80) +
+      "\n" +
+      "📋 GRADUAL FEATURE OPTIMIZATION FINAL REPORT" +
+      "\n" +
+      "=".repeat(80);
+    console.log(reportHeader);
+    this.writeToFile(reportHeader);
 
     const removedFeatures = this.optimizationSteps.filter(
       (s) => s.decision === "REMOVE"
@@ -810,44 +1049,57 @@ class GradualFeatureOptimizer {
       (s) => s.decision === "MINIMAL_IMPACT"
     );
 
-    console.log(`\n📊 SUMMARY:`);
-    console.log(`   Original Features: ${this.featureNames.length}`);
-    console.log(`   Features to Remove: ${removedFeatures.length}`);
-    console.log(`   Features to Keep: ${keptFeatures.length}`);
-    console.log(`   Minimal Impact: ${minimalImpactFeatures.length}`);
-    console.log(
+    const summary = [
+      `\n📊 SUMMARY:`,
+      `   Original Features: ${this.featureNames.length}`,
+      `   Features to Remove: ${removedFeatures.length}`,
+      `   Features to Keep: ${keptFeatures.length}`,
+      `   Minimal Impact: ${minimalImpactFeatures.length}`,
       `   Final Feature Count: ${
         this.featureNames.length - removedFeatures.length
-      }`
-    );
+      }`,
+    ].join("\n");
+    console.log(summary);
+    this.writeToFile(summary);
 
     if (removedFeatures.length > 0) {
-      console.log(`\n✅ FEATURES TO REMOVE (${removedFeatures.length}):`);
+      const removeSection = [
+        `\n✅ FEATURES TO REMOVE (${removedFeatures.length}):`,
+      ];
       removedFeatures.forEach((step) => {
-        console.log(
+        removeSection.push(
           `   - ${step.featureName} (index ${step.featureIndex}): ${step.reason}`
         );
       });
+      const removeText = removeSection.join("\n");
+      console.log(removeText);
+      this.writeToFile(removeText);
     }
 
     if (keptFeatures.length > 0) {
-      console.log(`\n🔒 FEATURES TO KEEP (${keptFeatures.length}):`);
+      const keepSection = [`\n🔒 FEATURES TO KEEP (${keptFeatures.length}):`];
       keptFeatures.forEach((step) => {
-        console.log(
+        keepSection.push(
           `   - ${step.featureName} (index ${step.featureIndex}): ${step.reason}`
         );
       });
+      const keepText = keepSection.join("\n");
+      console.log(keepText);
+      this.writeToFile(keepText);
     }
 
     if (minimalImpactFeatures.length > 0) {
-      console.log(
-        `\n⚠️  MINIMAL IMPACT FEATURES (${minimalImpactFeatures.length}):`
-      );
+      const minimalSection = [
+        `\n⚠️  MINIMAL IMPACT FEATURES (${minimalImpactFeatures.length}):`,
+      ];
       minimalImpactFeatures.forEach((step) => {
-        console.log(
+        minimalSection.push(
           `   - ${step.featureName} (index ${step.featureIndex}): ${step.reason}`
         );
       });
+      const minimalText = minimalSection.join("\n");
+      console.log(minimalText);
+      this.writeToFile(minimalText);
     }
 
     // Generate optimized feature array
@@ -856,29 +1108,37 @@ class GradualFeatureOptimizer {
       return step && step.decision !== "REMOVE";
     });
 
-    console.log(`\n🎯 OPTIMIZED FEATURE ARRAY:`);
-    console.log(`const optimizedFeatures = [`);
+    const optimizedArray = [
+      `\n🎯 OPTIMIZED FEATURE ARRAY:`,
+      `const optimizedFeatures = [`,
+    ];
     optimizedFeatureNames.forEach((name, index) => {
-      console.log(`  "${name}", // ${index + 1}`);
+      optimizedArray.push(`  "${name}", // ${index + 1}`);
     });
-    console.log(`];`);
+    optimizedArray.push(`];`);
+    const optimizedText = optimizedArray.join("\n");
+    console.log(optimizedText);
+    this.writeToFile(optimizedText);
 
-    console.log(`\n📈 PERFORMANCE IMPACT:`);
+    const performanceImpact = [`\n📈 PERFORMANCE IMPACT:`];
     const baselineStep = this.optimizationSteps[0];
     const finalStep = this.optimizationSteps[this.optimizationSteps.length - 1];
     if (baselineStep && finalStep) {
       const improvement =
         finalStep.modifiedPerformance.combinedF1 -
         baselineStep.originalPerformance.combinedF1;
-      console.log(
+      performanceImpact.push(
         `   Combined F1 Improvement: ${(improvement * 100).toFixed(2)}%`
       );
-      console.log(
+      performanceImpact.push(
         `   Final Combined F1: ${finalStep.modifiedPerformance.combinedF1.toFixed(
           4
         )}`
       );
     }
+    const performanceText = performanceImpact.join("\n");
+    console.log(performanceText);
+    this.writeToFile(performanceText);
   }
 
   private logResults(
@@ -888,95 +1148,96 @@ class GradualFeatureOptimizer {
     performanceChange: PerformanceChange,
     decision: string
   ): void {
-    console.log("\n" + "=".repeat(80));
-    console.log("📋 FEATURE REMOVAL TEST RESULTS");
-    console.log("=".repeat(80));
+    const resultsHeader =
+      "\n" +
+      "=".repeat(80) +
+      "\n" +
+      "📋 FEATURE REMOVAL TEST RESULTS" +
+      "\n" +
+      "=".repeat(80);
+    console.log(resultsHeader);
+    this.writeToFile(resultsHeader);
 
-    console.log(`\n🎯 Feature Tested: "${featureName}"`);
-    console.log(
+    const featureInfo = [
+      `\n🎯 Feature Tested: "${featureName}"`,
       `📊 Feature Index: ${this.featureNames.indexOf(featureName) + 1}/${
         this.featureNames.length
-      }`
-    );
+      }`,
+    ].join("\n");
+    console.log(featureInfo);
+    this.writeToFile(featureInfo);
 
-    console.log(`\n📈 PERFORMANCE COMPARISON:`);
-    console.log(`   Metric              | Baseline | Modified | Change`);
-    console.log(`   --------------------|----------|----------|--------`);
-    console.log(
+    const performanceComparison = [
+      `\n📈 PERFORMANCE COMPARISON:`,
+      `   Metric              | Baseline | Modified | Change`,
+      `   --------------------|----------|----------|--------`,
       `   Validation Accuracy | ${baselinePerformance.validationAccuracy.toFixed(
         4
       )} | ${modifiedPerformance.validationAccuracy.toFixed(4)} | ${(
         performanceChange.validationAccuracy * 100
-      ).toFixed(2)}%`
-    );
-    console.log(
+      ).toFixed(2)}%`,
       `   Buy F1 Score        | ${baselinePerformance.buyF1.toFixed(
         4
       )} | ${modifiedPerformance.buyF1.toFixed(4)} | ${(
         performanceChange.buyF1 * 100
-      ).toFixed(2)}%`
-    );
-    console.log(
+      ).toFixed(2)}%`,
       `   Sell F1 Score       | ${baselinePerformance.sellF1.toFixed(
         4
       )} | ${modifiedPerformance.sellF1.toFixed(4)} | ${(
         performanceChange.sellF1 * 100
-      ).toFixed(2)}%`
-    );
-    console.log(
+      ).toFixed(2)}%`,
       `   Combined F1 Score   | ${baselinePerformance.combinedF1.toFixed(
         4
       )} | ${modifiedPerformance.combinedF1.toFixed(4)} | ${(
         performanceChange.combinedF1 * 100
-      ).toFixed(2)}%`
-    );
-    console.log(
+      ).toFixed(2)}%`,
       `   Balanced Accuracy   | ${baselinePerformance.balancedAccuracy.toFixed(
         4
       )} | ${modifiedPerformance.balancedAccuracy.toFixed(4)} | ${(
         performanceChange.balancedAccuracy * 100
-      ).toFixed(2)}%`
-    );
-    console.log(
+      ).toFixed(2)}%`,
       `   Matthews Correlation| ${baselinePerformance.matthewsCorrelation.toFixed(
         4
       )} | ${modifiedPerformance.matthewsCorrelation.toFixed(4)} | ${(
         performanceChange.matthewsCorrelation * 100
-      ).toFixed(2)}%`
-    );
+      ).toFixed(2)}%`,
+    ].join("\n");
+    console.log(performanceComparison);
+    this.writeToFile(performanceComparison);
 
-    console.log(`\n🎯 DECISION: ${decision}`);
+    const decisionText = `\n🎯 DECISION: ${decision}`;
+    console.log(decisionText);
+    this.writeToFile(decisionText);
 
     const combinedF1Change = performanceChange.combinedF1;
+    let recommendation = "";
     if (decision === "REMOVE") {
-      console.log(
-        `✅ RECOMMENDATION: Remove "${featureName}" - Performance improved by ${(
-          combinedF1Change * 100
-        ).toFixed(2)}%`
-      );
+      recommendation = `✅ RECOMMENDATION: Remove "${featureName}" - Performance improved by ${(
+        combinedF1Change * 100
+      ).toFixed(2)}%`;
     } else if (decision === "KEEP") {
-      console.log(
-        `🔒 RECOMMENDATION: Keep "${featureName}" - Performance degraded by ${(
-          Math.abs(combinedF1Change) * 100
-        ).toFixed(2)}%`
-      );
+      recommendation = `🔒 RECOMMENDATION: Keep "${featureName}" - Performance degraded by ${(
+        Math.abs(combinedF1Change) * 100
+      ).toFixed(2)}%`;
     } else {
-      console.log(
-        `⚠️  RECOMMENDATION: "${featureName}" has minimal impact (within ${(
-          this.tolerance * 100
-        ).toFixed(1)}% tolerance)`
-      );
+      recommendation = `⚠️  RECOMMENDATION: "${featureName}" has minimal impact (within ${(
+        this.tolerance * 100
+      ).toFixed(1)}% tolerance)`;
     }
+    console.log(recommendation);
+    this.writeToFile(recommendation);
 
-    console.log(`\n📊 FEATURE COUNT:`);
-    console.log(`   Original: ${this.featureNames.length} features`);
-    console.log(`   Modified: ${this.featureNames.length - 1} features`);
-    console.log(
+    const featureCount = [
+      `\n📊 FEATURE COUNT:`,
+      `   Original: ${this.featureNames.length} features`,
+      `   Modified: ${this.featureNames.length - 1} features`,
       `   Reduction: 1 feature (${(
         (1 / this.featureNames.length) *
         100
-      ).toFixed(1)}%)`
-    );
+      ).toFixed(1)}%)`,
+    ].join("\n");
+    console.log(featureCount);
+    this.writeToFile(featureCount);
   }
 
   private logMultipleFeatureResults(
@@ -986,103 +1247,100 @@ class GradualFeatureOptimizer {
     performanceChange: PerformanceChange,
     decision: string
   ): void {
-    console.log("\n" + "=".repeat(80));
-    console.log("📋 MULTIPLE FEATURE REMOVAL TEST RESULTS");
-    console.log("=".repeat(80));
+    const resultsHeader =
+      "\n" +
+      "=".repeat(80) +
+      "\n" +
+      "📋 MULTIPLE FEATURE REMOVAL TEST RESULTS" +
+      "\n" +
+      "=".repeat(80);
+    console.log(resultsHeader);
+    this.writeToFile(resultsHeader);
 
-    console.log(
-      `\n🎯 Features Tested: ${featureNames.map((f) => `"${f}"`).join(", ")}`
-    );
-    console.log(
-      `📊 Features Count: ${featureNames.length} features removed from ${this.featureNames.length} total`
-    );
+    const featureInfo = [
+      `\n🎯 Features Tested: ${featureNames.map((f) => `"${f}"`).join(", ")}`,
+      `📊 Features Count: ${featureNames.length} features removed from ${this.featureNames.length} total`,
+    ].join("\n");
+    console.log(featureInfo);
+    this.writeToFile(featureInfo);
 
-    console.log(`\n📈 PERFORMANCE COMPARISON:`);
-    console.log(`   Metric              | Baseline | Modified | Change`);
-    console.log(`   --------------------|----------|----------|--------`);
-    console.log(
+    const performanceComparison = [
+      `\n📈 PERFORMANCE COMPARISON:`,
+      `   Metric              | Baseline | Modified | Change`,
+      `   --------------------|----------|----------|--------`,
       `   Validation Accuracy | ${baselinePerformance.validationAccuracy.toFixed(
         4
       )} | ${modifiedPerformance.validationAccuracy.toFixed(4)} | ${(
         performanceChange.validationAccuracy * 100
-      ).toFixed(2)}%`
-    );
-    console.log(
+      ).toFixed(2)}%`,
       `   Buy F1 Score        | ${baselinePerformance.buyF1.toFixed(
         4
       )} | ${modifiedPerformance.buyF1.toFixed(4)} | ${(
         performanceChange.buyF1 * 100
-      ).toFixed(2)}%`
-    );
-    console.log(
+      ).toFixed(2)}%`,
       `   Sell F1 Score       | ${baselinePerformance.sellF1.toFixed(
         4
       )} | ${modifiedPerformance.sellF1.toFixed(4)} | ${(
         performanceChange.sellF1 * 100
-      ).toFixed(2)}%`
-    );
-    console.log(
+      ).toFixed(2)}%`,
       `   Combined F1 Score   | ${baselinePerformance.combinedF1.toFixed(
         4
       )} | ${modifiedPerformance.combinedF1.toFixed(4)} | ${(
         performanceChange.combinedF1 * 100
-      ).toFixed(2)}%`
-    );
-    console.log(
+      ).toFixed(2)}%`,
       `   Balanced Accuracy   | ${baselinePerformance.balancedAccuracy.toFixed(
         4
       )} | ${modifiedPerformance.balancedAccuracy.toFixed(4)} | ${(
         performanceChange.balancedAccuracy * 100
-      ).toFixed(2)}%`
-    );
-    console.log(
+      ).toFixed(2)}%`,
       `   Matthews Correlation| ${baselinePerformance.matthewsCorrelation.toFixed(
         4
       )} | ${modifiedPerformance.matthewsCorrelation.toFixed(4)} | ${(
         performanceChange.matthewsCorrelation * 100
-      ).toFixed(2)}%`
-    );
+      ).toFixed(2)}%`,
+    ].join("\n");
+    console.log(performanceComparison);
+    this.writeToFile(performanceComparison);
 
-    console.log(`\n🎯 DECISION: ${decision}`);
+    const decisionText = `\n🎯 DECISION: ${decision}`;
+    console.log(decisionText);
+    this.writeToFile(decisionText);
 
     const combinedF1Change = performanceChange.combinedF1;
+    let recommendation = "";
     if (decision === "REMOVE") {
-      console.log(
-        `✅ RECOMMENDATION: Remove ${
-          featureNames.length
-        } features - Performance improved by ${(combinedF1Change * 100).toFixed(
-          2
-        )}%`
-      );
+      recommendation = `✅ RECOMMENDATION: Remove ${
+        featureNames.length
+      } features - Performance improved by ${(combinedF1Change * 100).toFixed(
+        2
+      )}%`;
     } else if (decision === "KEEP") {
-      console.log(
-        `🔒 RECOMMENDATION: Keep ${
-          featureNames.length
-        } features - Performance degraded by ${(
-          Math.abs(combinedF1Change) * 100
-        ).toFixed(2)}%`
-      );
+      recommendation = `🔒 RECOMMENDATION: Keep ${
+        featureNames.length
+      } features - Performance degraded by ${(
+        Math.abs(combinedF1Change) * 100
+      ).toFixed(2)}%`;
     } else {
-      console.log(
-        `⚠️  RECOMMENDATION: ${
-          featureNames.length
-        } features have minimal impact (within ${(this.tolerance * 100).toFixed(
-          1
-        )}% tolerance)`
-      );
+      recommendation = `⚠️  RECOMMENDATION: ${
+        featureNames.length
+      } features have minimal impact (within ${(this.tolerance * 100).toFixed(
+        1
+      )}% tolerance)`;
     }
+    console.log(recommendation);
+    this.writeToFile(recommendation);
 
-    console.log(`\n📊 FEATURE COUNT:`);
-    console.log(`   Original: ${this.featureNames.length} features`);
-    console.log(
-      `   Modified: ${this.featureNames.length - featureNames.length} features`
-    );
-    console.log(
+    const featureCount = [
+      `\n📊 FEATURE COUNT:`,
+      `   Original: ${this.featureNames.length} features`,
+      `   Modified: ${this.featureNames.length - featureNames.length} features`,
       `   Reduction: ${featureNames.length} features (${(
         (featureNames.length / this.featureNames.length) *
         100
-      ).toFixed(1)}%)`
-    );
+      ).toFixed(1)}%)`,
+    ].join("\n");
+    console.log(featureCount);
+    this.writeToFile(featureCount);
   }
 }
 

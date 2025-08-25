@@ -1801,9 +1801,6 @@ export default class FeatureCalculator {
       supportResistanceLevel: this.calculateSupportResistanceLevel(
         prices.slice(0, dayIndex + 1)
       ),
-      ehlersFisherTransform: this.calculateEhlersFisherTransform(
-        prices.slice(0, dayIndex + 1)
-      ),
       mcginleyDynamic: this.calculateMcGinleyDynamic(
         prices.slice(0, dayIndex + 1)
       ),
@@ -1922,7 +1919,6 @@ export default class FeatureCalculator {
       indicators.mesaSineWave, // MESA Sine Wave - EXPERIMENT #10-4
       indicators.rainbowMovingAverage, // Rainbow Moving Average - EXPERIMENT #10-5
       indicators.supportResistanceLevel, // Support/Resistance Level (SRL) - EXPERIMENT #12-2
-      indicators.ehlersFisherTransform, // Ehlers Fisher Transform - EXPERIMENT #15-2
       indicators.mcginleyDynamic, // McGinley Dynamic - EXPERIMENT #15-3
       indicators.knowSureThing, // Know Sure Thing (KST) - EXPERIMENT #15-4
       indicators.trix, // Trix - EXPERIMENT #15-5
@@ -2396,48 +2392,6 @@ export default class FeatureCalculator {
     const ao = fastSMA - slowSMA;
 
     return ao;
-  }
-
-  // EXPERIMENT #15-2: Ehlers Fisher Transform
-  public calculateEhlersFisherTransform(
-    prices: number[],
-    period: number = 10
-  ): number {
-    if (prices.length < period) return 0;
-
-    // Calculate median price (HLC/3) - using close price as proxy
-    const medianPrices: number[] = [];
-    for (let i = 0; i < prices.length; i++) {
-      medianPrices.push(prices[i]);
-    }
-
-    // Calculate highest and lowest median prices over the period
-    const recentMedianPrices = medianPrices.slice(-period);
-    const highestMedian = Math.max(...recentMedianPrices);
-    const lowestMedian = Math.min(...recentMedianPrices);
-
-    // Calculate value1 (normalized median price)
-    const currentMedian = medianPrices[medianPrices.length - 1];
-    const range = highestMedian - lowestMedian;
-
-    if (range === 0) return 0;
-
-    const value1 =
-      0.33 * 2 * ((currentMedian - lowestMedian) / range - 0.5) +
-      0.67 *
-        (medianPrices.length > 1 ? medianPrices[medianPrices.length - 2] : 0);
-
-    // Apply Fisher Transform
-    let fisher = 0;
-    if (value1 > 0.99) {
-      fisher = 0.999;
-    } else if (value1 < -0.99) {
-      fisher = -0.999;
-    } else {
-      fisher = 0.5 * Math.log((1 + value1) / (1 - value1));
-    }
-
-    return fisher;
   }
 
   // EXPERIMENT #15-3: McGinley Dynamic

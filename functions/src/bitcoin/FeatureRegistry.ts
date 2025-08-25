@@ -17,13 +17,7 @@ export interface FeatureDefinition {
  * Optimized from 36 to 26 features based on gradual optimization results
  */
 export const FEATURE_REGISTRY: FeatureDefinition[] = [
-  // 1-5: Core Price Action & Volatility (5 features)
-  {
-    name: "priceChangePct",
-    description: "Price change percentage",
-    category: "core",
-    importance: "high",
-  },
+  // 1-4: Core Price Action & Volatility (4 features)
   {
     name: "highLowRange",
     description: "High-low price range",
@@ -330,13 +324,6 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
       "Chaikin Oscillator - volume-based momentum indicator using ADL EMAs",
     category: "technical",
     experimentAdded: "Experiment #9-1",
-    importance: "medium",
-  },
-  {
-    name: "elderForceIndex",
-    description: "Elder Force Index - volume-weighted momentum indicator",
-    category: "technical",
-    experimentAdded: "Experiment #9-2",
     importance: "medium",
   },
   {

@@ -14,6 +14,8 @@
  *   npm run features:gradual -- --feature "rsi"
  */
 
+// gradualFeatureOptimization.ts
+
 import * as tf from "@tensorflow/tfjs-node";
 import { DataProcessor } from "../bitcoin/DataProcessor";
 import { FeatureDetector } from "../bitcoin/FeatureDetector";
@@ -239,6 +241,9 @@ class GradualFeatureOptimizer {
     try {
       // Create a custom trainer with the consistent seed
       const trainer = new TradeModelTrainer(FIXED_SEED);
+
+      // Set the current feature name for logging purposes
+      trainer.setCurrentFeatureName(featureArray.join(", "));
 
       // Get the original data to understand the feature structure
       const originalDataProcessor = new DataProcessor(

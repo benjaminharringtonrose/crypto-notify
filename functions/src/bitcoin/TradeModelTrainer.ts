@@ -33,6 +33,7 @@ export class TradeModelTrainer {
   private bestValLoss: number = Infinity; // Track best validation loss
   private patienceCounter: number = 0; // Early stopping counter
   private seed: number;
+  private currentFeatureName?: string; // For tracking which feature is being evaluated
 
   // Final metrics for analysis
   private finalMetrics: {
@@ -72,6 +73,13 @@ export class TradeModelTrainer {
       TRAINING_CONFIG.START_DAYS_AGO
     );
     console.log("TradeModelTrainer initialized");
+  }
+
+  /**
+   * Set the current feature name being evaluated (for logging purposes)
+   */
+  public setCurrentFeatureName(featureName: string): void {
+    this.currentFeatureName = featureName;
   }
 
   /**
@@ -326,7 +334,8 @@ export class TradeModelTrainer {
       const evaluationResults = await Metrics.evaluateModel(
         this.model,
         X_normalized,
-        y_tensor
+        y_tensor,
+        this.currentFeatureName
       );
       this.finalMetrics = {
         balancedAccuracy: evaluationResults.balancedAccuracy,

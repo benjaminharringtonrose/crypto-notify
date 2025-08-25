@@ -299,7 +299,8 @@ export class Metrics {
   static async evaluateModel(
     model: tf.LayersModel,
     X: tf.Tensor,
-    y: tf.Tensor
+    y: tf.Tensor,
+    featureName?: string
   ): Promise<{
     balancedAccuracy: number;
     buyF1: number;
@@ -312,7 +313,8 @@ export class Metrics {
     sellRecall: number;
     confusionMatrix: number[][];
   }> {
-    console.log("\n=== Model Evaluation ===");
+    const featureInfo = featureName ? ` for feature: ${featureName}` : "";
+    console.log(`\n=== Model Evaluation${featureInfo} ===`);
 
     // Get predictions
     const predictions = model.predict(X) as tf.Tensor;

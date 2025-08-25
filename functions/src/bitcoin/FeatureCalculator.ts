@@ -1600,10 +1600,7 @@ export default class FeatureCalculator {
       dayIndex >= PERIODS.MOMENTUM
         ? currentPrice - prices[dayIndex - PERIODS.MOMENTUM]
         : 0;
-    const priceChangePct =
-      dayIndex >= 1
-        ? ((currentPrice - prices[dayIndex - 1]) / prices[dayIndex - 1]) * 100
-        : 0;
+
     const volAdjustedMomentum =
       dayIndex >= PERIODS.MOMENTUM && atr !== 0
         ? (currentPrice - prices[dayIndex - PERIODS.MOMENTUM]) / atr
@@ -1666,7 +1663,6 @@ export default class FeatureCalculator {
       isTripleBottom,
       isVolumeSpike,
       momentum,
-      priceChangePct,
       sma20,
       sma50,
       sma200,
@@ -1774,10 +1770,6 @@ export default class FeatureCalculator {
         prices.slice(0, dayIndex + 1),
         volumes.slice(0, dayIndex + 1)
       ),
-      elderForceIndex: this.calculateElderForceIndex(
-        prices.slice(0, dayIndex + 1),
-        volumes.slice(0, dayIndex + 1)
-      ),
       klingerVolumeOscillator: this.calculateKlingerVolumeOscillator(
         prices.slice(0, dayIndex + 1),
         prices.slice(0, dayIndex + 1),
@@ -1826,11 +1818,10 @@ export default class FeatureCalculator {
       currentPrice,
     });
 
-    // OPTIMIZED FEATURE SET: 26 Most Important Features (Based on Gradual Optimization)
+    // OPTIMIZED FEATURE SET: 53 Most Important Features (Based on Gradual Optimization)
     // Selected features that provide maximum trading performance with minimal redundancy
     const optimizedFeatures = [
-      // 1-5: Core Price Action & Volatility (5 features)
-      indicators.priceChangePct, // Price change percentage
+      // 1-4: Core Price Action & Volatility (4 features)
       dayIndex >= 20
         ? Math.max(...prices.slice(dayIndex - 19, dayIndex + 1)) -
           Math.min(...prices.slice(dayIndex - 19, dayIndex + 1))
@@ -1911,7 +1902,6 @@ export default class FeatureCalculator {
       indicators.camarillaPivots, // Camarilla Pivots (CP) - EXPERIMENT #8-4
       indicators.acceleratorOscillator, // Accelerator Oscillator (AO) - EXPERIMENT #8-5
       indicators.chaikinOscillator, // Chaikin Oscillator (CO) - EXPERIMENT #9-1
-      indicators.elderForceIndex, // Elder Force Index (EFI) - EXPERIMENT #9-2
       indicators.klingerVolumeOscillator, // Klinger Volume Oscillator (KVO) - EXPERIMENT #9-3
       indicators.massIndex, // Mass Index (MI) - EXPERIMENT #9-4
       indicators.priceChannel, // Price Channel (PC) - EXPERIMENT #9-5

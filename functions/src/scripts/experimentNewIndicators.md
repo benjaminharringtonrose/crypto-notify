@@ -349,7 +349,13 @@ The model maintains its optimal 36-feature configuration, demonstrating that the
 **Round 9**: 4 out of 5 indicators kept (Chaikin Oscillator, Elder Force Index, Klinger Volume Oscillator, Price Channel)
 **Round 10**: 1 out of 5 indicators kept (Hull Moving Average)
 
-**Final Result**: The Bitcoin trading model now has **50 optimized features** (up from the original 26), with 26 new indicators from the ten rounds providing measurable value for 7-day BUY/SELL prediction.
+**Final Result**: The Bitcoin trading model now has **53 optimized features** (up from the original 26), with 26 new indicators from the ten rounds providing measurable value for 7-day BUY/SELL prediction.
+
+### **Feature Cleanup Results:**
+
+- **Removed**: `priceChangePct` (performance improved by 23.71% when removed)
+- **Removed**: `elderForceIndex` (performance improved by 8.13% when removed)
+- **Final Feature Count**: 53 features (down from 55)
 
 ### **Current Optimal Feature Set:**
 

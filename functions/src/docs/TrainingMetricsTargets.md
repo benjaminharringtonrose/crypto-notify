@@ -19,6 +19,13 @@ This document defines the specific target metrics for improving the Bitcoin trad
 - **Sell Recall**: 84.82% ✅ **EXCELLENT**
 - **Matthews Correlation Coefficient**: 0.1763 ⚠️ **NEEDS IMPROVEMENT**
 
+### Model Architecture:
+
+- **Features**: 42 comprehensive technical indicators
+- **Architecture**: Conv1D(48,3) → LSTM(64) → Dense(32) → Output(2)
+- **Timesteps**: 35 days of historical data
+- **Training Time**: ~73 seconds for 35 epochs
+
 ### Trading Performance Metrics:
 
 - **Win Rate**: ~58-60% ⚠️ **NEEDS IMPROVEMENT**

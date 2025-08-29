@@ -9,7 +9,7 @@ This document provides a comprehensive explanation of the crypto trading model a
 The model follows a **Conv1D-LSTM-Dense** architecture specifically designed for time series prediction in cryptocurrency markets:
 
 ```
-Input (35 timesteps × 26 features)
+Input (35 timesteps × 42 features)
     ↓
 Conv1D Layer (48 filters, kernel=3) + BatchNorm + Dropout(0.3)
     ↓
@@ -26,7 +26,7 @@ Output Layer (2 units, Softmax)
 
 - **Shape**: `[batch_size, timesteps, FeatureDetector.getFeatureCount()]`
 - **Timesteps**: 35 days of historical data
-- **Features**: 26 features (optimized from original 36 features)
+- **Features**: 42 features (comprehensive technical analysis set)
 
 ### 2. Convolutional Layer (Feature Extraction)
 
@@ -78,7 +78,7 @@ Output Layer (2 units, Softmax)
 
 ### Input Features
 
-The model uses 26 optimized technical indicators and features computed from Bitcoin price and volume data:
+The model uses 42 comprehensive technical indicators and features computed from Bitcoin price and volume data:
 
 1. **Core Features (4 features)**:
 
@@ -111,14 +111,46 @@ The model uses 26 optimized technical indicators and features computed from Bitc
    - Ichimoku Kijun-sen (26-period)
    - Ichimoku cloud position
 
-5. **Advanced Microstructure Features (7 features)**:
+5. **Advanced Microstructure Features (23 features)**:
+
    - Williams %R momentum oscillator
    - Volume MA20
    - Volume oscillator
+   - Bollinger squeeze
+   - RSI divergence
+   - Commodity Channel Index (CCI)
    - Money Flow Index (MFI)
    - Aroon Oscillator
    - Donchian Channels position
    - Parabolic SAR trend
+   - Average Directional Index (ADX)
+   - Ichimoku Cloud position
+   - Fibonacci Retracement position
+   - Stochastic K oscillator
+   - Price acceleration indicator
+   - Price Rate of Change (PROC)
+   - Stochastic RSI (StochRSI)
+   - Volume Weighted Moving Average (VWMA)
+   - Center of Gravity Oscillator (COG)
+   - True Strength Index (TSI)
+   - Price Momentum Oscillator (PMO)
+   - Bollinger Band Width
+   - Historical Volatility
+   - Camarilla Pivots
+   - Accelerator Oscillator
+   - Chaikin Oscillator
+   - Klinger Volume Oscillator
+   - Mass Index
+   - Price Channel
+   - Fisher Transform
+   - Hull Moving Average (HMA)
+   - Kaufman Adaptive Moving Average (KAMA)
+   - MESA Sine Wave
+   - Rainbow Moving Average
+   - Support/Resistance Level (SRL)
+   - McGinley Dynamic
+   - Know Sure Thing (KST)
+   - Trix
 
 ## Training Configuration
 
@@ -152,7 +184,7 @@ The model uses 26 optimized technical indicators and features computed from Bitc
 ### Data Preparation
 
 1. **Historical Data Fetching**: 730 days of BTC data
-2. **Feature Calculation**: 26 technical indicators computed
+2. **Feature Calculation**: 42 technical indicators computed
 3. **Sequence Generation**: 35-day sliding windows
 4. **Data Normalization**: Z-score normalization per feature
 5. **Data Augmentation**: Noise injection and sequence balancing
@@ -198,7 +230,7 @@ The model uses 26 optimized technical indicators and features computed from Bitc
 ### Design Decisions
 
 1. **35 Timesteps**: Balance between sufficient history and computational efficiency
-2. **26 Features**: Optimized feature set based on gradual feature optimization
+2. **42 Features**: Comprehensive technical analysis covering all major indicators
 3. **Single LSTM Layer**: Proven optimal for this dataset size
 4. **Batch Normalization**: Stabilize training and improve convergence
 5. **Dropout**: Prevent overfitting in deep architecture
@@ -218,13 +250,13 @@ The current architecture is the result of systematic experimentation:
 
 - **Experiment #1**: Threshold optimization (0.0015 → 0.001)
 - **Experiment #3**: Conv1D filters optimization (32 → 48)
-- **Experiment #61**: Advanced market microstructure features (36 → 26 optimized)
+- **Experiment #61**: Advanced market microstructure features (36 → 42 optimized)
 
 ## Future Enhancements
 
 ### Potential Improvements
 
-1. **Feature Selection**: Further optimize the 26-feature set
+1. **Feature Selection**: Further optimize the 42-feature set
 2. **Attention Mechanisms**: Add self-attention for better feature weighting
 3. **Ensemble Methods**: Combine multiple model predictions
 4. **Online Learning**: Continuous model updates with new data

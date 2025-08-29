@@ -465,14 +465,14 @@ export class EnhancedDataProcessor {
   }
 
   /**
-   * Apply enhanced balancing with SMOTE
+   * Apply balanced dataset using undersampling (more robust than SMOTE)
    */
   public enhancedBalanceDataset(
     X: number[][][],
     y: number[]
   ): { X: number[][][]; y: number[] } {
     console.log(
-      "🔧 Phase 1.4: Applying enhanced dataset balancing with SMOTE..."
+      "🔧 Phase 1.4: Applying balanced dataset using undersampling..."
     );
 
     // Separate buy and sell samples
@@ -491,7 +491,7 @@ export class EnhancedDataProcessor {
       `📊 Original distribution - Buy: ${buySamples.length}, Sell: ${sellSamples.length}`
     );
 
-    // Determine minority class (the class with fewer samples)
+    // Determine minority class
     const buyCount = buySamples.length;
     const sellCount = sellSamples.length;
     const isBuyMinority = buyCount < sellCount;
@@ -504,47 +504,39 @@ export class EnhancedDataProcessor {
 
     const minoritySamples = isBuyMinority ? buySamples : sellSamples;
     const majoritySamples = isBuyMinority ? sellSamples : buySamples;
-    const minorityLabel = isBuyMinority ? 1 : 0; // 1 for Buy, 0 for Sell
-    const majorityLabel = isBuyMinority ? 0 : 1; // 0 for Sell, 1 for Buy
+    const minorityLabel = isBuyMinority ? 1 : 0;
+    const majorityLabel = isBuyMinority ? 0 : 1;
 
-    // Calculate target ratio to achieve better balance (aim for 0.8:1 ratio instead of 1:1 to avoid over-sampling)
-    const targetRatio = Math.min(
-      2.0,
-      Math.ceil((majoritySamples.length / minoritySamples.length) * 0.8)
+    // Use undersampling to achieve balance (keep all minority samples, sample majority)
+    const targetMajorityCount = Math.min(
+      majoritySamples.length,
+      minoritySamples.length * 1.0 // 1.0:1 ratio for perfect balance
+    ); // Perfect balance to prevent bias
+
+    // Randomly sample majority class
+    const shuffledMajority = [...majoritySamples].sort(
+      () => Math.random() - 0.5
     );
+    const sampledMajority = shuffledMajority.slice(0, targetMajorityCount);
+
     console.log(
-      `📊 Target SMOTE ratio: ${targetRatio.toFixed(
-        2
-      )} samples per minority sample`
+      `📊 Undersampling: Keeping ${minoritySamples.length} minority samples, sampling ${sampledMajority.length} majority samples`
     );
 
-    // Apply SMOTE to minority class
-    const syntheticSamples = this.smoteTimeSeries(
-      minoritySamples,
-      5,
-      targetRatio
-    );
-
-    // Combine original and synthetic samples
+    // Combine samples
     const balancedX: number[][][] = [];
     const balancedY: number[] = [];
 
-    // Add majority samples
-    majoritySamples.forEach((sample) => {
-      balancedX.push(sample);
-      balancedY.push(majorityLabel);
-    });
-
-    // Add original minority samples
+    // Add minority samples
     minoritySamples.forEach((sample) => {
       balancedX.push(sample);
       balancedY.push(minorityLabel);
     });
 
-    // Add synthetic minority samples
-    syntheticSamples.forEach((sample) => {
+    // Add sampled majority samples
+    sampledMajority.forEach((sample) => {
       balancedX.push(sample);
-      balancedY.push(minorityLabel);
+      balancedY.push(majorityLabel);
     });
 
     // Shuffle the balanced dataset
@@ -566,6 +558,22 @@ export class EnhancedDataProcessor {
     console.log(
       `📊 Balance ratio: ${(finalBuyCount / finalSellCount).toFixed(3)}`
     );
+
+    // Validate that we have a reasonable balance
+    const balanceRatio = finalBuyCount / finalSellCount;
+    if (balanceRatio < 0.5 || balanceRatio > 2.0) {
+      console.log(
+        `⚠️ Warning: Balance ratio ${balanceRatio.toFixed(
+          3
+        )} is outside recommended range [0.5, 2.0]`
+      );
+    } else {
+      console.log(
+        `✅ Balance ratio ${balanceRatio.toFixed(
+          3
+        )} is within recommended range`
+      );
+    }
 
     return { X: shuffledX, y: shuffledY };
   }

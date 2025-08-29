@@ -97,6 +97,73 @@ export class TradeModelTrainer {
     return featureCount;
   }
 
+  /**
+   * Optimize decision threshold for better balanced performance
+   */
+  private optimizeThreshold(yTrue: tf.Tensor, yPred: tf.Tensor): number {
+    console.log("🔧 Optimizing decision threshold for balanced performance...");
+
+    const predictions = yPred.arraySync() as number[][];
+    const trueLabels = yTrue.argMax(-1).arraySync() as number[];
+
+    let bestThreshold = 0.5;
+    let bestF1Score = 0;
+    let bestBalancedAccuracy = 0;
+
+    // Test different thresholds
+    for (let threshold = 0.1; threshold <= 0.9; threshold += 0.05) {
+      let tp = 0,
+        fp = 0,
+        tn = 0,
+        fn = 0;
+
+      for (let i = 0; i < predictions.length; i++) {
+        const buyProb = predictions[i][1];
+        const predictedLabel = buyProb > threshold ? 1 : 0;
+        const trueLabel = trueLabels[i];
+
+        if (predictedLabel === 1 && trueLabel === 1) tp++;
+        else if (predictedLabel === 1 && trueLabel === 0) fp++;
+        else if (predictedLabel === 0 && trueLabel === 0) tn++;
+        else if (predictedLabel === 0 && trueLabel === 1) fn++;
+      }
+
+      // Calculate metrics
+      const precision = tp + fp > 0 ? tp / (tp + fp) : 0;
+      const recall = tp + fn > 0 ? tp / (tp + fn) : 0;
+      const f1 =
+        precision + recall > 0
+          ? (2 * precision * recall) / (precision + recall)
+          : 0;
+
+      const sellPrecision = tn + fn > 0 ? tn / (tn + fn) : 0;
+      const sellRecall = tn + fp > 0 ? tn / (tn + fp) : 0;
+      const sellF1 =
+        sellPrecision + sellRecall > 0
+          ? (2 * sellPrecision * sellRecall) / (sellPrecision + sellRecall)
+          : 0;
+
+      const balancedAccuracy = (recall + sellRecall) / 2;
+      const combinedF1 = (f1 + sellF1) / 2;
+
+      // Use combined F1 score as optimization metric
+      if (combinedF1 > bestF1Score) {
+        bestF1Score = combinedF1;
+        bestThreshold = threshold;
+        bestBalancedAccuracy = balancedAccuracy;
+      }
+    }
+
+    console.log(
+      `✅ Optimal threshold: ${bestThreshold.toFixed(
+        3
+      )} (Combined F1: ${bestF1Score.toFixed(
+        3
+      )}, Balanced Acc: ${bestBalancedAccuracy.toFixed(3)})`
+    );
+    return bestThreshold;
+  }
+
   private async trainModel(
     X: number[][][],
     y: number[]
@@ -358,12 +425,20 @@ export class TradeModelTrainer {
 
       console.log("Model training completed.");
 
-      // Capture final metrics for multi-run analysis
+      // Optimize threshold for better balanced performance
+      const optimizedThreshold = this.optimizeThreshold(
+        y_tensor,
+        this.model.predict(X_normalized) as tf.Tensor
+      );
+      this.bestThreshold = optimizedThreshold;
+
+      // Capture final metrics for multi-run analysis with optimized threshold
       const evaluationResults = await Metrics.evaluateModel(
         this.model,
         X_normalized,
         y_tensor,
-        this.currentFeatureName
+        this.currentFeatureName,
+        optimizedThreshold
       );
       this.finalMetrics = {
         balancedAccuracy: evaluationResults.balancedAccuracy,

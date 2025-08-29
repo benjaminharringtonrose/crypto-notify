@@ -29,6 +29,15 @@ export class Metrics {
       const ce = tf.log(tf.add(pt, 1e-8));
       const focalLoss = tf.neg(tf.mul(alpha, tf.mul(focalWeight, ce)));
 
+      // Add class weight penalty to prevent over-prediction of majority class
+      const classWeights = tf.where(
+        yTrueIndices.equal(1),
+        tf.scalar(1.2), // Higher weight for minority class (Buy)
+        tf.scalar(0.8) // Lower weight for majority class (Sell)
+      );
+
+      const weightedLoss = tf.mul(focalLoss, classWeights);
+
       // Clean up tensors
       probs.dispose();
       gatheredProbs.dispose();
@@ -36,8 +45,10 @@ export class Metrics {
       alpha.dispose();
       focalWeight.dispose();
       ce.dispose();
+      focalLoss.dispose();
+      classWeights.dispose();
 
-      return focalLoss.mean() as tf.Scalar;
+      return weightedLoss.mean() as tf.Scalar;
     } catch (error) {
       console.warn(
         "Focal loss calculation failed, falling back to cross-entropy:",
@@ -300,7 +311,8 @@ export class Metrics {
     model: tf.LayersModel,
     X: tf.Tensor,
     y: tf.Tensor,
-    featureName?: string
+    featureName?: string,
+    threshold?: number
   ): Promise<{
     balancedAccuracy: number;
     buyF1: number;
@@ -318,10 +330,19 @@ export class Metrics {
 
     // Get predictions
     const predictions = model.predict(X) as tf.Tensor;
-    const predLabels = predictions.argMax(-1);
+
+    // Use threshold if provided, otherwise use argMax
+    let predArray: number[];
+    if (threshold !== undefined) {
+      const predProbs = (await predictions.array()) as number[][];
+      predArray = predProbs.map((p) => (p[1] > threshold ? 1 : 0));
+      console.log(`Using optimized threshold: ${threshold.toFixed(3)}`);
+    } else {
+      const predLabels = predictions.argMax(-1);
+      predArray = Array.from(await predLabels.data());
+    }
 
     // Convert to arrays
-    const predArray = Array.from(await predLabels.data());
     const trueLabels = y.argMax(-1);
     const trueArray = Array.from(await trueLabels.data());
 
@@ -362,7 +383,6 @@ export class Metrics {
 
     // Clean up tensors
     predictions.dispose();
-    predLabels.dispose();
     trueLabels.dispose();
 
     return {

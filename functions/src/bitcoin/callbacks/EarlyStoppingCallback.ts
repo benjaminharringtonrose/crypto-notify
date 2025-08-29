@@ -16,7 +16,8 @@ export class EarlyStoppingCallback extends tf.CustomCallback {
     | "val_loss"
     | "val_customF1"
     | "val_customF1Buy"
-    | "val_customF1Sell";
+    | "val_customF1Sell"
+    | "val_balanced_accuracy";
   private patience: number;
   private bestWeights: tf.Tensor[];
   private bestValue: number;
@@ -27,7 +28,7 @@ export class EarlyStoppingCallback extends tf.CustomCallback {
 
   constructor(options: EarlyStoppingOptions = {}) {
     super({});
-    this.monitor = options.monitor || "val_customF1Buy"; // Default to buy F1
+    this.monitor = options.monitor || "val_balanced_accuracy"; // Default to balanced accuracy
     this.patience = options.patience || TRAINING_CONFIG.PATIENCE;
     this.restoreBestWeights = options.restoreBestWeights ?? true;
     this.bestWeights = [];
@@ -67,6 +68,12 @@ export class EarlyStoppingCallback extends tf.CustomCallback {
         break;
       case "val_customF1Sell":
         currentValue = logs["val_customF1Sell"];
+        break;
+      case "val_balanced_accuracy":
+        // Calculate balanced accuracy from buy and sell recall
+        const buyRecall = logs["val_recallBuy"] || 0;
+        const sellRecall = logs["val_recallSell"] || 0;
+        currentValue = (buyRecall + sellRecall) / 2;
         break;
     }
 

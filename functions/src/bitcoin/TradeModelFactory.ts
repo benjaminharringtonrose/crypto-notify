@@ -13,7 +13,7 @@ export default class TradeModelFactory {
   public createModel(seed?: number): tf.LayersModel {
     // REVERTED TO PROVEN BASELINE: Optimal architecture after systematic testing
     console.log(
-      "🔄 REVERTED: Back to proven baseline architecture after systematic experiments"
+      "🔄 REVERTED: Back to proven baseline architecture after Experiment #62 failure"
     );
 
     // CRITICAL: Add deterministic seeding for stable training
@@ -70,7 +70,7 @@ export default class TradeModelFactory {
       })
     );
 
-    console.log("🚀 OPTIMAL BASELINE: Restored after systematic experiments");
+    console.log("🚀 OPTIMAL BASELINE: Restored after Experiment #62 failure");
     console.log(
       "🎯 Target: Proven optimal configuration for balanced predictions"
     );
@@ -78,7 +78,7 @@ export default class TradeModelFactory {
       `📊 Architecture: Conv1D(48,3) → BN → Dropout(0.3) → LSTM(64) → Dense(32) → Dropout(0.3) → Output(2)`
     );
     console.log(
-      `📈 Timesteps: ${this.timesteps} (35 days), Features: ${this.features} (36 advanced microstructure indicators)`
+      `📈 Timesteps: ${this.timesteps} (35 days), Features: ${this.features} (42 advanced microstructure indicators)`
     );
 
     model.summary();

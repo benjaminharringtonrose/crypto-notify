@@ -198,9 +198,9 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
   },
   {
     name: "donchianPosition",
-    description: "Donchian Channels position",
+    description: "Position within Donchian Channel",
     category: "microstructure",
-    experimentAdded: "Experiment #2 - Donchian",
+    experimentAdded: "Experiment #6 - Donchian",
     importance: "medium",
   },
   {
@@ -419,6 +419,57 @@ export const FEATURE_REGISTRY: FeatureDefinition[] = [
       "Trix - advanced momentum oscillator that uses triple exponential moving average to filter out market noise",
     category: "technical",
     experimentAdded: "Experiment #15-5",
+    importance: "medium",
+  },
+
+  // EXPERIMENT #62: Advanced Market Microstructure Features (7 new features)
+  {
+    name: "orderFlowImbalance",
+    description: "Buy/sell volume imbalance indicator",
+    category: "microstructure",
+    experimentAdded: "Experiment #62",
+    importance: "high",
+  },
+  {
+    name: "volumeWeightedPrice",
+    description: "Volume-weighted price analysis",
+    category: "microstructure",
+    experimentAdded: "Experiment #62",
+    importance: "high",
+  },
+  {
+    name: "spreadProxy",
+    description: "Bid-ask spread proxy indicator",
+    category: "microstructure",
+    experimentAdded: "Experiment #62",
+    importance: "medium",
+  },
+  {
+    name: "momentumConvergence",
+    description: "Multi-timeframe momentum convergence",
+    category: "enhanced",
+    experimentAdded: "Experiment #62",
+    importance: "high",
+  },
+  {
+    name: "volatilityRegimeEnhanced",
+    description: "Enhanced volatility regime detection",
+    category: "enhanced",
+    experimentAdded: "Experiment #62",
+    importance: "high",
+  },
+  {
+    name: "priceMomentumDivergence",
+    description: "Price-volume momentum divergence",
+    category: "enhanced",
+    experimentAdded: "Experiment #62",
+    importance: "medium",
+  },
+  {
+    name: "marketEfficiencyRatio",
+    description: "Market efficiency ratio indicator",
+    category: "microstructure",
+    experimentAdded: "Experiment #62",
     importance: "medium",
   },
 ];

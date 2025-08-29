@@ -1922,6 +1922,15 @@ export default class FeatureCalculator {
       indicators.mcginleyDynamic, // McGinley Dynamic - EXPERIMENT #15-3
       indicators.knowSureThing, // Know Sure Thing (KST) - EXPERIMENT #15-4
       indicators.trix, // Trix - EXPERIMENT #15-5
+
+      // EXPERIMENT #62: Advanced Market Microstructure Features (7 new features)
+      this.calculateOrderFlowImbalance(prices, volumes, 14), // orderFlowImbalance
+      this.calculateVolumeWeightedPrice(prices, volumes, 20), // volumeWeightedPrice
+      this.calculateSpreadProxy(prices, 10), // spreadProxy
+      this.calculateMomentumConvergence(prices, 5, 20), // momentumConvergence
+      this.calculateVolatilityRegime(prices, 20), // volatilityRegimeEnhanced
+      this.calculatePriceMomentumDivergence(prices, volumes, 14), // priceMomentumDivergence
+      this.calculateMarketEfficiencyRatio(prices, 20), // marketEfficiencyRatio
     ];
 
     return optimizedFeatures;
@@ -2480,5 +2489,173 @@ export default class FeatureCalculator {
     const trix = ((ema - prevEma) / prevEma) * 100;
 
     return trix;
+  }
+
+  // EXPERIMENT #62: Volatility Regime Features
+  public calculateVolatilityRegime(
+    prices: number[],
+    period: number = 20
+  ): number {
+    if (prices.length < period) return 0;
+
+    const recentPrices = prices.slice(-period);
+    const returns = [];
+
+    for (let i = 1; i < recentPrices.length; i++) {
+      returns.push(
+        (recentPrices[i] - recentPrices[i - 1]) / recentPrices[i - 1]
+      );
+    }
+
+    const volatility = Math.sqrt(
+      returns.reduce((sum, ret) => sum + ret * ret, 0) / returns.length
+    );
+    const avgVolatility =
+      returns.reduce((sum, ret) => sum + Math.abs(ret), 0) / returns.length;
+
+    // Regime indicator: high volatility periods
+    return volatility / (avgVolatility + 1e-8);
+  }
+
+  // EXPERIMENT #62: Price Momentum Divergence
+  public calculatePriceMomentumDivergence(
+    prices: number[],
+    volumes: number[],
+    period: number = 14
+  ): number {
+    if (prices.length < period || volumes.length < period) return 0;
+
+    const priceMomentum = this.calculateMomentum(prices, period);
+    const volumeMomentum = this.calculateMomentum(volumes, period);
+
+    // Divergence: when price and volume momentum disagree
+    const divergence =
+      Math.sign(priceMomentum) !== Math.sign(volumeMomentum)
+        ? Math.abs(priceMomentum) * Math.abs(volumeMomentum)
+        : 0;
+
+    return divergence;
+  }
+
+  // Helper method for momentum calculations
+  public calculateMomentum(values: number[], period: number): number {
+    if (values.length < period) return 0;
+
+    const recentValues = values.slice(-period);
+    const currentValue = recentValues[recentValues.length - 1];
+    const pastValue = recentValues[0];
+
+    return pastValue !== 0 ? (currentValue - pastValue) / pastValue : 0;
+  }
+
+  // EXPERIMENT #62: Advanced Market Microstructure Features - Order Flow Imbalance
+  public calculateOrderFlowImbalance(
+    prices: number[],
+    volumes: number[],
+    period: number = 14
+  ): number {
+    if (prices.length < period + 1 || volumes.length < period + 1) return 0;
+
+    let buyVolume = 0;
+    let sellVolume = 0;
+
+    for (let i = 1; i < period + 1; i++) {
+      const priceChange =
+        prices[prices.length - i] - prices[prices.length - i - 1];
+      const volume = volumes[volumes.length - i];
+
+      if (priceChange > 0) {
+        buyVolume += volume;
+      } else if (priceChange < 0) {
+        sellVolume += volume;
+      }
+    }
+
+    const totalVolume = buyVolume + sellVolume;
+    if (totalVolume === 0) return 0;
+
+    return (buyVolume - sellVolume) / totalVolume; // Range: [-1, 1]
+  }
+
+  // EXPERIMENT #62: Volume Profile Analysis
+  public calculateVolumeWeightedPrice(
+    prices: number[],
+    volumes: number[],
+    period: number = 20
+  ): number {
+    if (prices.length < period || volumes.length < period)
+      return prices[prices.length - 1];
+
+    const recentPrices = prices.slice(-period);
+    const recentVolumes = volumes.slice(-period);
+
+    const volumePriceSum = recentPrices.reduce(
+      (sum, price, i) => sum + price * recentVolumes[i],
+      0
+    );
+    const totalVolume = recentVolumes.reduce((sum, vol) => sum + vol, 0);
+
+    return totalVolume > 0
+      ? volumePriceSum / totalVolume
+      : prices[prices.length - 1];
+  }
+
+  // EXPERIMENT #62: Market Microstructure - Bid-Ask Spread Proxy
+  public calculateSpreadProxy(prices: number[], period: number = 10): number {
+    if (prices.length < period) return 0;
+
+    const recentPrices = prices.slice(-period);
+    const priceChanges = [];
+
+    for (let i = 1; i < recentPrices.length; i++) {
+      priceChanges.push(Math.abs(recentPrices[i] - recentPrices[i - 1]));
+    }
+
+    const avgPriceChange =
+      priceChanges.reduce((sum, change) => sum + change, 0) /
+      priceChanges.length;
+    const currentPrice = prices[prices.length - 1];
+
+    return avgPriceChange / currentPrice; // Normalized spread proxy
+  }
+
+  // EXPERIMENT #62: Multi-timeframe Momentum Convergence
+  public calculateMomentumConvergence(
+    prices: number[],
+    shortPeriod: number = 5,
+    longPeriod: number = 20
+  ): number {
+    if (prices.length < longPeriod) return 0;
+
+    const shortMomentum = this.calculateMomentum(prices, shortPeriod);
+    const longMomentum = this.calculateMomentum(prices, longPeriod);
+
+    // Convergence indicator: when short and long momentum align
+    const convergence =
+      Math.sign(shortMomentum) === Math.sign(longMomentum)
+        ? Math.min(Math.abs(shortMomentum), Math.abs(longMomentum))
+        : 0;
+
+    return convergence;
+  }
+
+  // EXPERIMENT #62: Market Efficiency Ratio
+  public calculateMarketEfficiencyRatio(
+    prices: number[],
+    period: number = 20
+  ): number {
+    if (prices.length < period) return 0;
+
+    const recentPrices = prices.slice(-period);
+    const totalDistance = Math.abs(
+      recentPrices[recentPrices.length - 1] - recentPrices[0]
+    );
+
+    let pathDistance = 0;
+    for (let i = 1; i < recentPrices.length; i++) {
+      pathDistance += Math.abs(recentPrices[i] - recentPrices[i - 1]);
+    }
+
+    return pathDistance > 0 ? totalDistance / pathDistance : 0; // Range: [0, 1]
   }
 }

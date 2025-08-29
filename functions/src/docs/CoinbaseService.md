@@ -211,9 +211,9 @@ enum Granularity {
 
 ```typescript
 interface AdvTradeCandle {
-  start: string; // Start time of the candle
-  low: string; // Lowest price during the period
-  high: string; // Highest price during the period
+  start: string; // ISO 8601 timestamp
+  low: string; // Lowest price during the interval
+  high: string; // Highest price during the interval
   open: string; // Opening price
   close: string; // Closing price
   volume: string; // Trading volume
@@ -222,112 +222,75 @@ interface AdvTradeCandle {
 
 ## Error Handling
 
-### Comprehensive Error Catching
+### Comprehensive Error Management
+
+The service implements robust error handling for various failure scenarios:
 
 ```typescript
 try {
-  const response = await this.client.getProductCandles(request);
-  // Process response
+  const currentPrice = await coinbaseService.getCurrentPrice(
+    CoinbaseProductIds.BTC
+  );
 } catch (error: any) {
-  console.error("Failed to fetch market data:", error.message || error);
-  throw error;
+  console.error("Failed to get current price:", error.message || error);
+  // Handle specific error types
+  if (error.code === "RATE_LIMIT_EXCEEDED") {
+    // Implement retry logic with exponential backoff
+  } else if (error.code === "INVALID_PRODUCT_ID") {
+    // Handle invalid product ID
+  }
 }
 ```
 
-**Error Scenarios Handled**:
+### Common Error Scenarios
 
-- **Network Failures**: Connection timeouts and network errors
-- **API Errors**: Invalid requests, authentication failures
-- **Data Parsing Errors**: Malformed responses or missing data
-- **Rate Limiting**: API quota exceeded errors
-
-**Error Propagation**:
-
-- Logs detailed error information for debugging
-- Re-throws errors to allow calling code to handle them appropriately
-- Maintains error context for proper error handling upstream
+1. **Rate Limiting**: API rate limits exceeded
+2. **Authentication**: Invalid API credentials
+3. **Network Issues**: Connection timeouts or failures
+4. **Invalid Parameters**: Incorrect product IDs or time ranges
+5. **Data Parsing**: Malformed API responses
 
 ## Performance Considerations
 
-### Request Optimization
+### Caching Strategy
 
-- **Efficient Data Fetching**: Uses appropriate granularity for data needs
-- **Minimal API Calls**: Consolidates data requests when possible
-- **Response Processing**: Efficient array operations for data transformation
-
-### Memory Management
-
-- **Streaming Processing**: Processes data in chunks to avoid memory issues
-- **Garbage Collection**: Proper cleanup of temporary variables
-- **Efficient Parsing**: Direct parsing without unnecessary object creation
-
-## Security Considerations
-
-### API Key Management
-
-- **Environment Variables**: API credentials stored securely in environment
-- **No Hardcoding**: Credentials never committed to source code
-- **Access Control**: Minimal required permissions for API keys
-
-### Request Validation
-
-- **Input Sanitization**: Validates all input parameters
-- **Type Safety**: TypeScript interfaces prevent invalid data types
-- **Error Boundaries**: Graceful handling of malformed requests
-
-## Integration Examples
-
-### Trading Strategy Integration
+For high-frequency applications, consider implementing caching:
 
 ```typescript
-import { CoinbaseService } from "./api/CoinbaseService";
-import { TradingStrategy } from "./cardano/TradingStrategy";
+// Example caching implementation
+private priceCache = new Map<string, { price: number; timestamp: number }>();
+private CACHE_DURATION = 60000; // 1 minute
 
-async function executeTradingStrategy() {
-  const coinbaseService = new CoinbaseService({
-    apiKey: process.env.COINBASE_API_KEY,
-    apiSecret: process.env.COINBASE_API_SECRET,
-  });
+public async getCurrentPriceWithCache(product_id: CoinbaseProductIds): Promise<number> {
+  const cacheKey = product_id;
+  const cached = this.priceCache.get(cacheKey);
 
-  const strategy = new TradingStrategy();
+  if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
+    return cached.price;
+  }
 
-  // Get current market data
-  const currentPrice = await coinbaseService.getCurrentPrice(
-    CoinbaseProductIds.ADA
-  );
-
-  // Get historical data for analysis
-  const now = Math.floor(Date.now() / 1000);
-  const start = now - TIME_CONVERSIONS.TIMESTEP_IN_SECONDS;
-
-  const adaData = await coinbaseService.getPricesAndVolumes({
-    product_id: CoinbaseProductIds.ADA,
-    granularity: Granularity.OneDay,
-    start: start.toString(),
-    end: now.toString(),
-  });
-
-  // Execute strategy with market data
-  const tradeDecision = await strategy.decideTrade({
-    currentPrice,
-    historicalPrices: adaData.prices,
-    historicalVolumes: adaData.volumes,
-    // ... other parameters
-  });
-
-  return tradeDecision;
+  const price = await this.getCurrentPrice(product_id);
+  this.priceCache.set(cacheKey, { price, timestamp: Date.now() });
+  return price;
 }
 ```
 
-### Price Monitoring Service
+### Rate Limiting
+
+The service respects Coinbase API rate limits:
+
+- **REST API**: 3 requests per second per API key
+- **WebSocket**: 30 messages per second per connection
+- **Automatic Backoff**: Implement exponential backoff for rate limit errors
+
+## Integration Examples
+
+### Trading System Integration
 
 ```typescript
-import { CoinbaseService } from "./api/CoinbaseService";
-import { CoinbaseProductIds } from "../types";
-
-class PriceMonitor {
+// Integration with trading system
+class TradingSystem {
   private coinbaseService: CoinbaseService;
-  private monitoringInterval: NodeJS.Timeout;
 
   constructor() {
     this.coinbaseService = new CoinbaseService({
@@ -336,22 +299,50 @@ class PriceMonitor {
     });
   }
 
-  startMonitoring(intervalMs: number = 60000) {
+  async executeTrade(symbol: CoinbaseProductIds, action: "buy" | "sell") {
+    const currentPrice = await this.coinbaseService.getCurrentPrice(symbol);
+    // Execute trade logic based on current price
+  }
+
+  async analyzeMarket(symbol: CoinbaseProductIds) {
+    const now = Math.floor(Date.now() / 1000);
+    const start = now - 30 * 24 * 60 * 60; // 30 days ago
+
+    const marketData = await this.coinbaseService.getPricesAndVolumes({
+      product_id: symbol,
+      granularity: Granularity.OneDay,
+      start: start.toString(),
+      end: now.toString(),
+    });
+
+    // Perform technical analysis on market data
+    return this.calculateIndicators(marketData.prices, marketData.volumes);
+  }
+}
+```
+
+### Real-time Price Monitoring
+
+```typescript
+// Real-time price monitoring
+class PriceMonitor {
+  private coinbaseService: CoinbaseService;
+  private monitoringInterval: NodeJS.Timeout | null = null;
+
+  constructor() {
+    this.coinbaseService = new CoinbaseService({
+      apiKey: process.env.COINBASE_API_KEY,
+      apiSecret: process.env.COINBASE_API_SECRET,
+    });
+  }
+
+  startMonitoring(symbol: CoinbaseProductIds, intervalMs: number = 30000) {
     this.monitoringInterval = setInterval(async () => {
       try {
-        const adaPrice = await this.coinbaseService.getCurrentPrice(
-          CoinbaseProductIds.ADA
-        );
-        const btcPrice = await this.coinbaseService.getCurrentPrice(
-          CoinbaseProductIds.BTC
-        );
-
-        console.log(`ADA: $${adaPrice} | BTC: $${btcPrice}`);
-
-        // Check for price alerts
-        this.checkPriceAlerts(adaPrice, btcPrice);
+        const price = await this.coinbaseService.getCurrentPrice(symbol);
+        this.onPriceUpdate(symbol, price);
       } catch (error) {
-        console.error("Price monitoring failed:", error);
+        console.error(`Failed to get price for ${symbol}:`, error);
       }
     }, intervalMs);
   }
@@ -359,127 +350,104 @@ class PriceMonitor {
   stopMonitoring() {
     if (this.monitoringInterval) {
       clearInterval(this.monitoringInterval);
+      this.monitoringInterval = null;
     }
   }
 
-  private checkPriceAlerts(adaPrice: number, btcPrice: number) {
+  private onPriceUpdate(symbol: CoinbaseProductIds, price: number) {
+    console.log(`${symbol}: $${price}`);
     // Implement price alert logic
-    if (adaPrice > 1.0) {
-      console.log("ADA price alert: Above $1.00");
-    }
   }
-}
-```
-
-### Backtesting Data Collection
-
-```typescript
-import { CoinbaseService } from "./api/CoinbaseService";
-import { TIME_CONVERSIONS } from "../constants";
-
-async function collectBacktestData(days: number = 365) {
-  const coinbaseService = new CoinbaseService({
-    apiKey: process.env.COINBASE_API_KEY,
-    apiSecret: process.env.COINBASE_API_SECRET,
-  });
-
-  const now = Math.floor(Date.now() / 1000);
-  const start = now - days * TIME_CONVERSIONS.ONE_DAY_IN_SECONDS;
-
-  const [adaData, btcData] = await Promise.all([
-    coinbaseService.getPricesAndVolumes({
-      product_id: CoinbaseProductIds.ADA,
-      granularity: Granularity.OneDay,
-      start: start.toString(),
-      end: now.toString(),
-    }),
-    coinbaseService.getPricesAndVolumes({
-      product_id: CoinbaseProductIds.BTC,
-      granularity: Granularity.OneDay,
-      start: start.toString(),
-      end: now.toString(),
-    }),
-  ]);
-
-  return {
-    ada: adaData,
-    btc: btcData,
-    metadata: {
-      startDate: new Date(start * 1000),
-      endDate: new Date(now * 1000),
-      totalDays: days,
-      dataPoints: adaData.prices.length,
-    },
-  };
 }
 ```
 
 ## Testing
 
-### Unit Testing Strategy
-
-- **Mock API Responses**: Test with simulated Coinbase API responses
-- **Error Scenarios**: Test various error conditions and edge cases
-- **Data Processing**: Verify correct parsing and formatting of responses
-- **Configuration**: Test different API key configurations
-
-### Integration Testing
-
-- **Live API Testing**: Test with actual Coinbase API (sandbox environment)
-- **Rate Limiting**: Verify proper handling of API rate limits
-- **Data Consistency**: Ensure data integrity across different time periods
-- **Performance**: Measure response times and data processing efficiency
-
-### Test Data Requirements
-
-- **Valid Responses**: Real API response structures
-- **Error Responses**: Various error scenarios from the API
-- **Edge Cases**: Empty data, malformed responses, network timeouts
-- **Performance Data**: Large datasets for stress testing
-
-## Monitoring and Logging
-
-### Request Logging
+### Unit Testing
 
 ```typescript
-console.log(`Fetching current price for ${product_id}`);
-console.log(`Retrieved ${response.candles.length} candles`);
-console.log(`Current price: $${currentPrice}`);
+// Example unit test
+describe("CoinbaseService", () => {
+  let coinbaseService: CoinbaseService;
+
+  beforeEach(() => {
+    coinbaseService = new CoinbaseService({
+      apiKey: "test-key",
+      apiSecret: "test-secret",
+    });
+  });
+
+  it("should get current price for BTC", async () => {
+    const price = await coinbaseService.getCurrentPrice(CoinbaseProductIds.BTC);
+    expect(typeof price).toBe("number");
+    expect(price).toBeGreaterThan(0);
+  });
+
+  it("should handle API errors gracefully", async () => {
+    // Mock API error
+    jest
+      .spyOn(coinbaseService["client"], "getProductCandles")
+      .mockRejectedValue(new Error("API Error"));
+
+    await expect(
+      coinbaseService.getCurrentPrice(CoinbaseProductIds.BTC)
+    ).rejects.toThrow("API Error");
+  });
+});
 ```
 
-### Error Logging
+## Best Practices
+
+### Security
+
+1. **Environment Variables**: Never hardcode API credentials
+2. **Credential Rotation**: Regularly rotate API keys
+3. **Access Control**: Use minimal required permissions
+4. **Error Logging**: Avoid logging sensitive data
+
+### Performance
+
+1. **Caching**: Implement appropriate caching for frequently accessed data
+2. **Rate Limiting**: Respect API rate limits
+3. **Connection Pooling**: Reuse HTTP connections when possible
+4. **Error Handling**: Implement retry logic with exponential backoff
+
+### Monitoring
+
+1. **API Usage**: Monitor API call frequency and success rates
+2. **Response Times**: Track API response times
+3. **Error Rates**: Monitor error rates and types
+4. **Data Quality**: Validate received data quality
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Authentication Errors**: Verify API key and secret are correct
+2. **Rate Limit Errors**: Implement exponential backoff
+3. **Network Timeouts**: Check network connectivity
+4. **Data Parsing Errors**: Verify API response format
+
+### Debug Mode
+
+Enable debug logging for troubleshooting:
 
 ```typescript
-console.error("Failed to get current price:", error.message || error);
-console.error("Failed to fetch market data:", error.message || error);
+// Enable debug mode
+const coinbaseService = new CoinbaseService({
+  apiKey: process.env.COINBASE_API_KEY,
+  apiSecret: process.env.COINBASE_API_SECRET,
+});
+
+// Debug logging
+console.log("API Configuration:", {
+  hasApiKey: !!process.env.COINBASE_API_KEY,
+  hasApiSecret: !!process.env.COINBASE_API_SECRET,
+});
 ```
 
-### Performance Metrics
+## Conclusion
 
-- **Response Times**: Track API response latency
-- **Success Rates**: Monitor API call success/failure rates
-- **Data Volume**: Track amount of data processed
-- **Error Frequency**: Monitor error patterns and frequency
+The CoinbaseService provides a robust, type-safe interface for interacting with the Coinbase Advanced Trade API. Its comprehensive error handling, performance optimizations, and ease of integration make it an essential component for cryptocurrency trading applications.
 
-## Future Enhancements
-
-### Potential Improvements
-
-- **Caching Layer**: Implement response caching for frequently requested data
-- **Batch Requests**: Support for multiple product requests in single API call
-- **WebSocket Integration**: Real-time price updates via WebSocket connections
-- **Rate Limit Management**: Automatic backoff and retry logic
-
-### Advanced Features
-
-- **Data Compression**: Efficient storage and transmission of historical data
-- **Predictive Caching**: Intelligent caching based on usage patterns
-- **Multi-Exchange Support**: Integration with additional cryptocurrency exchanges
-- **Advanced Analytics**: Built-in technical analysis and market insights
-
-### Integration Enhancements
-
-- **Event-Driven Architecture**: Publish price updates to message queues
-- **Microservice Integration**: Service mesh integration for distributed systems
-- **Cloud-Native Features**: Kubernetes and container orchestration support
-- **Observability**: Enhanced metrics, tracing, and monitoring capabilities
+The service abstracts away the complexity of API interactions while providing the flexibility needed for various trading scenarios. Whether used for real-time price monitoring, historical data analysis, or automated trading systems, the CoinbaseService delivers reliable and efficient access to cryptocurrency market data.

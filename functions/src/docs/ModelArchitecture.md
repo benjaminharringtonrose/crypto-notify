@@ -6,24 +6,16 @@ This document provides a comprehensive explanation of the crypto trading model a
 
 ## Model Architecture Summary
 
-The model follows a **CNN-LSTM-Dense** hybrid architecture specifically designed for time series prediction in cryptocurrency markets:
+The model follows a **Conv1D-LSTM-Dense** architecture specifically designed for time series prediction in cryptocurrency markets:
 
 ```
-Input (30 timesteps × 36 features)
+Input (35 timesteps × 26 features)
     ↓
-Conv1D Layer 1 (12 filters, kernel=5) + BatchNorm + Dropout(0.2)
+Conv1D Layer (48 filters, kernel=3) + BatchNorm + Dropout(0.3)
     ↓
-Conv1D Layer 2 (24 filters, kernel=3) + BatchNorm + Dropout(0.2)
+LSTM Layer (64 units, return_sequences=False) + RecurrentDropout(0.1)
     ↓
-LSTM Layer 1 (48 units, return_sequences=True) + BatchNorm + Dropout(0.35)
-    ↓
-LSTM Layer 2 (24 units, return_sequences=True) + BatchNorm + Dropout(0.35)
-    ↓
-LSTM Layer 3 (12 units, return_sequences=False) + BatchNorm + Dropout(0.35)
-    ↓
-Dense Layer 1 (24 units, ReLU) + BatchNorm + Dropout(0.35)
-    ↓
-Dense Layer 2 (12 units, ReLU) + BatchNorm + Dropout(0.175)
+Dense Layer (32 units, ReLU) + Dropout(0.3)
     ↓
 Output Layer (2 units, Softmax)
 ```
@@ -33,14 +25,14 @@ Output Layer (2 units, Softmax)
 ### 1. Input Layer
 
 - **Shape**: `[batch_size, timesteps, FeatureDetector.getFeatureCount()]`
-- **Timesteps**: Configurable (typically 20-30 days of historical data)
-- **Features**: Dynamic count determined by `FeatureDetector.getFeatureCount()`
+- **Timesteps**: 35 days of historical data
+- **Features**: 26 features (optimized from original 36 features)
 
 ### 2. Convolutional Layer (Feature Extraction)
 
 #### Conv1D Layer
 
-- **Filters**: 48 (proven optimal filter count)
+- **Filters**: 48 (proven optimal filter count from experiments)
 - **Kernel Size**: 3 (proven optimal kernel size)
 - **Activation**: ReLU
 - **Input Shape**: `[timesteps, FeatureDetector.getFeatureCount()]`
@@ -59,7 +51,7 @@ Output Layer (2 units, Softmax)
 - **Return Sequences**: False (proven: returnSequences=true failed)
 - **Input Shape**: `[timesteps, 48]` (from Conv1D output)
 - **Output Shape**: `[64]` (flattened for dense layer)
-- **Dropout**: 0.1 (recurrent dropout)
+- **Recurrent Dropout**: 0.1
 - **Purpose**: Capture temporal dependencies and extract sequential patterns
 - **Kernel Initializer**: HeNormal (proven optimal for ReLU activation)
 
@@ -67,7 +59,7 @@ Output Layer (2 units, Softmax)
 
 #### Dense Layer
 
-- **Units**: 32 (from current TradeModelFactory - simplified architecture)
+- **Units**: 32 (proven optimal - 48 units caused severe overfitting)
 - **Activation**: ReLU
 - **Input Shape**: `[64]` (from LSTM output)
 - **Output Shape**: `[32]`
@@ -86,81 +78,69 @@ Output Layer (2 units, Softmax)
 
 ### Input Features
 
-The model uses technical indicators and features computed from Bitcoin price and volume data, with the count determined dynamically by `FeatureDetector.getFeatureCount()`:
+The model uses 26 optimized technical indicators and features computed from Bitcoin price and volume data:
 
-1. **Momentum Indicators**:
+1. **Core Features (4 features)**:
 
-   - RSI (14-period) and previous RSI
-   - Stochastic RSI and signal line
-   - Price momentum and volatility-adjusted momentum
+   - High-low price range
+   - Price volatility
+   - Price position in recent range
+   - Relative volume indicator
 
-2. **Trend Indicators**:
+2. **Technical Indicators (5 features)**:
 
-   - SMA (7, 20, 21, 50, 200-day)
-   - MACD line and signal line
-   - Previous MACD line
+   - RSI momentum oscillator
+   - MACD signal line
+   - VWAP ratio
+   - Average True Range (ATR)
+   - On-Balance Volume (OBV)
 
-3. **Price Information**:
+3. **Enhanced Indicators (5 features)**:
 
-   - Current price and previous price
-   - VWAP (Volume Weighted Average Price)
+   - Raw momentum
+   - MACD histogram
+   - Price to SMA7 ratio
+   - Price to SMA21 ratio
+   - Price to SMA50 ratio
 
-4. **Volatility Indicators**:
+4. **Market Regime Features (5 features)**:
 
-   - ATR (Average True Range) and baseline
-   - Bollinger Bands (upper, lower)
-   - Z-score
-
-5. **Volume Indicators**:
-
-   - OBV (On-Balance Volume)
-   - Volume oscillator and previous volume oscillator
-   - Volume spike detection
-
-6. **Pattern Recognition**:
-
-   - Double top detection
-   - Head and shoulders detection
-   - Triple top detection
-   - Triple bottom detection
-
-7. **Market Regime Features**:
-
-   - Volatility regime score
    - Trend regime score
-   - Momentum regime score
-   - Realized volatility
-   - Overall regime score
+   - Volatility regime score
+   - Ichimoku Tenkan-sen (9-period)
+   - Ichimoku Kijun-sen (26-period)
+   - Ichimoku cloud position
 
-8. **Advanced Technical Features**:
-   - ADX proxy
-   - Trend regime
-   - Fibonacci levels
-   - Price-to-moving average ratios
-   - Volume ratios
-   - Normalized indicators
+5. **Advanced Microstructure Features (7 features)**:
+   - Williams %R momentum oscillator
+   - Volume MA20
+   - Volume oscillator
+   - Money Flow Index (MFI)
+   - Aroon Oscillator
+   - Donchian Channels position
+   - Parabolic SAR trend
 
 ## Training Configuration
 
 ### Hyperparameters
 
-- **Epochs**: 120
-- **Batch Size**: 32
-- **Initial Learning Rate**: 0.0008
-- **Minimum Learning Rate**: 0.000005
-- **Patience (Early Stopping)**: 20 epochs
-- **Train/Validation Split**: 85%/15%
+- **Epochs**: 35 (proven optimal - 50+ caused issues)
+- **Batch Size**: 16 (proven optimal balance for gradient updates)
+- **Initial Learning Rate**: 0.0005 (proven optimal baseline)
+- **Minimum Learning Rate**: 0.00005
+- **Patience (Early Stopping)**: 10 epochs
+- **Train/Validation Split**: 80%/20%
 
 ### Regularization
 
-- **L2 Regularization**: 0.008
-- **Dropout Rate**: 0.35 (main), 0.175 (final dense layer)
+- **L2 Regularization**: 0.001
+- **Dropout Rate**: 0.3 (main), 0.1 (recurrent)
 - **Gradient Clipping**: 1.0
 
 ### Loss Function
 
 - **Focal Loss** with parameters:
-  - Alpha: [0.35, 0.65] (class weights)
+  - Alpha: [0.45, 0.55] (class weights)
   - Gamma: 1.5 (focusing parameter)
 
 ### Optimizer
@@ -171,17 +151,11 @@ The model uses technical indicators and features computed from Bitcoin price and
 
 ### Data Preparation
 
-1. **Historical Data Fetching**: 1200 days of BTC data
-2. **Feature Calculation**: Technical indicators computed (count via `FeatureDetector.getFeatureCount()`)
-3. **Sequence Generation**: 30-day sliding windows
+1. **Historical Data Fetching**: 730 days of BTC data
+2. **Feature Calculation**: 26 technical indicators computed
+3. **Sequence Generation**: 35-day sliding windows
 4. **Data Normalization**: Z-score normalization per feature
 5. **Data Augmentation**: Noise injection and sequence balancing
-
-### Curriculum Learning
-
-- **Difficulty Progression**: Starts with easier samples, gradually increases complexity
-- **Sample Filtering**: Based on volatility and trend complexity scores
-- **Adaptive Training**: Adjusts training difficulty based on model performance
 
 ## Model Performance Metrics
 
@@ -215,17 +189,17 @@ The model uses technical indicators and features computed from Bitcoin price and
 
 ## Architecture Rationale
 
-### Why CNN-LSTM-Dense?
+### Why Conv1D-LSTM-Dense?
 
-1. **CNN Layers**: Extract local temporal patterns and reduce noise
-2. **LSTM Layers**: Capture long-term dependencies and temporal relationships
-3. **Dense Layers**: Learn complex feature combinations for final classification
+1. **Conv1D Layer**: Extract local temporal patterns and reduce noise
+2. **LSTM Layer**: Capture long-term dependencies and temporal relationships
+3. **Dense Layer**: Learn complex feature combinations for final classification
 
 ### Design Decisions
 
-1. **30 Timesteps**: Balance between sufficient history and computational efficiency
-2. **36 Features**: Comprehensive technical analysis without overfitting
-3. **3 LSTM Layers**: Gradual temporal abstraction (48→24→12 units)
+1. **35 Timesteps**: Balance between sufficient history and computational efficiency
+2. **26 Features**: Optimized feature set based on gradual feature optimization
+3. **Single LSTM Layer**: Proven optimal for this dataset size
 4. **Batch Normalization**: Stabilize training and improve convergence
 5. **Dropout**: Prevent overfitting in deep architecture
 
@@ -233,24 +207,24 @@ The model uses technical indicators and features computed from Bitcoin price and
 
 ### Computational Complexity
 
-- **Parameters**: ~50K trainable parameters
-- **Memory Usage**: ~200MB during training
-- **Training Time**: ~2-4 hours for 120 epochs
+- **Parameters**: ~35K trainable parameters
+- **Memory Usage**: ~150MB during training
+- **Training Time**: ~73 seconds for 35 epochs
 - **Inference Time**: <100ms per prediction
 
-### Optimization Opportunities
+### Optimization History
 
-1. **Batch Size**: Can be increased to 64-128 for faster training
-2. **Model Complexity**: LSTM units can be reduced for speed
-3. **Feature Count**: Less important features can be removed
-4. **Timesteps**: Can be reduced from 30 to 20-25
+The current architecture is the result of systematic experimentation:
+
+- **Experiment #1**: Threshold optimization (0.0015 → 0.001)
+- **Experiment #3**: Conv1D filters optimization (32 → 48)
+- **Experiment #61**: Advanced market microstructure features (36 → 26 optimized)
 
 ## Future Enhancements
 
 ### Potential Improvements
 
-1. **Attention Mechanisms**: Add self-attention for better feature weighting
-2. **Residual Connections**: Improve gradient flow in deep layers
-3. **Multi-head Architecture**: Separate models for different market conditions
-4. **Ensemble Methods**: Combine multiple model predictions
-5. **Online Learning**: Continuous model updates with new data
+1. **Feature Selection**: Further optimize the 26-feature set
+2. **Attention Mechanisms**: Add self-attention for better feature weighting
+3. **Ensemble Methods**: Combine multiple model predictions
+4. **Online Learning**: Continuous model updates with new data

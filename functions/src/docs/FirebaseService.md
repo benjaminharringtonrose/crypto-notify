@@ -200,243 +200,270 @@ Provides direct access to Google Cloud Storage bucket operations:
 this.bucket = admin.storage().bucket();
 ```
 
-**Bucket Operations Available**:
+## File Operations
 
-- **File Upload**: Store model weights and configuration files
-- **File Download**: Retrieve model weights for inference
-- **File Management**: Delete, copy, and move storage objects
-- **Metadata Access**: File information and properties
+### Model Weight Storage
 
-## Usage Examples
-
-### Basic Service Access
+The service is primarily used for storing and retrieving model weights:
 
 ```typescript
-import { FirebaseService } from "./api/FirebaseService";
+// Store model weights
+const bucket = FirebaseService.getInstance().getBucket();
+const file = bucket.file("tradePredictorWeights.json");
 
-// Get the singleton instance
-const firebaseService = FirebaseService.getInstance();
-
-// Access the storage bucket
-const bucket = firebaseService.getBucket();
+await file.save(JSON.stringify(modelWeights), {
+  metadata: {
+    contentType: "application/json",
+    metadata: {
+      modelVersion: "1.0.0",
+      timestamp: new Date().toISOString(),
+    },
+  },
+});
 ```
 
-### Model Weight Management
+### Model Weight Retrieval
 
 ```typescript
-import { FirebaseService } from "./api/FirebaseService";
-import { FILE_NAMES } from "../constants";
+// Retrieve model weights
+const bucket = FirebaseService.getInstance().getBucket();
+const file = bucket.file("tradePredictorWeights.json");
 
-class ModelWeightManager {
-  private bucket: Bucket;
+const [exists] = await file.exists();
+if (exists) {
+  const [data] = await file.download();
+  const modelWeights = JSON.parse(data.toString());
+  return modelWeights;
+}
+```
+
+## Integration Examples
+
+### Trading Model Integration
+
+```typescript
+// Integration with trading model
+class TradingModel {
+  private firebaseService: FirebaseService;
 
   constructor() {
-    this.bucket = FirebaseService.getInstance().getBucket();
+    this.firebaseService = FirebaseService.getInstance();
   }
 
-  async saveWeights(weights: any): Promise<void> {
-    const file = this.bucket.file(FILE_NAMES.WEIGHTS);
-    const weightsJson = JSON.stringify({ weights });
+  async saveModelWeights(weights: any, version: string = "1.0.0") {
+    const bucket = this.firebaseService.getBucket();
+    const file = bucket.file("tradePredictorWeights.json");
 
-    await file.save(weightsJson, {
+    const weightData = {
+      weights,
+      metadata: {
+        version,
+        timestamp: new Date().toISOString(),
+        modelType: "bitcoin-trading",
+        features: 26,
+        architecture: "Conv1D-LSTM-Dense",
+      },
+    };
+
+    await file.save(JSON.stringify(weightData), {
       metadata: {
         contentType: "application/json",
         metadata: {
+          modelVersion: version,
           timestamp: new Date().toISOString(),
-          version: "1.0.0",
         },
       },
     });
+
+    console.log(`Model weights saved successfully: ${version}`);
   }
 
-  async loadWeights(): Promise<any> {
-    const file = this.bucket.file(FILE_NAMES.WEIGHTS);
-    const [weightsData] = await file.download();
-    return JSON.parse(weightsData.toString("utf8"));
+  async loadModelWeights(): Promise<any> {
+    const bucket = this.firebaseService.getBucket();
+    const file = bucket.file("tradePredictorWeights.json");
+
+    try {
+      const [exists] = await file.exists();
+      if (!exists) {
+        throw new Error("Model weights file not found");
+      }
+
+      const [data] = await file.download();
+      const weightData = JSON.parse(data.toString());
+
+      console.log(`Model weights loaded: ${weightData.metadata.version}`);
+      return weightData.weights;
+    } catch (error) {
+      console.error("Failed to load model weights:", error);
+      throw error;
+    }
   }
 }
 ```
 
-### File Operations
+### Backup and Versioning
 
 ```typescript
-import { FirebaseService } from "./api/FirebaseService";
-
-class StorageManager {
-  private bucket: Bucket;
+// Model versioning and backup
+class ModelVersionManager {
+  private firebaseService: FirebaseService;
 
   constructor() {
-    this.bucket = FirebaseService.getInstance().getBucket();
+    this.firebaseService = FirebaseService.getInstance();
   }
 
-  async listFiles(prefix: string = ""): Promise<string[]> {
-    const [files] = await this.bucket.getFiles({ prefix });
+  async createBackup(weights: any, version: string) {
+    const bucket = this.firebaseService.getBucket();
+    const backupFile = bucket.file(`backups/model-weights-${version}.json`);
+
+    const backupData = {
+      weights,
+      metadata: {
+        version,
+        timestamp: new Date().toISOString(),
+        backupType: "manual",
+        originalFile: "tradePredictorWeights.json",
+      },
+    };
+
+    await backupFile.save(JSON.stringify(backupData), {
+      metadata: {
+        contentType: "application/json",
+        metadata: {
+          version,
+          timestamp: new Date().toISOString(),
+        },
+      },
+    });
+
+    console.log(`Backup created: model-weights-${version}.json`);
+  }
+
+  async listBackups(): Promise<string[]> {
+    const bucket = this.firebaseService.getBucket();
+    const [files] = await bucket.getFiles({ prefix: "backups/" });
+
     return files.map((file) => file.name);
   }
 
-  async deleteFile(filename: string): Promise<void> {
-    const file = this.bucket.file(filename);
-    await file.delete();
-  }
+  async restoreBackup(version: string): Promise<any> {
+    const bucket = this.firebaseService.getBucket();
+    const backupFile = bucket.file(`backups/model-weights-${version}.json`);
 
-  async getFileMetadata(filename: string): Promise<any> {
-    const file = this.bucket.file(filename);
-    const [metadata] = await file.getMetadata();
-    return metadata;
-  }
+    const [data] = await backupFile.download();
+    const backupData = JSON.parse(data.toString());
 
-  async copyFile(source: string, destination: string): Promise<void> {
-    const sourceFile = this.bucket.file(source);
-    const destFile = this.bucket.file(destination);
-    await sourceFile.copy(destFile);
-  }
-}
-```
-
-### Configuration Management
-
-```typescript
-import { FirebaseService } from "./api/FirebaseService";
-
-class ConfigManager {
-  private bucket: Bucket;
-
-  constructor() {
-    this.bucket = FirebaseService.getInstance().getBucket();
-  }
-
-  async saveConfig(configName: string, config: any): Promise<void> {
-    const file = this.bucket.file(`configs/${configName}.json`);
-    const configJson = JSON.stringify(config, null, 2);
-
-    await file.save(configJson, {
+    // Restore to main weights file
+    const mainFile = bucket.file("tradePredictorWeights.json");
+    await mainFile.save(JSON.stringify(backupData), {
       metadata: {
         contentType: "application/json",
         metadata: {
-          lastModified: new Date().toISOString(),
-          version: "1.0.0",
+          modelVersion: version,
+          timestamp: new Date().toISOString(),
+          restoredFrom: `backups/model-weights-${version}.json`,
         },
       },
     });
-  }
 
-  async loadConfig(configName: string): Promise<any> {
-    const file = this.bucket.file(`configs/${configName}.json`);
-    const [configData] = await file.download();
-    return JSON.parse(configData.toString("utf8"));
-  }
-
-  async listConfigs(): Promise<string[]> {
-    const [files] = await this.bucket.getFiles({ prefix: "configs/" });
-    return files.map((file) =>
-      file.name.replace("configs/", "").replace(".json", "")
-    );
-  }
-}
-```
-
-## Integration with Other Services
-
-### ModelWeightManager Integration
-
-The FirebaseService is primarily used by the ModelWeightManager for neural network weight storage:
-
-```typescript
-import { FirebaseService } from "../api/FirebaseService";
-import { Bucket } from "@google-cloud/storage";
-
-export class ModelWeightManager {
-  private bucket: Bucket;
-
-  constructor() {
-    this.bucket = FirebaseService.getInstance().getBucket();
-  }
-
-  // ... weight management methods
-}
-```
-
-### TradeModelPredictor Integration
-
-Used during model initialization to ensure Firebase is available:
-
-```typescript
-import { FirebaseService } from "../api/FirebaseService";
-
-export class TradeModelPredictor {
-  constructor() {
-    // Ensure Firebase is initialized
-    FirebaseService.getInstance();
-
-    // ... other initialization
-  }
-}
-```
-
-### TradeModelTrainer Integration
-
-Used during model training to ensure Firebase services are available:
-
-```typescript
-import { FirebaseService } from "../api/FirebaseService";
-
-export class TradeModelTrainer {
-  constructor() {
-    // Initialize Firebase service
-    FirebaseService.getInstance();
-
-    // ... training setup
+    console.log(`Backup restored: ${version}`);
+    return backupData.weights;
   }
 }
 ```
 
 ## Error Handling
 
-### Initialization Errors
+### Comprehensive Error Management
 
-The service handles Firebase initialization failures gracefully:
+The service provides robust error handling for various failure scenarios:
 
 ```typescript
-try {
-  if (!admin.apps.length) {
-    admin.initializeApp({
-      credential: admin.credential.cert(
-        require("../../../serviceAccount.json")
-      ),
-      storageBucket: process.env.STORAGE_BUCKET,
-    });
+class FirebaseServiceError extends Error {
+  constructor(message: string, public code: string, public details?: any) {
+    super(message);
+    this.name = "FirebaseServiceError";
   }
-} catch (error) {
-  console.error("Firebase initialization failed:", error);
-  throw new Error("Firebase service unavailable");
+}
+
+// Error handling example
+async function safeFileOperation(operation: () => Promise<any>) {
+  try {
+    return await operation();
+  } catch (error: any) {
+    if (error.code === "storage/unauthorized") {
+      throw new FirebaseServiceError(
+        "Firebase authentication failed",
+        "AUTH_ERROR",
+        error
+      );
+    } else if (error.code === "storage/not-found") {
+      throw new FirebaseServiceError(
+        "File not found in storage",
+        "FILE_NOT_FOUND",
+        error
+      );
+    } else {
+      throw new FirebaseServiceError(
+        "Firebase storage operation failed",
+        "STORAGE_ERROR",
+        error
+      );
+    }
+  }
 }
 ```
 
-### Service Account Errors
+### Common Error Scenarios
 
-Handles missing or invalid service account credentials:
+1. **Authentication Errors**: Invalid service account credentials
+2. **Permission Errors**: Insufficient storage bucket permissions
+3. **Network Errors**: Connection timeouts or network failures
+4. **File Not Found**: Attempting to access non-existent files
+5. **Quota Exceeded**: Storage quota or rate limit exceeded
+
+## Performance Considerations
+
+### Connection Pooling
+
+The singleton pattern ensures efficient connection management:
 
 ```typescript
-// Service account file not found
-if (!require("../../../serviceAccount.json")) {
-  throw new Error("Firebase service account not found");
-}
+// Efficient connection reuse
+const firebaseService = FirebaseService.getInstance();
+const bucket = firebaseService.getBucket();
 
-// Invalid credentials
-try {
-  admin.credential.cert(require("../../../serviceAccount.json"));
-} catch (error) {
-  throw new Error("Invalid Firebase service account credentials");
-}
+// Multiple operations use the same connection
+const file1 = bucket.file("file1.json");
+const file2 = bucket.file("file2.json");
 ```
 
-### Environment Configuration Errors
+### Caching Strategy
 
-Validates required environment variables:
+For frequently accessed data, consider implementing caching:
 
 ```typescript
-if (!process.env.STORAGE_BUCKET) {
-  throw new Error("STORAGE_BUCKET environment variable not set");
+class CachedFirebaseService {
+  private cache = new Map<string, { data: any; timestamp: number }>();
+  private CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+  async getCachedFile(filePath: string): Promise<any> {
+    const cached = this.cache.get(filePath);
+
+    if (cached && Date.now() - cached.timestamp < this.CACHE_DURATION) {
+      return cached.data;
+    }
+
+    const firebaseService = FirebaseService.getInstance();
+    const bucket = firebaseService.getBucket();
+    const file = bucket.file(filePath);
+
+    const [data] = await file.download();
+    const parsedData = JSON.parse(data.toString());
+
+    this.cache.set(filePath, { data: parsedData, timestamp: Date.now() });
+    return parsedData;
+  }
 }
 ```
 
@@ -444,179 +471,214 @@ if (!process.env.STORAGE_BUCKET) {
 
 ### Service Account Security
 
-- **Credential Management**: Service account stored securely in JSON file
-- **Access Control**: Minimal required permissions for storage operations
-- **Environment Isolation**: Credentials not committed to source code
-- **Rotation Support**: Easy credential rotation through file replacement
+1. **Credential Protection**: Store service account JSON securely
+2. **Access Control**: Use minimal required permissions
+3. **Environment Isolation**: Separate credentials for different environments
+4. **Regular Rotation**: Periodically rotate service account keys
 
-### Storage Security
+### Data Security
 
-- **Bucket Access**: Controlled access through Firebase Admin SDK
-- **File Permissions**: Proper file access controls and metadata
-- **Audit Logging**: Firebase provides comprehensive access logs
-- **Encryption**: Google Cloud Storage provides encryption at rest
-
-### Network Security
-
-- **HTTPS Only**: All communications use encrypted HTTPS
-- **API Key Protection**: API keys stored in environment variables
-- **Request Validation**: Input validation and sanitization
-- **Rate Limiting**: Firebase provides built-in rate limiting
-
-## Performance Considerations
-
-### Connection Management
-
-- **Singleton Pattern**: Single Firebase connection across application
-- **Connection Pooling**: Efficient connection reuse
-- **Lazy Initialization**: Firebase initialized only when needed
-- **Resource Cleanup**: Automatic cleanup through Firebase Admin SDK
-
-### Storage Operations
-
-- **Efficient Bucket Access**: Direct bucket reference for fast operations
-- **Batch Operations**: Support for bulk file operations
-- **Streaming**: Support for streaming uploads and downloads
-- **Caching**: Firebase provides built-in caching mechanisms
+1. **Encryption**: Enable server-side encryption for sensitive data
+2. **Access Logging**: Monitor file access patterns
+3. **Version Control**: Maintain audit trail of file changes
+4. **Backup Security**: Secure backup storage locations
 
 ## Testing
 
-### Unit Testing Strategy
+### Unit Testing
 
-- **Mock Firebase**: Test with mocked Firebase Admin SDK
-- **Singleton Testing**: Verify singleton pattern behavior
-- **Error Scenarios**: Test various initialization failures
-- **Configuration Testing**: Test different environment configurations
+```typescript
+// Example unit test
+describe("FirebaseService", () => {
+  let firebaseService: FirebaseService;
+
+  beforeEach(() => {
+    // Mock Firebase Admin SDK
+    jest.mock("firebase-admin", () => ({
+      apps: [],
+      initializeApp: jest.fn(),
+      storage: jest.fn(() => ({
+        bucket: jest.fn(() => ({
+          file: jest.fn(() => ({
+            save: jest.fn(),
+            download: jest.fn(),
+            exists: jest.fn(),
+          })),
+        })),
+      })),
+    }));
+
+    firebaseService = FirebaseService.getInstance();
+  });
+
+  it("should return singleton instance", () => {
+    const instance1 = FirebaseService.getInstance();
+    const instance2 = FirebaseService.getInstance();
+    expect(instance1).toBe(instance2);
+  });
+
+  it("should provide bucket access", () => {
+    const bucket = firebaseService.getBucket();
+    expect(bucket).toBeDefined();
+  });
+});
+```
 
 ### Integration Testing
 
-- **Live Firebase**: Test with actual Firebase project
-- **Storage Operations**: Verify file upload/download functionality
-- **Performance Testing**: Measure storage operation performance
-- **Error Handling**: Test real Firebase error scenarios
+```typescript
+// Integration test with real Firebase
+describe("FirebaseService Integration", () => {
+  it("should save and retrieve model weights", async () => {
+    const firebaseService = FirebaseService.getInstance();
+    const bucket = firebaseService.getBucket();
 
-### Test Data Requirements
+    const testWeights = { layer1: [1, 2, 3], layer2: [4, 5, 6] };
+    const file = bucket.file("test-weights.json");
 
-- **Service Account**: Test service account credentials
-- **Storage Bucket**: Test bucket with appropriate permissions
-- **Test Files**: Sample files for upload/download testing
-- **Error Conditions**: Various error scenarios for testing
+    // Save weights
+    await file.save(JSON.stringify(testWeights));
+
+    // Retrieve weights
+    const [data] = await file.download();
+    const retrievedWeights = JSON.parse(data.toString());
+
+    expect(retrievedWeights).toEqual(testWeights);
+
+    // Cleanup
+    await file.delete();
+  });
+});
+```
 
 ## Monitoring and Logging
 
-### Service Status
+### Performance Monitoring
 
 ```typescript
-// Service initialization
-console.log("Firebase service initialized successfully");
+// Performance monitoring
+class FirebaseServiceMonitor {
+  private metrics = {
+    readOperations: 0,
+    writeOperations: 0,
+    errors: 0,
+    totalLatency: 0,
+  };
 
-// Service access
-console.log("Firebase service instance accessed");
+  async monitorOperation<T>(operation: () => Promise<T>): Promise<T> {
+    const startTime = Date.now();
+
+    try {
+      const result = await operation();
+      const latency = Date.now() - startTime;
+
+      this.metrics.totalLatency += latency;
+      console.log(`Operation completed in ${latency}ms`);
+
+      return result;
+    } catch (error) {
+      this.metrics.errors++;
+      console.error("Operation failed:", error);
+      throw error;
+    }
+  }
+
+  getMetrics() {
+    return {
+      ...this.metrics,
+      averageLatency:
+        this.metrics.totalLatency /
+        (this.metrics.readOperations + this.metrics.writeOperations),
+    };
+  }
+}
 ```
 
-### Error Logging
+### Logging Strategy
 
 ```typescript
-console.error("Firebase initialization failed:", error);
-console.error("Firebase service unavailable");
+// Structured logging
+const logger = {
+  info: (message: string, metadata?: any) => {
+    console.log(
+      JSON.stringify({
+        level: "info",
+        message,
+        timestamp: new Date().toISOString(),
+        service: "FirebaseService",
+        ...metadata,
+      })
+    );
+  },
+
+  error: (message: string, error?: any) => {
+    console.error(
+      JSON.stringify({
+        level: "error",
+        message,
+        timestamp: new Date().toISOString(),
+        service: "FirebaseService",
+        error: error?.message || error,
+      })
+    );
+  },
+};
 ```
 
-### Performance Metrics
+## Best Practices
 
-- **Initialization Time**: Firebase app initialization duration
-- **Bucket Access Time**: Storage bucket access latency
-- **Service Usage**: Frequency of service access
-- **Error Frequency**: Firebase-related error rates
+### Configuration Management
 
-## Future Enhancements
+1. **Environment Variables**: Use environment variables for configuration
+2. **Service Account**: Store service account JSON securely
+3. **Bucket Naming**: Use consistent bucket naming conventions
+4. **File Organization**: Organize files with clear directory structure
 
-### Potential Improvements
+### Error Handling
 
-- **Configuration Validation**: Enhanced environment variable validation
-- **Health Checks**: Firebase service health monitoring
-- **Retry Logic**: Automatic retry for failed operations
-- **Connection Pooling**: Advanced connection management
+1. **Graceful Degradation**: Handle errors without crashing the application
+2. **Retry Logic**: Implement exponential backoff for transient errors
+3. **Error Logging**: Log errors with sufficient context for debugging
+4. **Fallback Mechanisms**: Provide fallback options when Firebase is unavailable
 
-### Advanced Features
+### Performance Optimization
 
-- **Multi-Project Support**: Support for multiple Firebase projects
-- **Dynamic Configuration**: Runtime configuration updates
-- **Performance Monitoring**: Detailed performance metrics
-- **Advanced Caching**: Intelligent caching strategies
-
-### Integration Enhancements
-
-- **Event-Driven Architecture**: Firebase event integration
-- **Microservice Support**: Enhanced microservice integration
-- **Cloud-Native Features**: Kubernetes and container support
-- **Observability**: Enhanced metrics, tracing, and monitoring
+1. **Connection Reuse**: Leverage singleton pattern for connection efficiency
+2. **Batch Operations**: Group multiple operations when possible
+3. **Caching**: Implement appropriate caching for frequently accessed data
+4. **Async Operations**: Use async/await for non-blocking operations
 
 ## Troubleshooting
 
 ### Common Issues
 
-#### Service Account Not Found
-
-```bash
-Error: Firebase service account not found
-```
-
-**Solution**: Ensure `serviceAccount.json` exists in the correct location and has proper permissions.
-
-#### Storage Bucket Not Set
-
-```bash
-Error: STORAGE_BUCKET environment variable not set
-```
-
-**Solution**: Set the `STORAGE_BUCKET` environment variable with your Firebase project's storage bucket name.
-
-#### Firebase Initialization Failed
-
-```bash
-Error: Firebase initialization failed
-```
-
-**Solution**: Verify service account credentials and Firebase project configuration.
-
-#### Permission Denied
-
-```bash
-Error: Permission denied accessing storage bucket
-```
-
-**Solution**: Ensure service account has appropriate storage permissions in Firebase project.
+1. **Authentication Failures**: Verify service account credentials
+2. **Permission Errors**: Check bucket permissions and IAM roles
+3. **Network Timeouts**: Verify network connectivity and firewall settings
+4. **Quota Exceeded**: Monitor storage usage and implement cleanup
 
 ### Debug Mode
 
-Enable detailed logging for troubleshooting:
+Enable debug logging for troubleshooting:
 
 ```typescript
-// Enable Firebase debug logging
-process.env.FIREBASE_DEBUG = "true";
+// Debug configuration
+const DEBUG_MODE = process.env.FIREBASE_DEBUG === "true";
 
-// Access service with logging
-const firebaseService = FirebaseService.getInstance();
-```
-
-### Health Check
-
-Implement service health monitoring:
-
-```typescript
-class FirebaseHealthChecker {
-  static async checkHealth(): Promise<boolean> {
-    try {
-      const firebaseService = FirebaseService.getInstance();
-      const bucket = firebaseService.getBucket();
-
-      // Test bucket access
-      await bucket.getMetadata();
-      return true;
-    } catch (error) {
-      console.error("Firebase health check failed:", error);
-      return false;
-    }
-  }
+if (DEBUG_MODE) {
+  console.log("Firebase Service Debug Mode Enabled");
+  console.log("Storage Bucket:", process.env.STORAGE_BUCKET);
+  console.log(
+    "Service Account Path:",
+    require.resolve("../../../serviceAccount.json")
+  );
 }
 ```
+
+## Conclusion
+
+The FirebaseService provides a robust, efficient interface for Firebase Cloud Storage operations within the Bitcoin trading system. Its singleton pattern ensures optimal resource utilization while providing comprehensive error handling and performance monitoring capabilities.
+
+The service seamlessly integrates with the trading model architecture, enabling reliable storage and retrieval of model weights, backup management, and version control. Whether used for production model deployment or development testing, the FirebaseService delivers consistent, secure, and performant storage operations.
+
+The comprehensive error handling, security considerations, and monitoring capabilities make it an essential component for maintaining reliable model weight management in the trading system.

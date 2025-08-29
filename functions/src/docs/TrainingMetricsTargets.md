@@ -2,43 +2,43 @@
 
 ## Overview
 
-This document defines the specific target metrics for improving the Cardano trading model's training performance. These targets are based on the current system analysis and designed to achieve optimal prediction accuracy for profitable trading decisions.
+This document defines the specific target metrics for improving the Bitcoin trading model's training performance. These targets are based on the current system analysis and designed to achieve optimal prediction accuracy for profitable trading decisions.
 
 ## Current Performance Baseline
 
-**As of December 2024 (After Iterative Training):**
+**As of January 2025 (After Experiment #61 - Advanced Market Microstructure Features):**
 
 ### Model Performance Metrics:
 
-- **Balanced Accuracy**: 83.78% ✅ **ACHIEVED TARGET!**
-- **Buy F1 Score**: 0.8063 ✅ **EXCEEDED TARGET!**
-- **Sell F1 Score**: 0.8989 ✅ **EXCEEDED TARGET!**
-- **Buy Precision**: 0.9753 ✅ **EXCEEDED TARGET!**
-- **Sell Precision**: 0.8243 ✅ **EXCEEDED TARGET!**
-- **Buy Recall**: 0.6872 ✅ **EXCEEDED TARGET!**
-- **Sell Recall**: 0.9883 ✅ **EXCEEDED TARGET!**
-- **Matthews Correlation Coefficient**: 0.7350 ✅ **EXCEEDED TARGET!**
+- **Validation Accuracy**: 57.37% ⚠️ **NEEDS IMPROVEMENT**
+- **Buy F1 Score**: 0.4442 ⚠️ **NEEDS IMPROVEMENT**
+- **Sell F1 Score**: 0.6376 ✅ **ACCEPTABLE**
+- **Buy Precision**: 66.34% ⚠️ **NEEDS IMPROVEMENT**
+- **Sell Precision**: 54.76% ⚠️ **NEEDS IMPROVEMENT**
+- **Buy Recall**: 29.91% ❌ **CRITICAL ISSUE**
+- **Sell Recall**: 84.82% ✅ **EXCELLENT**
+- **Matthews Correlation Coefficient**: 0.1763 ⚠️ **NEEDS IMPROVEMENT**
 
 ### Trading Performance Metrics:
 
-- **Win Rate**: 47.50% ❌ **NEEDS IMPROVEMENT**
-- **Total Return**: 23.96% ✅ **IMPROVED**
-- **Annualized Return**: 10.61% ✅ **IMPROVED**
-- **Sharpe Ratio**: 1.53 ❌ **NEEDS IMPROVEMENT**
-- **Max Drawdown**: 3.78% ✅ **ACCEPTABLE**
+- **Win Rate**: ~58-60% ⚠️ **NEEDS IMPROVEMENT**
+- **Total Return**: ~15-20% ⚠️ **NEEDS IMPROVEMENT**
+- **Annualized Return**: ~8-10% ⚠️ **NEEDS IMPROVEMENT**
+- **Sharpe Ratio**: ~1.2-1.5 ⚠️ **NEEDS IMPROVEMENT**
+- **Max Drawdown**: ~3-5% ✅ **ACCEPTABLE**
 
 ## Primary Target Metrics
 
-### 1. Win Rate Target: 75%
+### 1. Win Rate Target: 70%
 
 **Current**: ~58-60%  
-**Target**: 75%  
-**Gap**: +15-17 percentage points
+**Target**: 70%  
+**Gap**: +10-12 percentage points
 
 **Rationale**:
 
 - Win rate is the most critical metric for profitable trading
-- 75% win rate provides sufficient margin for transaction costs and slippage
+- 70% win rate provides sufficient margin for transaction costs and slippage
 - Achievable with improved model confidence and better strategy selection
 
 **Measurement**:
@@ -47,15 +47,15 @@ This document defines the specific target metrics for improving the Cardano trad
 - Monitor consistency across different market conditions
 - Ensure win rate stability over time
 
-### 2. Balanced Accuracy Target: 75%
+### 2. Validation Accuracy Target: 65%
 
-**Current**: 58.47%  
-**Target**: 75%  
-**Gap**: +16.53 percentage points
+**Current**: 57.37%  
+**Target**: 65%  
+**Gap**: +7.63 percentage points
 
 **Rationale**:
 
-- Balanced accuracy provides overall model performance measure
+- Validation accuracy provides overall model performance measure
 - Accounts for class imbalance in trading datasets
 - More reliable than simple accuracy for imbalanced data
 
@@ -67,9 +67,9 @@ This document defines the specific target metrics for improving the Cardano trad
 
 ### 3. Buy/Sell F1 Score Balance Target: <0.1 Difference
 
-**Current**: Buy F1 (0.3893) vs Sell F1 (0.7714) = 0.3821 difference  
+**Current**: Buy F1 (0.4442) vs Sell F1 (0.6376) = 0.1934 difference  
 **Target**: <0.1 difference  
-**Gap**: Reduce imbalance by 0.2821
+**Gap**: Reduce imbalance by 0.0934
 
 **Rationale**:
 
@@ -83,31 +83,31 @@ This document defines the specific target metrics for improving the Cardano trad
 - Aim for |Buy F1 - Sell F1| < 0.1
 - Monitor during training and validation
 
-### 4. Prediction Confidence Target: 0.7+ Average
+### 4. Buy Recall Target: 60%
 
-**Current**: 0.4-0.6 range  
-**Target**: 0.7+ average  
-**Gap**: +0.1-0.3 improvement
+**Current**: 29.91%  
+**Target**: 60%  
+**Gap**: +30.09 percentage points
 
 **Rationale**:
 
-- Higher confidence indicates stronger model conviction
-- Reduces false positive trades
-- Enables better position sizing decisions
+- Buy recall is critically low and needs major improvement
+- Higher buy recall enables more trading opportunities
+- Essential for capturing upward price movements
 
 **Measurement**:
 
-- Track average confidence across all predictions
-- Monitor confidence distribution (target: fewer low-confidence predictions)
-- Ensure confidence correlates with accuracy
+- Track buy signal detection rate
+- Monitor false negative rate for buy signals
+- Ensure balanced buy/sell signal generation
 
 ## Secondary Target Metrics
 
 ### 5. Sharpe Ratio Target: >2.0
 
-**Current**: 1.24-6.67 (varies by period)  
+**Current**: 1.2-1.5  
 **Target**: >2.0 consistently  
-**Gap**: Improve worst-case performance
+**Gap**: Improve risk-adjusted returns
 
 **Rationale**:
 
@@ -115,10 +115,10 @@ This document defines the specific target metrics for improving the Cardano trad
 - > 2.0 indicates excellent risk-adjusted performance
 - Ensures consistent performance across market conditions
 
-### 6. Maximum Drawdown Target: <2%
+### 6. Maximum Drawdown Target: <3%
 
-**Current**: 1-2.5%  
-**Target**: <2%  
+**Current**: 3-5%  
+**Target**: <3%  
 **Gap**: Reduce worst-case drawdown
 
 **Rationale**:
@@ -127,37 +127,37 @@ This document defines the specific target metrics for improving the Cardano trad
 - Enables more aggressive position sizing
 - Improves investor confidence
 
-### 7. Average Holding Period Target: <30 days
+### 7. Matthews Correlation Target: >0.3
 
-**Current**: 799 days  
-**Target**: <30 days  
-**Gap**: Dramatic reduction needed
-
-**Rationale**:
-
-- Shorter holding periods increase trading frequency
-- Reduces exposure to adverse market movements
-- Enables faster capital deployment
-
-### 8. Strategy Diversification Target: <50% Single Strategy
-
-**Current**: Heavy momentum strategy bias  
-**Target**: <50% reliance on any single strategy  
-**Gap**: Improve strategy distribution
+**Current**: 0.1763  
+**Target**: >0.3  
+**Gap**: +0.1237 improvement
 
 **Rationale**:
 
-- Diversified strategies reduce overfitting
-- Adapts to different market conditions
-- Improves overall system robustness
+- MCC is robust to class imbalance
+- > 0.3 indicates good model performance
+- Better measure than accuracy for imbalanced datasets
+
+### 8. Combined F1 Score Target: >1.2
+
+**Current**: 1.0818  
+**Target**: >1.2  
+**Gap**: +0.1182 improvement
+
+**Rationale**:
+
+- Combined F1 provides balanced performance measure
+- > 1.2 indicates strong overall model performance
+- Accounts for both buy and sell prediction quality
 
 ## Model-Specific Training Targets
 
 ### 9. Validation Loss Target: <0.08
 
-**Current**: 0.0990 (best achieved)  
+**Current**: ~0.12  
 **Target**: <0.08  
-**Gap**: -0.019 improvement
+**Gap**: -0.04 improvement
 
 **Rationale**:
 
@@ -165,57 +165,7 @@ This document defines the specific target metrics for improving the Cardano trad
 - Prevents overfitting to training data
 - Ensures model learns meaningful patterns
 
-### 10. Matthews Correlation Coefficient Target: >0.4
-
-**Current**: 0.2072  
-**Target**: >0.4  
-**Gap**: +0.1928 improvement
-
-**Rationale**:
-
-- MCC is robust to class imbalance
-- > 0.4 indicates good model performance
-- Better measure than accuracy for imbalanced datasets
-
-### 11. Precision-Recall Balance Target: <0.1 Difference
-
-**Current**: Significant imbalance between precision and recall  
-**Target**: <0.1 difference for both buy and sell  
-**Gap**: Balance precision and recall
-
-**Rationale**:
-
-- Balanced precision-recall indicates good model calibration
-- Prevents over-prediction or under-prediction bias
-- Ensures reliable trading signals
-
-## Training Process Targets
-
-### 12. Training Convergence Target: <100 Epochs
-
-**Current**: 120 epochs (early stopping at 91)  
-**Target**: <100 epochs  
-**Gap**: Faster convergence
-
-**Rationale**:
-
-- Faster convergence indicates better learning
-- Reduces training time and computational cost
-- Prevents overfitting from excessive training
-
-### 13. Learning Rate Efficiency Target: Stable Learning
-
-**Current**: Learning rate reduction from 0.0001 to 0.000001  
-**Target**: More stable learning rate progression  
-**Gap**: Better learning rate scheduling
-
-**Rationale**:
-
-- Stable learning indicates good optimization
-- Prevents learning rate collapse
-- Enables better model convergence
-
-### 14. Class Balance Target: 40-60% Buy Ratio
+### 10. Class Balance Target: 40-60% Buy Ratio
 
 **Current**: Varies from 0.000 to 0.674  
 **Target**: 40-60% buy ratio consistently  
@@ -227,36 +177,48 @@ This document defines the specific target metrics for improving the Cardano trad
 - Prevents bias toward majority class
 - Enables better buy signal prediction
 
+### 11. Training Stability Target: Consistent Learning
+
+**Current**: Early stopping at epoch 27  
+**Target**: Stable learning through full training  
+**Gap**: Improve training stability
+
+**Rationale**:
+
+- Stable training indicates good optimization
+- Prevents premature convergence
+- Enables better model convergence
+
 ## Implementation Priority
 
-### Phase 1 (Immediate - 1-2 weeks): Core Metrics
+### Phase 1 (Immediate - 1-2 weeks): Critical Fixes
 
-1. **Win Rate**: Target 65% (current: ~58-60%)
-2. **Balanced Accuracy**: Target 65% (current: 58.47%)
-3. **Buy F1 Score**: Target 0.5+ (current: 0.3893)
-4. **Prediction Confidence**: Target 0.6+ average
+1. **Buy Recall**: Target 50% (current: 29.91%)
+2. **Validation Accuracy**: Target 60% (current: 57.37%)
+3. **Buy F1 Score**: Target 0.55+ (current: 0.4442)
+4. **Training Stability**: Eliminate early stopping issues
 
 ### Phase 2 (Short-term - 2-4 weeks): Balance Metrics
 
-1. **Buy/Sell F1 Balance**: Target <0.2 difference
-2. **Precision-Recall Balance**: Target <0.15 difference
-3. **Class Balance**: Target 45-55% buy ratio
-4. **Validation Loss**: Target <0.09
+1. **Buy/Sell F1 Balance**: Target <0.15 difference
+2. **Class Balance**: Target 45-55% buy ratio
+3. **Validation Loss**: Target <0.10
+4. **Matthews Correlation**: Target >0.25
 
-### Phase 3 (Medium-term - 1-2 months): Advanced Metrics
+### Phase 3 (Medium-term - 1-2 months): Performance Metrics
 
-1. **Win Rate**: Target 70%+
-2. **Balanced Accuracy**: Target 70%+
-3. **Sharpe Ratio**: Target >2.0 consistently
-4. **Strategy Diversification**: Target <60% single strategy
+1. **Win Rate**: Target 65%+
+2. **Validation Accuracy**: Target 65%+
+3. **Sharpe Ratio**: Target >1.8
+4. **Combined F1 Score**: Target >1.15
 
 ### Phase 4 (Long-term - 2-3 months): Optimal Performance
 
-1. **Win Rate**: Target 75%
-2. **Balanced Accuracy**: Target 75%
+1. **Win Rate**: Target 70%
+2. **Validation Accuracy**: Target 65%
 3. **Buy/Sell F1 Balance**: Target <0.1 difference
-4. **Prediction Confidence**: Target 0.7+ average
-5. **Maximum Drawdown**: Target <2%
+4. **Buy Recall**: Target 60%
+5. **Maximum Drawdown**: Target <3%
 
 ## Measurement and Tracking
 
@@ -292,28 +254,28 @@ This document defines the specific target metrics for improving the Cardano trad
 
 ### Minimum Viable Performance
 
-- Win Rate: 65%+
-- Balanced Accuracy: 65%+
+- Win Rate: 60%+
+- Validation Accuracy: 60%+
 - Buy F1 Score: 0.5+
-- Prediction Confidence: 0.6+ average
+- Buy Recall: 50%+
 
 ### Target Performance
 
-- Win Rate: 75%
-- Balanced Accuracy: 75%
+- Win Rate: 70%
+- Validation Accuracy: 65%
 - Buy/Sell F1 Balance: <0.1 difference
-- Prediction Confidence: 0.7+ average
+- Buy Recall: 60%
 - Sharpe Ratio: >2.0
-- Maximum Drawdown: <2%
+- Maximum Drawdown: <3%
 
 ### Optimal Performance
 
-- Win Rate: 80%+
-- Balanced Accuracy: 80%+
+- Win Rate: 75%+
+- Validation Accuracy: 70%+
 - Buy/Sell F1 Balance: <0.05 difference
-- Prediction Confidence: 0.8+ average
-- Sharpe Ratio: >3.0
-- Maximum Drawdown: <1.5%
+- Buy Recall: 65%+
+- Sharpe Ratio: >2.5
+- Maximum Drawdown: <2%
 
 ## Risk Mitigation
 
@@ -340,6 +302,13 @@ This document defines the specific target metrics for improving the Cardano trad
 
 ## Conclusion
 
-These target metrics provide a clear roadmap for improving the Cardano trading model's performance. The phased approach ensures steady progress while maintaining system stability. Regular monitoring and adjustment of these targets will guide the development toward optimal trading performance.
+These target metrics provide a clear roadmap for improving the Bitcoin trading model's performance. The phased approach ensures steady progress while maintaining system stability. Regular monitoring and adjustment of these targets will guide the development toward optimal trading performance.
 
 The focus should be on achieving balanced performance across all metrics rather than optimizing any single metric at the expense of others. This balanced approach will result in a more robust and profitable trading system.
+
+**Critical Focus Areas**:
+
+1. **Buy Signal Performance**: Major improvement needed in buy recall and F1 score
+2. **Class Balance**: Address severe sell bias in current model
+3. **Training Stability**: Eliminate early stopping and convergence issues
+4. **Overall Accuracy**: Improve validation accuracy from 57.37% to 65%+

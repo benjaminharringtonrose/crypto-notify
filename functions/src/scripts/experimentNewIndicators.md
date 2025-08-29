@@ -26,6 +26,11 @@
 **Round 14**: Momentum Divergence Index (MDI), Volume Price Confirmation (VPC), Price Momentum Index (PMI), Volatility Breakout Index (VBI), Support Resistance Momentum (SRM)
 **Round 15**: Awesome Oscillator (AO), Ehlers Fisher Transform, McGinley Dynamic, Know Sure Thing (KST), Trix
 
+**Random ones not to test**:
+
+- bollingerSqueeze
+- rsiDivergence
+
 **Total Tested Indicators**: 75+ indicators across 15 rounds
 
 **MODEL PURPOSE**: The Bitcoin trading model predicts whether to **BUY** or **SELL** Bitcoin 7 days into the future based on current market conditions and technical indicators.

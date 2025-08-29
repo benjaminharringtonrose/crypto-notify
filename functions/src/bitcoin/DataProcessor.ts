@@ -1,8 +1,8 @@
 import { CryptoCompareService } from "../api/CryptoCompareService";
-import { PERIODS } from "../constants";
 import { HistoricalData, ModelConfig } from "../types";
 import FeatureCalculator from "./FeatureCalculator";
 import { FeatureDetector } from "./FeatureDetector";
+import { EnhancedDataProcessor } from "./EnhancedDataProcessor";
 
 const cryptoCompare = new CryptoCompareService();
 
@@ -10,10 +10,12 @@ export class DataProcessor {
   private readonly config: ModelConfig;
   private readonly startDaysAgo: number;
   private difficultyLevel: number = 1.0; // New: curriculum learning difficulty level
+  private enhancedProcessor: EnhancedDataProcessor; // Phase 1: Enhanced data processing
 
   constructor(config: ModelConfig, startDaysAgo: number) {
     this.config = config;
     this.startDaysAgo = startDaysAgo;
+    this.enhancedProcessor = new EnhancedDataProcessor(); // Initialize enhanced processor
   }
 
   // New: Set difficulty level for curriculum learning
@@ -99,12 +101,17 @@ export class DataProcessor {
   private async fetchHistoricalData(): Promise<{
     btcData: HistoricalData;
   }> {
-    console.log("Fetching historical data...");
     const btcData = await cryptoCompare.getHistoricalData(
       "BTC",
       this.startDaysAgo
     );
-    console.log(`BTC data length: ${btcData.prices.length}`);
+
+    console.log(`Retrieved ${btcData.prices.length} days of BTC data`);
+    console.log(`Latest price: $${btcData.prices[btcData.prices.length - 1]}`);
+    console.log(
+      `Latest volume: ${btcData.volumes[btcData.volumes.length - 1]}`
+    );
+
     return { btcData };
   }
 
@@ -112,145 +119,67 @@ export class DataProcessor {
     btcData: HistoricalData,
     index: number
   ): number[][] | null {
+    if (index < this.config.timesteps - 1) {
+      return null;
+    }
+
     const sequence: number[][] = [];
-    for (let j = index - this.config.timesteps + 1; j <= index; j++) {
-      const btcFeatures = this.computeFeatures(btcData, j);
+    const startIndex = index - this.config.timesteps + 1;
+
+    for (let i = startIndex; i <= index; i++) {
+      const btcFeatures = this.computeFeatures(btcData, i);
       if (!this.validateFeatures(btcFeatures)) {
-        console.log(
-          `Invalid features at index ${j}: btcFeatures length=${btcFeatures.length}`
-        );
         return null;
       }
-      const atr = new FeatureCalculator().calculateATR(
-        btcData.prices.slice(0, j + 1),
-        PERIODS.ATR
-      );
-      const scale = 1 + atr * (0.9 + Math.random() * 0.2); // Volatility-based noise
-      const noisyFeatures = this.addNoise(btcFeatures, scale);
-      sequence.push(noisyFeatures);
+      sequence.push(btcFeatures);
     }
-    return this.adjustSequenceLength(sequence);
+
+    // Ensure sequence has correct length
+    while (sequence.length < this.config.timesteps) {
+      sequence.unshift(
+        sequence[0] || Array(FeatureDetector.getFeatureCount()).fill(0)
+      );
+    }
+
+    return sequence;
   }
 
   private computeFeatures(btcData: HistoricalData, index: number): number[] {
-    const featureCalculator = new FeatureCalculator();
-    const btcFeatures = featureCalculator.compute({
+    const calculator = new FeatureCalculator();
+    const btcFeatures = calculator.compute({
       prices: btcData.prices,
       volumes: btcData.volumes,
       dayIndex: index,
       currentPrice: btcData.prices[index],
     });
+
     return btcFeatures;
   }
 
   private validateFeatures(btcFeatures: number[]): boolean {
-    return (
-      Array.isArray(btcFeatures) &&
-      btcFeatures.length === FeatureDetector.getFeatureCount()
-    );
-  }
+    if (!btcFeatures || btcFeatures.length === 0) {
+      return false;
+    }
 
-  private addNoise(features: number[], scale: number): number[] {
-    // Simplified but effective data augmentation
-    const noiseLevel = 0.01; // Very low noise for stability
-    const shiftProb = 0.2; // 20% chance of temporal shift
-
-    if (Math.random() < shiftProb) {
-      // Add slight temporal shift for robustness
-      const shift = Math.floor(Math.random() * 3) - 1; // -1, 0, or 1
-      if (shift !== 0) {
-        const shiftedFeatures = [...features];
-        // Apply small shift to price-related features (first few features)
-        for (let i = 0; i < Math.min(10, features.length); i++) {
-          shiftedFeatures[i] = features[i] * (1 + shift * 0.005);
-        }
-        return shiftedFeatures.map(
-          (f) => f * scale + (Math.random() - 0.5) * noiseLevel
-        );
+    // Check for NaN or Infinity values
+    for (const feature of btcFeatures) {
+      if (isNaN(feature) || !isFinite(feature)) {
+        return false;
       }
     }
 
-    // Simple noise addition
-    return features.map((f) => f * scale + (Math.random() - 0.5) * noiseLevel);
+    return true;
   }
 
-  private adjustSequenceLength(sequence: number[][]): number[][] {
-    while (sequence.length < this.config.timesteps)
-      sequence.unshift(sequence[0]);
-    while (sequence.length > this.config.timesteps) sequence.pop();
-    return sequence;
-  }
-
+  // Phase 1: Enhanced dataset balancing with SMOTE
   private balanceDataset(
     X: number[][][],
     y: number[]
   ): { X: number[][][]; y: number[] } {
-    const buySamples = X.filter((_, i) => y[i] === 1);
-    const sellSamples = X.filter((_, i) => y[i] === 0);
+    console.log("🔧 Phase 1: Applying enhanced dataset balancing...");
 
-    console.log(
-      `Before balancing - Buy samples: ${buySamples.length}, Sell samples: ${sellSamples.length}`
-    );
-
-    // Ensure we have both classes
-    if (buySamples.length === 0 || sellSamples.length === 0) {
-      console.warn(
-        "Warning: Missing one of the classes, using original dataset"
-      );
-      return { X, y };
-    }
-
-    // Use all available samples but ensure minimum balance
-    const minSamples = Math.min(buySamples.length, sellSamples.length);
-    const maxSamples = Math.max(buySamples.length, sellSamples.length);
-    const targetSamplesPerClass = Math.min(
-      minSamples,
-      Math.floor(maxSamples * 0.8)
-    ); // Ensure reasonable balance
-
-    const balancedX: number[][][] = [];
-    const balancedY: number[] = [];
-
-    // Add buy samples (exactly targetSamplesPerClass)
-    const selectedBuySamples = buySamples.slice(0, targetSamplesPerClass);
-    selectedBuySamples.forEach((sample) => {
-      balancedX.push(sample);
-      balancedY.push(1);
-    });
-
-    // Add sell samples (exactly targetSamplesPerClass)
-    const selectedSellSamples = sellSamples.slice(0, targetSamplesPerClass);
-    selectedSellSamples.forEach((sample) => {
-      balancedX.push(sample);
-      balancedY.push(0);
-    });
-
-    // Shuffle the balanced dataset
-    const indices = Array.from({ length: balancedX.length }, (_, i) => i);
-    for (let i = indices.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [indices[i], indices[j]] = [indices[j], indices[i]];
-    }
-
-    const shuffledX = indices.map((i) => balancedX[i]);
-    const shuffledY = indices.map((i) => balancedY[i]);
-
-    console.log(
-      `After balancing - Buy samples: ${
-        shuffledY.filter((l) => l === 1).length
-      }, Sell samples: ${shuffledY.filter((l) => l === 0).length}`
-    );
-
-    // Final safety check
-    if (
-      shuffledY.filter((l) => l === 1).length === 0 ||
-      shuffledY.filter((l) => l === 0).length === 0
-    ) {
-      console.error("Error: Still missing one of the classes after balancing!");
-      return { X, y }; // Return original dataset as fallback
-    }
-
-    return { X: shuffledX, y: shuffledY };
+    // Use enhanced processor for SMOTE-based balancing
+    return this.enhancedProcessor.enhancedBalanceDataset(X, y);
   }
 
   private labelData({
@@ -290,46 +219,49 @@ export class DataProcessor {
     return label;
   }
 
+  // Phase 1: Enhanced feature statistics with robust normalization
   public computeFeatureStats(features: number[][]): {
     mean: number[];
     std: number[];
+    selectedFeatures: number[];
+    normalizationStats: any;
   } {
-    const numFeatures = features[0].length;
-    const means = Array(numFeatures).fill(0);
-    const stds = Array(numFeatures).fill(0);
+    console.log("🔧 Phase 1: Computing enhanced feature statistics...");
 
-    // Compute means
-    features.forEach((seq) => seq.forEach((val, i) => (means[i] += val)));
-    means.forEach((sum, i) => (means[i] = sum / features.length));
+    // Apply robust normalization and feature selection
+    const { stats, selectedFeatures } =
+      this.enhancedProcessor.robustNormalize(features);
 
-    // Compute robust standard deviations
-    features.forEach((seq) =>
-      seq.forEach((val, i) => (stds[i] += (val - means[i]) ** 2))
-    );
-    stds.forEach((sum, i) => {
-      const variance = sum / features.length;
-      // Use robust std calculation with minimum threshold
-      stds[i] = Math.sqrt(variance) || 0.01; // Minimum std to prevent division by zero
-    });
-
-    // Clip extreme values to prevent outliers from dominating
-    const maxStd = 10; // Maximum allowed standard deviation
-    stds.forEach((std, i) => {
-      if (std > maxStd) {
-        stds[i] = maxStd;
-      }
+    // Convert back to mean/std format for compatibility with existing code
+    const means = stats.median; // Use median instead of mean for robustness
+    const stds = stats.mad.map((mad: number) => {
+      const std = mad * 1.4826; // Convert MAD to approximate std
+      return std === 0 ? 1.0 : std; // Use 1.0 as fallback for zero MAD
     });
 
     console.log(
-      `Feature means: ${means.slice(0, 5).map((m) => m.toFixed(4))}...`
+      `Enhanced feature stats - Selected features: ${selectedFeatures.length}, Original: ${features[0].length}`
     );
     console.log(
-      `Feature stds: ${stds.slice(0, 5).map((s) => s.toFixed(4))}...`
+      `Feature medians: ${means
+        .slice(0, 5)
+        .map((m: number) => m.toFixed(4))}...`
     );
-    return { mean: means, std: stds };
+    console.log(
+      `Feature MADs: ${stds.slice(0, 5).map((s: number) => s.toFixed(4))}...`
+    );
+
+    return {
+      mean: means,
+      std: stds,
+      selectedFeatures,
+      normalizationStats: stats,
+    };
   }
 
   public async prepareData(): Promise<{ X: number[][][]; y: number[] }> {
+    console.log("🚀 Phase 1: Starting enhanced data preparation...");
+
     const { btcData } = await this.fetchHistoricalData();
     const X: number[][][] = [];
     const y: number[] = [];
@@ -351,6 +283,14 @@ export class DataProcessor {
       y.push(label);
     }
 
+    console.log(`📊 Raw data - Total samples: ${X.length}`);
+    console.log(
+      `📊 Raw data - Buy samples: ${
+        y.filter((l) => l === 1).length
+      }, Sell samples: ${y.filter((l) => l === 0).length}`
+    );
+
+    // Phase 1: Apply enhanced balancing with SMOTE
     const balancedData = this.balanceDataset(X, y);
 
     // Apply curriculum learning filter based on difficulty level
@@ -360,8 +300,24 @@ export class DataProcessor {
     );
 
     console.log(
-      `Total samples: ${balancedData.X.length}, Filtered samples: ${filteredData.X.length}`
+      `✅ Phase 1 Complete - Final dataset: ${filteredData.X.length} samples`
     );
+    console.log(
+      `📊 Final distribution - Buy: ${
+        filteredData.y.filter((l) => l === 1).length
+      }, Sell: ${filteredData.y.filter((l) => l === 0).length}`
+    );
+
     return { X: filteredData.X, y: filteredData.y };
+  }
+
+  // Phase 1: Get selected feature indices for model creation
+  public getSelectedFeatureIndices(): number[] {
+    return this.enhancedProcessor.getSelectedFeatureIndices();
+  }
+
+  // Phase 1: Get normalization statistics
+  public getNormalizationStats(): any {
+    return this.enhancedProcessor.getNormalizationStats();
   }
 }

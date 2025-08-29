@@ -35,6 +35,10 @@ export class TradeModelTrainer {
   private seed: number;
   private currentFeatureName?: string; // For tracking which feature is being evaluated
 
+  // Phase 1: Dynamic feature management
+  private selectedFeatureIndices: number[] = [];
+  private dynamicFeatureCount: number = 0;
+
   // Final metrics for analysis
   private finalMetrics: {
     balancedAccuracy: number;
@@ -72,7 +76,7 @@ export class TradeModelTrainer {
       this.config,
       TRAINING_CONFIG.START_DAYS_AGO
     );
-    console.log("TradeModelTrainer initialized");
+    console.log("TradeModelTrainer initialized with Phase 1 enhancements");
   }
 
   /**
@@ -97,46 +101,69 @@ export class TradeModelTrainer {
     X: number[][][],
     y: number[]
   ): Promise<{ X_mean: tf.Tensor; X_std: tf.Tensor }> {
-    // Dynamic feature detection and validation
-    const detectedFeatureCount = FeatureDetector.getFeatureCount();
-    const actualFeatureCount = X[0][0].length;
+    // Phase 1: First compute feature stats to get selected features
+    console.log("🔧 Phase 1: Computing feature statistics and selection...");
+    const featureStats = this.dataProcessor.computeFeatureStats(
+      X.flat(1) // Use original X for feature stats computation
+    );
+
+    // Get selected feature indices from the computed stats
+    this.selectedFeatureIndices = featureStats.selectedFeatures;
+    this.dynamicFeatureCount = this.selectedFeatureIndices.length;
 
     console.log(
-      `Input data dimensions: [${X.length}, ${X[0].length}, ${actualFeatureCount}]`
+      `🔧 Phase 1: Selected ${this.dynamicFeatureCount} features from ${X[0][0].length} original features`
+    );
+
+    // Phase 1: Apply feature selection to training data
+    const selectedX = X.map((sample) =>
+      sample.map((timestep) =>
+        this.selectedFeatureIndices.map((index) => timestep[index])
+      )
+    );
+
+    // Dynamic feature detection and validation
+    const detectedFeatureCount = FeatureDetector.getFeatureCount();
+    const actualFeatureCount = selectedX[0][0].length;
+
+    console.log(
+      `Input data dimensions: [${selectedX.length}, ${selectedX[0].length}, ${actualFeatureCount}]`
     );
     console.log(
       `🔍 Expected features: ${detectedFeatureCount}, Actual: ${actualFeatureCount}`
     );
 
-    if (X[0].length !== this.config.timesteps) {
+    if (selectedX[0].length !== this.config.timesteps) {
       throw new Error(
-        `Data timestep mismatch: expected ${this.config.timesteps}, got ${X[0].length}`
+        `Data timestep mismatch: expected ${this.config.timesteps}, got ${selectedX[0].length}`
       );
     }
 
-    if (actualFeatureCount !== detectedFeatureCount) {
-      throw new Error(
-        `Feature count mismatch! Expected ${detectedFeatureCount}, got ${actualFeatureCount}. ` +
-          `This suggests inconsistent feature calculation.`
-      );
-    }
-
-    const X_tensor = tf.tensor3d(X, [
-      X.length,
+    // Phase 1: Use dynamic feature count for model creation
+    const X_tensor = tf.tensor3d(selectedX, [
+      selectedX.length,
       this.config.timesteps,
-      detectedFeatureCount, // Dynamic feature count!
+      this.dynamicFeatureCount, // Use dynamic feature count!
     ]);
     const y_tensor = tf.tensor2d(
       y.map((label) => [label === 0 ? 1 : 0, label === 1 ? 1 : 0]),
       [y.length, TRAINING_CONFIG.OUTPUT_CLASSES]
     );
-    const featureStats = this.dataProcessor.computeFeatureStats(X.flat(1));
-    const X_mean = tf.tensor1d(featureStats.mean);
-    const X_std = tf.tensor1d(featureStats.std);
+
+    // Extract only the selected features from the computed stats
+    const selectedMeans = this.selectedFeatureIndices.map(
+      (i) => featureStats.mean[i]
+    );
+    const selectedStds = this.selectedFeatureIndices.map(
+      (i) => featureStats.std[i]
+    );
+
+    const X_mean = tf.tensor1d(selectedMeans);
+    const X_std = tf.tensor1d(selectedStds);
     const X_normalized = X_tensor.sub(X_mean).div(X_std);
 
     try {
-      const totalSamples = X.length;
+      const totalSamples = selectedX.length;
       const numChunks = Math.ceil(
         totalSamples / TRAINING_CONFIG.SHUFFLE_CHUNK_SIZE
       );
@@ -194,9 +221,10 @@ export class TradeModelTrainer {
         })
         .batch(this.config.batchSize);
 
+      // Phase 1: Use dynamic feature count for model creation
       const factory = new TradeModelFactory(
         this.config.timesteps,
-        detectedFeatureCount // Dynamic feature count!
+        this.dynamicFeatureCount // Use dynamic feature count!
       );
       this.model = factory.createModel(this.seed);
 
@@ -374,8 +402,12 @@ export class TradeModelTrainer {
     if (!this.model) throw new Error("Model not initialized");
     console.log("Saving simplified model weights...");
 
-    // REVERTED: Back to proven baseline weight saving
+    // Phase 1: Save selected feature indices and dynamic feature count
     const weights = {
+      // Phase 1: Feature selection metadata
+      selectedFeatureIndices: this.selectedFeatureIndices,
+      dynamicFeatureCount: this.dynamicFeatureCount,
+
       // Conv1D layer
       conv1Weights: Array.from(
         await this.model.getLayer("conv1d_input").getWeights()[0].data()
@@ -460,5 +492,15 @@ export class TradeModelTrainer {
 
   public getMatthewsCorrelation(): number {
     return this.finalMetrics.matthewsCorrelation;
+  }
+
+  // Phase 1: Get selected feature indices
+  public getSelectedFeatureIndices(): number[] {
+    return this.selectedFeatureIndices;
+  }
+
+  // Phase 1: Get dynamic feature count
+  public getDynamicFeatureCount(): number {
+    return this.dynamicFeatureCount;
   }
 }

@@ -64,7 +64,7 @@ function printStats(label: string, stats: TrainingStats, unit: string = "") {
 }
 
 async function runMultipleTrainingSessions() {
-  const NUM_RUNS = 5; // Number of training runs for statistical analysis
+  const NUM_RUNS = 1; // Number of training runs for statistical analysis
   const RANDOM_SEEDS = [42, 123, 456, 789, 999]; // Fixed seeds for reproducibility
   const results: TrainingResult[] = [];
 

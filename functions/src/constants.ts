@@ -104,7 +104,7 @@ export const TRAINING_CONFIG = {
   BYTES_TO_MB: 1024 * 1024,
   MS_TO_SECONDS: 1000,
   GAMMA: 1.5, // PROVEN OPTIMAL: Found in experiments, prevents class collapse
-  ALPHA: [0.45, 0.55] as [number, number], // 7DAY-1: More balanced for 7-day predictions
+  ALPHA: [0.3, 0.7] as [number, number], // ADJUSTED: More weight to minority class (Buy) to fix imbalance
   GRADIENT_CLIP_NORM: 1.0, // REDUCED: 5.0 → 1.0 for natural gradients
   LR_DECAY_RATE: 0.8, // REDUCED: was 0.92, now 0.8 for more aggressive decay
   WARMUP_EPOCHS: 2, // REDUCED: was 5, now 2 for faster warmup

@@ -9,9 +9,6 @@ export class Metrics {
     alphaArr: [number, number] = TRAINING_CONFIG.ALPHA
   ): tf.Scalar {
     try {
-      // Use standard cross-entropy with label smoothing for better learning
-      const labelSmoothing = 0.1;
-
       // Apply softmax to get probabilities
       const probs = yPred.softmax();
 
@@ -20,27 +17,30 @@ export class Metrics {
       const gatheredProbs = tf.gather(probs, yTrueIndices, 1);
       const pt = gatheredProbs.squeeze();
 
-      // Apply label smoothing
-      const smoothedPt = tf.add(
-        tf.mul(pt, tf.sub(1, labelSmoothing)),
-        tf.mul(labelSmoothing, 0.5)
+      // Calculate focal loss with class-specific alpha weights
+      const alpha = tf.where(
+        yTrueIndices.equal(1), // Buy class (minority)
+        tf.scalar(alphaArr[1]), // Higher weight for minority class
+        tf.scalar(alphaArr[0]) // Lower weight for majority class
       );
 
-      // Simple cross-entropy loss with smoothing
-      const ce = tf.log(tf.add(smoothedPt, 1e-8));
-      const loss = tf.neg(ce);
+      // Focal loss formula: -alpha * (1 - pt)^gamma * log(pt)
+      const focalWeight = tf.pow(tf.sub(1, pt), gamma);
+      const ce = tf.log(tf.add(pt, 1e-8));
+      const focalLoss = tf.neg(tf.mul(alpha, tf.mul(focalWeight, ce)));
 
       // Clean up tensors
       probs.dispose();
       gatheredProbs.dispose();
       pt.dispose();
-      smoothedPt.dispose();
+      alpha.dispose();
+      focalWeight.dispose();
       ce.dispose();
 
-      return loss.mean() as tf.Scalar;
+      return focalLoss.mean() as tf.Scalar;
     } catch (error) {
       console.warn(
-        "Loss calculation failed, falling back to cross-entropy:",
+        "Focal loss calculation failed, falling back to cross-entropy:",
         error
       );
       // Fallback to standard cross-entropy

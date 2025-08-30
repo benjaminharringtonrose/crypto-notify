@@ -104,22 +104,14 @@ export interface RLReward {
   total: number;
   components: {
     returns: number;
-    profitBonus: number;
-    trendBonus: number;
-    explorationBonus: number;
-    momentumBonus: number;
-    survivalBonus: number;
-    doNothingBonus: number;
+    profitIncentive: number;
+    lossPenalty: number;
+    stabilityBonus: number;
+    survivalIncentive: number;
+    regimeIncentive: number;
+    riskBonus: number;
     transactionCosts: number;
-    riskPenalty: number;
-    volatilityPenalty: number;
-    holdingPenalty: number;
     drawdownPenalty: number;
-    // New reward components
-    regimeBonus: number; // Bonus for trading in favorable regimes
-    hybridBonus: number; // Bonus for successful hybrid decisions
-    riskManagementBonus: number; // Bonus for good risk management
-    syntheticDataBonus: number; // Bonus for learning on synthetic data
   };
 }
 
@@ -758,95 +750,60 @@ export class RLTradingEnvironment {
     const riskFreeReturn = this.config.riskFreeRate / 252; // Daily risk-free rate
     const excessReturn = returns - riskFreeReturn;
 
-    // Calculate volatility penalty (much reduced)
-    const priceChange =
-      (this.prices[this.currentIndex] - this.prices[this.currentIndex - 1]) /
-      this.prices[this.currentIndex - 1];
-    const volatilityPenalty =
-      Math.abs(priceChange) * this.config.volatilityPenalty;
-
     // Calculate transaction cost penalty (much reduced)
     const positionChange = Math.abs(this.currentPosition - previousPosition);
     const transactionCostPenalty =
       positionChange * this.config.transactionCostPenalty;
 
-    // Calculate holding penalty (removed - allow holding profitable positions)
-    const holdingPenalty = 0; // this.config.holdingPenalty;
-
     // Calculate drawdown penalty (much reduced)
     const drawdownPenalty = this.calculateDrawdownPenalty() * 0.1; // Reduced by 90%
 
-    // Calculate risk penalty (much reduced)
-    const riskPenalty = this.calculateRiskPenalty() * 0.1; // Reduced by 90%
+    // IMPROVED REWARD: Simplified and more effective
+    // Focus on core profitability with clear signals
+    const baseReward = excessReturn * this.config.rewardScaling;
 
-    // Calculate exploration bonus (increased)
-    const explorationBonus = this.calculateExplorationBonus() * 2; // Doubled
+    // Strong profit incentives
+    const profitIncentive = returns > 0 ? returns * 20 : 0; // Strong positive reinforcement
+    const lossPenalty = returns < 0 ? returns * 10 : 0; // Moderate negative reinforcement
 
-    // Calculate momentum bonus (increased)
-    const momentumBonus = this.calculateMomentumBonus() * 3; // Tripled
+    // Survival and stability bonuses
+    const stabilityBonus = this.currentPosition === 0 ? 0.1 : 0; // Small bonus for cash
+    const survivalIncentive =
+      currentPortfolioValue > this.config.initialCapital * 0.8 ? 0.5 : 0;
 
-    // Calculate profit bonus (new - reward consistent profits)
-    const profitBonus = this.calculateProfitBonus();
+    // Regime-based bonuses (simplified)
+    const regimeIncentive =
+      this.getCurrentState().marketRegime === "bullish" && returns > 0
+        ? 1.0
+        : 0;
 
-    // Calculate trend following bonus (new - reward good timing)
-    const trendBonus = this.calculateTrendBonus();
+    // Risk management bonuses
+    const riskBonus = this.calculateRiskManagementBonus();
 
-    // Calculate survival bonus (new - reward staying alive)
-    const survivalBonus = this.calculateSurvivalBonus();
-
-    // Calculate "do nothing" bonus (new - reward holding cash during bad markets)
-    const doNothingBonus = this.calculateDoNothingBonus();
-
-    // NEW: Calculate regime bonus (reward for trading in favorable conditions)
-    const regimeBonus = this.calculateRegimeBonus();
-
-    // NEW: Calculate hybrid bonus (reward for successful hybrid decisions)
-    const hybridBonus = this.calculateHybridBonus();
-
-    // NEW: Calculate risk management bonus (reward for good risk management)
-    const riskManagementBonus = this.calculateRiskManagementBonus();
-
-    // NEW: Calculate synthetic data bonus (reward for learning on synthetic data)
-    const syntheticDataBonus = this.calculateSyntheticDataBonus();
-
-    // ENHANCED REWARD: Include all components
+    // IMPROVED TOTAL REWARD: Clear, simple, effective
     const totalReward =
-      excessReturn * this.config.rewardScaling +
-      survivalBonus * 10 + // Much stronger survival incentive
-      profitBonus * 5 + // Stronger profit incentive
-      doNothingBonus * 3 + // Reward for holding cash in bad markets
-      explorationBonus +
-      momentumBonus +
-      trendBonus +
-      regimeBonus * 2 + // Regime-based trading bonus
-      hybridBonus * 1.5 + // Hybrid approach bonus
-      riskManagementBonus * 2 + // Risk management bonus
-      syntheticDataBonus * 0.5 + // Synthetic data learning bonus
-      -transactionCostPenalty -
-      volatilityPenalty -
-      holdingPenalty -
-      drawdownPenalty -
-      riskPenalty;
+      baseReward +
+      profitIncentive +
+      lossPenalty +
+      stabilityBonus +
+      survivalIncentive +
+      regimeIncentive +
+      riskBonus -
+      transactionCostPenalty * 0.5 - // Reduced transaction cost penalty
+      drawdownPenalty * 0.3; // Reduced drawdown penalty
 
     return {
       total: totalReward,
       components: {
-        returns: excessReturn * this.config.rewardScaling,
-        profitBonus: profitBonus,
-        trendBonus: trendBonus,
-        explorationBonus: explorationBonus,
-        momentumBonus: momentumBonus,
-        survivalBonus: survivalBonus,
-        doNothingBonus: doNothingBonus,
-        transactionCosts: -transactionCostPenalty,
-        riskPenalty: -riskPenalty,
-        volatilityPenalty: -volatilityPenalty,
-        holdingPenalty: -holdingPenalty,
-        drawdownPenalty: -drawdownPenalty,
-        regimeBonus: regimeBonus,
-        hybridBonus: hybridBonus,
-        riskManagementBonus: riskManagementBonus,
-        syntheticDataBonus: syntheticDataBonus,
+        returns: baseReward,
+        profitIncentive: profitIncentive,
+        lossPenalty: lossPenalty,
+        stabilityBonus: stabilityBonus,
+        survivalIncentive: survivalIncentive,
+        regimeIncentive: regimeIncentive,
+        riskBonus: riskBonus,
+        transactionCosts: -transactionCostPenalty * 0.5,
+        drawdownPenalty: -drawdownPenalty * 0.3,
       },
     };
   }
@@ -865,189 +822,6 @@ export class RLTradingEnvironment {
 
     const drawdown = (this.peakValue - currentValue) / this.peakValue;
     return drawdown * 0.05; // Reduced penalty for drawdowns (was 0.1)
-  }
-
-  /**
-   * Calculate risk penalty based on position size and volatility
-   */
-  private calculateRiskPenalty(): number {
-    const volatility = this.calculateVolatility();
-    const positionRisk = Math.abs(this.currentPosition) * volatility;
-    return positionRisk * 0.02; // Reduced penalty for high risk positions (was 0.05)
-  }
-
-  /**
-   * Calculate exploration bonus to encourage diverse actions
-   */
-  private calculateExplorationBonus(): number {
-    // Small bonus for taking actions that haven't been taken recently
-    const recentActions = this.actionHistory.slice(-10);
-    const currentAction = this.actionHistory[this.actionHistory.length - 1];
-
-    if (!currentAction) return 0;
-
-    const actionFrequency = recentActions.filter(
-      (a) => a === currentAction
-    ).length;
-    const explorationBonus = Math.max(0, (5 - actionFrequency) * 0.001);
-
-    return explorationBonus;
-  }
-
-  /**
-   * Calculate momentum bonus for trend following
-   */
-  private calculateMomentumBonus(): number {
-    const momentum = this.calculateMomentum();
-    const position = this.currentPosition;
-
-    // Reward for being on the right side of the trend
-    if (momentum > 0 && position > 0) {
-      return momentum * 0.1; // Long position in uptrend
-    } else if (momentum < 0 && position < 0) {
-      return Math.abs(momentum) * 0.1; // Short position in downtrend
-    }
-
-    return 0;
-  }
-
-  /**
-   * Calculate profit bonus for consistent positive returns
-   */
-  private calculateProfitBonus(): number {
-    const currentValue = this.getPortfolioValue();
-    const initialValue = this.config.initialCapital;
-
-    if (currentValue <= initialValue) return 0;
-
-    // Bonus for being profitable
-    const profitRatio = (currentValue - initialValue) / initialValue;
-    return profitRatio * 2.0; // 200% of profit as bonus - much more generous
-  }
-
-  /**
-   * Calculate trend following bonus for good timing
-   */
-  private calculateTrendBonus(): number {
-    const momentum = this.calculateMomentum();
-    const position = this.currentPosition;
-    const priceChange =
-      this.prices[this.currentIndex] - this.prices[this.currentIndex - 1];
-
-    // Reward for entering positions in the right direction
-    if (Math.abs(position) > 0.1) {
-      // Only if we have a meaningful position
-      if (
-        (momentum > 0 && priceChange > 0) ||
-        (momentum < 0 && priceChange < 0)
-      ) {
-        return Math.abs(momentum) * 0.2; // Bonus for good timing
-      }
-    }
-
-    return 0;
-  }
-
-  /**
-   * Calculate survival bonus for maintaining portfolio value
-   */
-  private calculateSurvivalBonus(): number {
-    const currentValue = this.getPortfolioValue();
-    const initialValue = this.config.initialCapital;
-
-    // Much more generous survival bonus
-    if (currentValue > initialValue * 0.8) {
-      return 0.1; // Strong bonus for staying above 80%
-    } else if (currentValue > initialValue * 0.5) {
-      return 0.05; // Medium bonus for staying above 50%
-    } else if (currentValue > initialValue * 0.2) {
-      return 0.02; // Small bonus for staying above 20%
-    }
-
-    return 0;
-  }
-
-  /**
-   * Calculate "do nothing" bonus for holding cash during unfavorable market conditions
-   */
-  private calculateDoNothingBonus(): number {
-    const position = this.currentPosition;
-    const momentum = this.calculateMomentum();
-    const volatility = this.calculateVolatility();
-
-    // Reward for holding cash (no position) during bad market conditions
-    if (Math.abs(position) < 0.1) {
-      // No significant position
-      if (momentum < -0.02 || volatility > 0.05) {
-        // Bad market conditions
-        return 0.05; // Bonus for staying out of bad markets
-      }
-    }
-
-    // Reward for using HOLD_CASH action specifically
-    const lastAction = this.actionHistory[this.actionHistory.length - 1];
-    if (lastAction === 1) {
-      // HOLD_CASH action
-      return 0.02; // Small bonus for explicit cash holding
-    }
-
-    return 0;
-  }
-
-  /**
-   * Calculate regime bonus for trading in favorable market conditions
-   */
-  private calculateRegimeBonus(): number {
-    const regime = this.regimeHistory[this.regimeHistory.length - 1];
-    if (!regime) return 0;
-
-    // Bonus for trading in favorable regimes
-    if (
-      regime.tradingConditions.isFavorable &&
-      Math.abs(this.currentPosition) > 0.1
-    ) {
-      return 0.1 * regime.confidence; // Bonus proportional to regime confidence
-    }
-
-    // Penalty for trading in unfavorable regimes
-    if (
-      !regime.tradingConditions.isFavorable &&
-      Math.abs(this.currentPosition) > 0.1
-    ) {
-      return -0.05 * regime.confidence; // Penalty proportional to regime confidence
-    }
-
-    return 0;
-  }
-
-  /**
-   * Calculate hybrid bonus for successful hybrid decisions
-   */
-  private calculateHybridBonus(): number {
-    const lastAction = this.actionHistory[this.actionHistory.length - 1];
-    const regime = this.regimeHistory[this.regimeHistory.length - 1];
-
-    if (!regime || !lastAction) return 0;
-
-    // Bonus for using hybrid actions in appropriate conditions
-    if (
-      (lastAction === RLAction.HYBRID_BUY ||
-        lastAction === RLAction.HYBRID_SELL) &&
-      regime.confidence > 0.7
-    ) {
-      return 0.05; // Bonus for high-confidence hybrid decisions
-    }
-
-    // Bonus for using rule-based actions when regime is clear
-    if (
-      (lastAction === RLAction.RULE_BASED_BUY ||
-        lastAction === RLAction.RULE_BASED_SELL) &&
-      regime.confidence > 0.8
-    ) {
-      return 0.03; // Bonus for high-confidence rule-based decisions
-    }
-
-    return 0;
   }
 
   /**
@@ -1080,18 +854,6 @@ export class RLTradingEnvironment {
     }
 
     return bonus;
-  }
-
-  /**
-   * Calculate synthetic data bonus for learning on synthetic data
-   */
-  private calculateSyntheticDataBonus(): number {
-    if (!this.syntheticDataIndices.has(this.currentIndex)) {
-      return 0; // No bonus for real data
-    }
-
-    // Small bonus for learning on synthetic data
-    return 0.01;
   }
 
   /**

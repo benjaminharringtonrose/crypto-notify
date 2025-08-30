@@ -523,25 +523,19 @@ export class EnhancedRLAgent {
    * Run a complete episode
    */
   public async runEpisode(): Promise<EnhancedRLTrainingMetrics> {
-    console.log("      🎯 Starting episode...");
+    console.log(`      🎯 Starting episode ${this.episodeCount}...`);
     let state = this.environment.reset();
     let totalReward = 0;
     let stepCount = 0;
     const maxSteps = 1000; // Safety limit
 
-    console.log("      📊 Episode initialized, starting steps...");
+    console.log(
+      `      📊 Episode ${this.episodeCount} initialized, starting steps...`
+    );
 
     while (stepCount < maxSteps) {
       // Choose action
       const action = this.chooseAction(state);
-
-      if (stepCount % 100 === 0) {
-        console.log(
-          `      🔄 Step ${stepCount}: Action=${action}, Epsilon=${this.epsilon.toFixed(
-            3
-          )}`
-        );
-      }
 
       // Execute action
       const { state: nextState, reward, done } = this.environment.step(action);
@@ -569,13 +563,15 @@ export class EnhancedRLAgent {
     }
 
     if (stepCount >= maxSteps) {
-      console.log(`      ⚠️ Episode stopped at max steps (${maxSteps})`);
+      console.log(
+        `      ⚠️ Episode ${this.episodeCount} stopped at max steps (${maxSteps})`
+      );
     }
 
     // Get episode results
     const episodeResults = this.environment.getEpisodeResults();
     console.log(
-      `      📈 Episode results: Return=${(
+      `      📈 Episode ${this.episodeCount} results: Return=${(
         episodeResults.totalReturn * 100
       ).toFixed(2)}%, Sharpe=${episodeResults.sharpeRatio.toFixed(3)}, Trades=${
         episodeResults.totalTrades

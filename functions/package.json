@@ -24,9 +24,9 @@
     "rl:train": "TF_CPP_MIN_LOG_LEVEL=1 npx ts-node src/scripts/optimizedRLTraining.ts",
     "rl:quick": "TF_CPP_MIN_LOG_LEVEL=1 npx ts-node src/scripts/optimizedRLTraining.ts --episodes=50 --quick",
     "rl:production": "TF_CPP_MIN_LOG_LEVEL=1 npx ts-node src/scripts/optimizedRLTraining.ts --episodes=200",
-    "rl:momentum": "TF_CPP_MIN_LOG_LEVEL=1 npx ts-node src/scripts/optimizedRLTraining.ts --strategy=momentum --episodes=100",
-    "rl:volatility": "TF_CPP_MIN_LOG_LEVEL=1 npx ts-node src/scripts/optimizedRLTraining.ts --strategy=volatility --episodes=100",
-    "rl:multi-timeframe": "TF_CPP_MIN_LOG_LEVEL=1 npx ts-node src/scripts/optimizedRLTraining.ts --strategy=multi-timeframe --episodes=100"
+    "rl:learning": "TF_CPP_MIN_LOG_LEVEL=1 npx ts-node src/scripts/optimizedRLTraining.ts --strategy=learning --episodes=100",
+    "rl:aggressive": "TF_CPP_MIN_LOG_LEVEL=1 npx ts-node src/scripts/optimizedRLTraining.ts --strategy=aggressive --episodes=100",
+    "rl:conservative": "TF_CPP_MIN_LOG_LEVEL=1 npx ts-node src/scripts/optimizedRLTraining.ts --strategy=conservative --episodes=100"
   },
   "engines": {
     "node": "20"

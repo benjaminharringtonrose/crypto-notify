@@ -4,12 +4,14 @@ import { RLTradingEnvironment } from "../bitcoin/rl/RLTradingEnvironment";
 import { EnhancedRLAgent } from "../bitcoin/rl/EnhancedRLAgent";
 import { FeatureDetector } from "../bitcoin/shared/FeatureDetector";
 import {
-  HighReturnRLEnvironmentConfig,
-  MomentumFocusedConfig,
-  VolatilityHarvestingConfig,
-  MultiTimeframeConfig,
-  ReturnOptimizationStrategies,
-} from "../bitcoin/rl/HighReturnRLConfig";
+  ImprovedRLEnvironmentConfig,
+  ImprovedRLAgentConfig,
+  ConservativeRLConfig,
+  AggressiveRLConfig,
+  LearningFocusedConfig,
+  QuickTrainingConfig,
+  MarketConditionConfigs,
+} from "../bitcoin/rl/ImprovedRLConfig";
 
 // Initialize Firebase
 FirebaseService.getInstance();
@@ -24,9 +26,9 @@ function parseArgs(): {
   quickMode: boolean;
 } {
   const args = process.argv.slice(2);
-  let episodes = 150;
-  let strategy = "high-return";
-  let dataDays = 365;
+  let episodes = 100;
+  let strategy = "improved";
+  let dataDays = 180; // Reduced from 365 for faster training
   let quickMode = false;
 
   for (let i = 0; i < args.length; i++) {
@@ -62,48 +64,43 @@ function calculateBaselinePerformance(prices: number[]): number {
  */
 function getStrategyConfig(strategy: string) {
   switch (strategy) {
-    case "momentum":
-      return MomentumFocusedConfig;
-    case "volatility":
-      return VolatilityHarvestingConfig;
-    case "multi-timeframe":
-      return MultiTimeframeConfig;
-    case "high-return":
+    case "conservative":
+      return ConservativeRLConfig;
+    case "aggressive":
+      return AggressiveRLConfig;
+    case "learning":
+      return LearningFocusedConfig;
+    case "quick":
+      return QuickTrainingConfig;
+    case "bull":
+      return MarketConditionConfigs.bull;
+    case "bear":
+      return MarketConditionConfigs.bear;
+    case "sideways":
+      return MarketConditionConfigs.sideways;
+    case "improved":
     default:
-      return HighReturnRLEnvironmentConfig;
+      return ImprovedRLEnvironmentConfig;
   }
 }
 
 /**
- * Optimized RL Agent Configuration
+ * IMPROVED RL Agent Configuration
+ * Addresses the learning issues we observed
  */
 const OPTIMIZED_AGENT_CONFIG = {
-  // Aggressive learning parameters for higher returns
-  learningRate: 0.003, // Higher learning rate
-  discountFactor: 0.9, // Lower discount factor for more immediate rewards
-  epsilon: 0.5, // Higher initial exploration
-  epsilonDecay: 0.999, // Slower decay to maintain exploration
-  epsilonMin: 0.08, // Higher minimum exploration
-
-  // Training parameters
-  batchSize: 128, // Larger batch size for better gradients
-  memorySize: 20000, // Larger memory for more diverse experiences
-  targetUpdateFrequency: 25, // More frequent target updates
-
-  // Network architecture optimized for returns
-  hiddenLayers: [512, 256, 128], // Larger network for complex patterns
-  activationFunction: "relu",
-  optimizer: "adam",
-  lossFunction: "meanSquaredError",
-  gradientClipping: 0.3,
-
-  // Advanced features
-  experienceReplay: true,
-  prioritizedReplay: true,
-  doubleDQN: true,
-  duelingDQN: true,
+  ...ImprovedRLAgentConfig,
+  // Additional improvements based on training observations
+  epsilon: 0.9, // Even higher initial exploration
+  epsilonDecay: 0.997, // Even slower decay
+  epsilonMin: 0.2, // Higher minimum exploration
+  learningRate: 0.0005, // Lower learning rate for stability
+  batchSize: 32, // Smaller batches for more frequent updates
+  memorySize: 5000, // Smaller memory for faster learning from recent experiences
+  targetUpdateFrequency: 5, // Very frequent target updates
+  hiddenLayers: [128, 64, 32], // Even simpler network
   useTradeModelFactory: true,
-  timesteps: 30,
+  timesteps: 20, // Reduced for faster training
   features: 36,
 };
 
@@ -252,13 +249,11 @@ async function trainOptimizedRL(): Promise<void> {
     // Strategy recommendations
     console.log("💡 Strategy Recommendations for Higher Returns:");
     console.log("");
-
-    for (const [, strategy] of Object.entries(ReturnOptimizationStrategies)) {
-      console.log(`📈 ${strategy.description}`);
-      console.log(`   Implementation: ${strategy.implementation}`);
-      console.log(`   Expected Return: ${strategy.expectedReturn}`);
-      console.log("");
-    }
+    console.log("📈 Use 'learning' config for initial training");
+    console.log("📈 Use 'aggressive' config for higher returns");
+    console.log("📈 Use 'conservative' config for risk management");
+    console.log("📈 Use 'quick' config for rapid testing");
+    console.log("");
 
     // Final summary
     console.log("🏆 Training Summary:");

@@ -26,7 +26,16 @@
     "rl:production": "TF_CPP_MIN_LOG_LEVEL=1 npx ts-node src/scripts/optimizedRLTraining.ts --episodes=200",
     "rl:learning": "TF_CPP_MIN_LOG_LEVEL=1 npx ts-node src/scripts/optimizedRLTraining.ts --strategy=learning --episodes=100",
     "rl:aggressive": "TF_CPP_MIN_LOG_LEVEL=1 npx ts-node src/scripts/optimizedRLTraining.ts --strategy=aggressive --episodes=100",
-    "rl:conservative": "TF_CPP_MIN_LOG_LEVEL=1 npx ts-node src/scripts/optimizedRLTraining.ts --strategy=conservative --episodes=100"
+    "rl:conservative": "TF_CPP_MIN_LOG_LEVEL=1 npx ts-node src/scripts/optimizedRLTraining.ts --strategy=conservative --episodes=100",
+    "ensemble:test": "npx ts-node src/bitcoin/ensemble/test-ensemble.ts",
+    "ensemble:test:all": "npx ts-node src/bitcoin/ensemble/test-ensemble.ts --all",
+    "ensemble:test:components": "npx ts-node src/bitcoin/ensemble/test-ensemble.ts --components",
+    "ensemble:test:performance": "npx ts-node src/bitcoin/ensemble/test-ensemble.ts --performance",
+    "ensemble:example": "npx ts-node src/bitcoin/ensemble/example.ts",
+    "ensemble:example:basic": "npx ts-node src/bitcoin/ensemble/example.ts --basic",
+    "ensemble:example:advanced": "npx ts-node src/bitcoin/ensemble/example.ts --advanced",
+    "ensemble:example:realtime": "npx ts-node src/bitcoin/ensemble/example.ts --realtime",
+    "ensemble:example:all": "npx ts-node src/bitcoin/ensemble/example.ts --all"
   },
   "engines": {
     "node": "20"

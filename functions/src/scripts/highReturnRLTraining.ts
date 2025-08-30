@@ -2,6 +2,7 @@ import { CryptoCompareService } from "../api/CryptoCompareService";
 import { FirebaseService } from "../api/FirebaseService";
 import { RLTradingEnvironment } from "../bitcoin/rl/RLTradingEnvironment";
 import { EnhancedRLAgent } from "../bitcoin/rl/EnhancedRLAgent";
+import { FeatureDetector } from "../bitcoin/shared/FeatureDetector";
 import {
   HighReturnRLEnvironmentConfig,
   MomentumFocusedConfig,
@@ -31,6 +32,10 @@ async function trainHighReturnRL(): Promise<void> {
   );
 
   try {
+    // Detect feature count dynamically
+    const featureCount = await FeatureDetector.detectFeatureCount();
+    console.log(`🔍 Detected ${featureCount} features for RL training`);
+
     // Load data - use longer period for better learning
     const cryptoCompare = new CryptoCompareService();
     const btcData = await cryptoCompare.getHistoricalData("BTC", 365); // 1 year
@@ -67,7 +72,7 @@ async function trainHighReturnRL(): Promise<void> {
       duelingDQN: true,
       useTradeModelFactory: true,
       timesteps: 30,
-      features: 36,
+      features: featureCount,
     };
 
     const highReturnAgent = new EnhancedRLAgent(

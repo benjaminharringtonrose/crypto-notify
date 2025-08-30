@@ -24,9 +24,7 @@ bitcoin/
 │   └── TradeExecutor.ts
 ├── rl/              # Reinforcement Learning components
 │   ├── RLTradingEnvironment.ts
-│   ├── RLTradingAgent.ts
 │   ├── EnhancedRLAgent.ts
-│   ├── RLTradingStrategy.ts
 │   ├── EnhancedRLConfig.ts
 │   └── HighReturnRLConfig.ts
 └── README.md
@@ -118,17 +116,9 @@ Executes trades through the Coinbase API.
 
 Defines the trading environment for RL agents.
 
-### RLTradingAgent
-
-Basic RL agent implementation.
-
 ### EnhancedRLAgent
 
 Advanced RL agent with multiple algorithms.
-
-### RLTradingStrategy
-
-RL-based trading strategy implementation.
 
 ### EnhancedRLConfig
 

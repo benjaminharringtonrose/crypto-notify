@@ -83,7 +83,7 @@ async function runMultipleTrainingSessions() {
     console.log(
       "📈 ARCHITECTURE: Conv1D(48,3) → BN → LSTM(64) → Dense(32) → Output(2)"
     );
-    console.log("🔮 FEATURES: 36 advanced market microstructure indicators");
+    console.log("🔮 FEATURES: Dynamic feature detection from FeatureRegistry");
     console.log("📅 DATA: 730 days (2 years), 35 epochs training\n");
 
     const overallStartTime = Date.now();

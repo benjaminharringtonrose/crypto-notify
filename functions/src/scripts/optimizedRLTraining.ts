@@ -2,6 +2,7 @@ import { CryptoCompareService } from "../api/CryptoCompareService";
 import { FirebaseService } from "../api/FirebaseService";
 import { RLTradingEnvironment } from "../bitcoin/rl/RLTradingEnvironment";
 import { EnhancedRLAgent } from "../bitcoin/rl/EnhancedRLAgent";
+import { FeatureDetector } from "../bitcoin/shared/FeatureDetector";
 import {
   HighReturnRLEnvironmentConfig,
   MomentumFocusedConfig,
@@ -119,6 +120,10 @@ async function trainOptimizedRL(): Promise<void> {
   console.log(`⚡ Quick Mode: ${quickMode ? "Enabled" : "Disabled"}`);
 
   try {
+    // Detect feature count dynamically
+    const featureCount = await FeatureDetector.detectFeatureCount();
+    console.log(`🔍 Detected ${featureCount} features for RL training`);
+
     // Load data
     const cryptoCompare = new CryptoCompareService();
     const btcData = await cryptoCompare.getHistoricalData("BTC", dataDays);
@@ -153,15 +158,20 @@ async function trainOptimizedRL(): Promise<void> {
       envConfig
     );
 
+    // Create dynamic agent configuration with detected feature count
+    const dynamicAgentConfig = {
+      ...OPTIMIZED_AGENT_CONFIG,
+      features: featureCount,
+    };
+
     // Create agent
-    const agent = new EnhancedRLAgent(environment, OPTIMIZED_AGENT_CONFIG);
+    const agent = new EnhancedRLAgent(environment, dynamicAgentConfig);
 
     console.log(`🤖 Agent Config:`);
-    console.log(`  - Learning Rate: ${OPTIMIZED_AGENT_CONFIG.learningRate}`);
-    console.log(
-      `  - Network: ${OPTIMIZED_AGENT_CONFIG.hiddenLayers.join(" → ")}`
-    );
-    console.log(`  - Memory Size: ${OPTIMIZED_AGENT_CONFIG.memorySize}`);
+    console.log(`  - Learning Rate: ${dynamicAgentConfig.learningRate}`);
+    console.log(`  - Network: ${dynamicAgentConfig.hiddenLayers.join(" → ")}`);
+    console.log(`  - Memory Size: ${dynamicAgentConfig.memorySize}`);
+    console.log(`  - Features: ${dynamicAgentConfig.features}`);
 
     // Training with progress tracking
     const results = await agent.trainForEpisodes(episodes, (metrics) => {

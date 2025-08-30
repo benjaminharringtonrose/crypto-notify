@@ -561,7 +561,9 @@ export class EnhancedRLAgent {
       state = nextState;
 
       if (done) {
-        console.log(`      ✅ Episode completed after ${stepCount} steps`);
+        console.log(
+          `      ✅ Episode ${this.episodeCount} completed after ${stepCount} steps`
+        );
         break;
       }
     }

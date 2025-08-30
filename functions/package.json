@@ -20,7 +20,13 @@
     "features:gradual": "npx ts-node src/scripts/gradualFeatureOptimization.ts",
     "features:apply": "npx ts-node src/scripts/applyOptimizedFeatures.ts",
     "features:fix-registry": "npx ts-node src/scripts/fixFeatureRegistry.ts",
-    "features:all": "npm run features:fix-registry && npm run features:analyze && npm run features:optimize"
+    "features:all": "npm run features:fix-registry && npm run features:analyze && npm run features:optimize",
+    "rl:train": "TF_CPP_MIN_LOG_LEVEL=1 npx ts-node src/scripts/optimizedRLTraining.ts",
+    "rl:quick": "TF_CPP_MIN_LOG_LEVEL=1 npx ts-node src/scripts/optimizedRLTraining.ts --episodes=50 --quick",
+    "rl:production": "TF_CPP_MIN_LOG_LEVEL=1 npx ts-node src/scripts/optimizedRLTraining.ts --episodes=200",
+    "rl:momentum": "TF_CPP_MIN_LOG_LEVEL=1 npx ts-node src/scripts/optimizedRLTraining.ts --strategy=momentum --episodes=100",
+    "rl:volatility": "TF_CPP_MIN_LOG_LEVEL=1 npx ts-node src/scripts/optimizedRLTraining.ts --strategy=volatility --episodes=100",
+    "rl:multi-timeframe": "TF_CPP_MIN_LOG_LEVEL=1 npx ts-node src/scripts/optimizedRLTraining.ts --strategy=multi-timeframe --episodes=100"
   },
   "engines": {
     "node": "20"

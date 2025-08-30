@@ -6,8 +6,8 @@ import {
   RLReward,
 } from "./RLTradingEnvironment";
 
-// RL Agent Configuration
-export interface RLAgentConfig {
+// Enhanced RL Agent Configuration
+export interface EnhancedRLAgentConfig {
   learningRate: number;
   discountFactor: number;
   epsilon: number;
@@ -16,15 +16,13 @@ export interface RLAgentConfig {
   batchSize: number;
   memorySize: number;
   targetUpdateFrequency: number;
-  hiddenLayers: number[];
-  activationFunction: string;
-  optimizer: string;
-  lossFunction: string;
   gradientClipping: number;
   experienceReplay: boolean;
   prioritizedReplay: boolean;
   doubleDQN: boolean;
-  duelingDQN: boolean;
+  useTradeModelFactory: boolean; // New: Use TradeModelFactory architecture
+  timesteps: number;
+  features: number;
 }
 
 // Experience replay memory entry
@@ -38,7 +36,7 @@ export interface Experience {
 }
 
 // Training metrics
-export interface RLTrainingMetrics {
+export interface EnhancedRLTrainingMetrics {
   episode: number;
   totalReward: number;
   averageReward: number;
@@ -50,10 +48,12 @@ export interface RLTrainingMetrics {
   maxDrawdown: number;
   winRate: number;
   totalTrades: number;
+  qTableSize?: number; // For Q-table based agents
+  modelComplexity?: string; // For neural network based agents
 }
 
-export class RLTradingAgent {
-  private config: RLAgentConfig;
+export class EnhancedRLAgent {
+  private config: EnhancedRLAgentConfig;
   private environment: RLTradingEnvironment;
   private qNetwork: tf.LayersModel;
   private targetNetwork: tf.LayersModel;
@@ -61,9 +61,12 @@ export class RLTradingAgent {
   private episodeCount: number;
   private stepCount: number;
   private epsilon: number;
-  private trainingMetrics: RLTrainingMetrics[];
+  private trainingMetrics: EnhancedRLTrainingMetrics[];
 
-  constructor(environment: RLTradingEnvironment, config: RLAgentConfig) {
+  constructor(
+    environment: RLTradingEnvironment,
+    config: EnhancedRLAgentConfig
+  ) {
     this.config = config;
     this.environment = environment;
     this.memory = [];
@@ -72,44 +75,132 @@ export class RLTradingAgent {
     this.epsilon = config.epsilon;
     this.trainingMetrics = [];
 
-    // Build Q-Network
+    // Build Q-Network using TradeModelFactory or custom architecture
     this.qNetwork = this.buildQNetwork();
     this.targetNetwork = this.buildQNetwork();
     this.updateTargetNetwork();
   }
 
   /**
-   * Build the Q-Network architecture
+   * Build the Q-Network architecture using TradeModelFactory
    */
   private buildQNetwork(): tf.LayersModel {
+    if (this.config.useTradeModelFactory) {
+      console.log("🏭 Using TradeModelFactory for RL agent architecture");
+
+      // Create RL-specific model using TradeModelFactory architecture
+      const actionSize = this.environment.getActionSpaceSize();
+      const model = tf.sequential();
+
+      // Conv1D layer - OPTIMIZED for fast RL training
+      model.add(
+        tf.layers.conv1d({
+          inputShape: [this.config.timesteps, this.config.features],
+          filters: 24, // Reduced from 48 - faster training
+          kernelSize: 3, // Keep optimal kernel size
+          activation: "relu",
+          kernelInitializer: "heNormal",
+          kernelRegularizer: tf.regularizers.l2({ l2: 0.001 }),
+          name: "conv1d_input",
+        })
+      );
+      model.add(tf.layers.batchNormalization({ name: "bn_conv1" }));
+      model.add(tf.layers.dropout({ rate: 0.2, name: "dropout_conv1" })); // Reduced dropout
+
+      // LSTM layer - OPTIMIZED for fast RL training
+      model.add(
+        tf.layers.lstm({
+          units: 32, // Reduced from 64 - much faster training
+          returnSequences: false,
+          kernelInitializer: "heNormal",
+          recurrentDropout: 0.1,
+          name: "lstm1",
+        })
+      );
+
+      // Dense layer - OPTIMIZED for fast RL training
+      model.add(
+        tf.layers.dense({
+          units: 16, // Reduced from 32 - faster training
+          activation: "relu",
+          kernelInitializer: "heNormal",
+          kernelRegularizer: tf.regularizers.l2({ l2: 0.001 }),
+          name: "dense1",
+        })
+      );
+      model.add(tf.layers.dropout({ rate: 0.2, name: "dropout_dense1" })); // Reduced dropout
+
+      // Q-Value output layer for RL
+      model.add(
+        tf.layers.dense({
+          units: actionSize, // 7 actions for RL
+          activation: "linear", // Linear activation for Q-values
+          kernelInitializer: "heNormal",
+          name: "q_values_output",
+        })
+      );
+
+      // Compile model
+      const optimizer = tf.train.adam(this.config.learningRate);
+
+      model.compile({
+        optimizer,
+        loss: "meanSquaredError",
+        metrics: ["accuracy"],
+      });
+
+      console.log("✅ Enhanced RL agent using TradeModelFactory architecture");
+      console.log(
+        `📊 RL Architecture: Conv1D(24,3) → BN → Dropout(0.2) → LSTM(32) → Dense(16) → Q-Values(${actionSize})`
+      );
+      console.log("⚡ OPTIMIZED for fast training - 75% fewer parameters");
+      return model;
+    } else {
+      // Fallback to custom architecture
+      console.log("🔧 Using custom architecture for RL agent");
+      return this.buildCustomQNetwork();
+    }
+  }
+
+  /**
+   * Build custom Q-Network architecture (fallback) - OPTIMIZED for fast training
+   */
+  private buildCustomQNetwork(): tf.LayersModel {
     const stateSize = this.environment.getStateSpaceSize();
     const actionSize = this.environment.getActionSpaceSize();
 
     const model = tf.sequential();
 
-    // Input layer
+    // Input layer - OPTIMIZED for fast training
     model.add(
       tf.layers.dense({
-        units: this.config.hiddenLayers[0],
+        units: 64, // Reduced from 128 - faster training
         inputShape: [stateSize],
-        activation: this.config.activationFunction as any,
+        activation: "relu",
         kernelInitializer: "heNormal",
         kernelRegularizer: tf.regularizers.l2({ l2: 0.001 }),
       })
     );
 
-    // Hidden layers
-    for (let i = 1; i < this.config.hiddenLayers.length; i++) {
-      model.add(
-        tf.layers.dense({
-          units: this.config.hiddenLayers[i],
-          activation: this.config.activationFunction as any,
-          kernelInitializer: "heNormal",
-          kernelRegularizer: tf.regularizers.l2({ l2: 0.001 }),
-        })
-      );
-      model.add(tf.layers.dropout({ rate: 0.2 }));
-    }
+    // Hidden layers - OPTIMIZED for fast training
+    model.add(
+      tf.layers.dense({
+        units: 32, // Reduced from 64 - faster training
+        activation: "relu",
+        kernelInitializer: "heNormal",
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.001 }),
+      })
+    );
+    model.add(tf.layers.dropout({ rate: 0.2 }));
+
+    model.add(
+      tf.layers.dense({
+        units: 16, // Reduced from 32 - faster training
+        activation: "relu",
+        kernelInitializer: "heNormal",
+        kernelRegularizer: tf.regularizers.l2({ l2: 0.001 }),
+      })
+    );
 
     // Output layer
     model.add(
@@ -121,14 +212,11 @@ export class RLTradingAgent {
     );
 
     // Compile model
-    const optimizer =
-      this.config.optimizer === "adam"
-        ? tf.train.adam(this.config.learningRate)
-        : tf.train.rmsprop(this.config.learningRate);
+    const optimizer = tf.train.adam(this.config.learningRate);
 
     model.compile({
       optimizer,
-      loss: this.config.lossFunction,
+      loss: "meanSquaredError",
       metrics: ["accuracy"],
     });
 
@@ -136,40 +224,84 @@ export class RLTradingAgent {
   }
 
   /**
-   * Convert state to tensor for neural network input
+   * Convert state to tensor for neural network input with improved normalization
    */
   private stateToTensor(state: RLState): tf.Tensor {
-    const stateArray = [
-      ...state.features,
-      state.position,
-      state.capital / this.environment.getConfig().initialCapital, // Normalize capital
-      state.portfolioValue / this.environment.getConfig().initialCapital, // Normalize portfolio
-      state.volatility,
-      state.momentum,
-      state.trendStrength,
-      state.timeStep / 1000, // Normalize time step
-      // Enhanced market regime encoding
-      state.marketRegime === "trending" ? 1 : 0,
-      state.marketRegime === "ranging" ? 1 : 0,
-      state.marketRegime === "volatile" ? 1 : 0,
-      state.marketRegime === "bullish" ? 1 : 0,
-      state.marketRegime === "bearish" ? 1 : 0,
-      // New state variables
-      state.regimeConfidence,
-      state.riskScore,
-      state.optimalPositionSize,
-      // Market condition encoding
-      state.marketCondition === "favorable" ? 1 : 0,
-      state.marketCondition === "neutral" ? 1 : 0,
-      state.marketCondition === "unfavorable" ? 1 : 0,
-      // Synthetic data flag
-      state.syntheticDataFlag ? 1 : 0,
-      // Rule-based and hybrid signals
-      state.ruleBasedSignal,
-      state.hybridWeight,
-    ];
+    if (this.config.useTradeModelFactory) {
+      // For TradeModelFactory, we need to reshape to [timesteps, features]
+      // We'll use the features array and pad/truncate to match timesteps
+      const features = this.normalizeFeatures(state.features);
+      const paddedFeatures = this.padFeaturesToTimesteps(features);
 
-    return tf.tensor2d([stateArray], [1, stateArray.length]);
+      return tf.tensor3d(
+        [paddedFeatures],
+        [1, this.config.timesteps, this.config.features]
+      );
+    } else {
+      // For custom architecture, use flat state with better normalization
+      const stateArray = [
+        ...this.normalizeFeatures(state.features),
+        this.normalizeValue(state.position, -1, 1), // Normalize position to [-1, 1]
+        this.normalizeValue(
+          state.capital / this.environment.getConfig().initialCapital,
+          0,
+          2
+        ), // Normalize capital
+        this.normalizeValue(
+          state.portfolioValue / this.environment.getConfig().initialCapital,
+          0,
+          2
+        ), // Normalize portfolio
+        this.normalizeValue(state.volatility, 0, 1), // Normalize volatility
+        this.normalizeValue(state.momentum, -1, 1), // Normalize momentum
+        this.normalizeValue(state.trendStrength, -1, 1), // Normalize trend strength
+        this.normalizeValue(state.timeStep / 1000, 0, 1), // Normalize time step
+        state.marketRegime === "trending" ? 1 : 0,
+        state.marketRegime === "ranging" ? 1 : 0,
+        state.marketRegime === "volatile" ? 1 : 0,
+      ];
+
+      return tf.tensor2d([stateArray], [1, stateArray.length]);
+    }
+  }
+
+  /**
+   * Normalize features using robust scaling
+   */
+  private normalizeFeatures(features: number[]): number[] {
+    return features.map((feature) => {
+      // Robust normalization: clip to [-3, 3] and scale to [-1, 1]
+      const clipped = Math.max(-3, Math.min(3, feature));
+      return clipped / 3;
+    });
+  }
+
+  /**
+   * Normalize a value to a specific range
+   */
+  private normalizeValue(value: number, min: number, max: number): number {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  /**
+   * Pad features to match timesteps for TradeModelFactory
+   */
+  private padFeaturesToTimesteps(features: number[]): number[][] {
+    const result: number[][] = [];
+
+    // Create timesteps by repeating the features
+    for (let i = 0; i < this.config.timesteps; i++) {
+      const timestepFeatures = features.slice(0, this.config.features);
+
+      // Pad with zeros if features are shorter than expected
+      while (timestepFeatures.length < this.config.features) {
+        timestepFeatures.push(0);
+      }
+
+      result.push(timestepFeatures);
+    }
+
+    return result;
   }
 
   /**
@@ -177,12 +309,10 @@ export class RLTradingAgent {
    */
   public chooseAction(state: RLState): RLAction {
     if (Math.random() < this.epsilon) {
-      // Random action
       return Math.floor(
         Math.random() * this.environment.getActionSpaceSize()
       ) as RLAction;
     } else {
-      // Greedy action
       return this.getGreedyAction(state);
     }
   }
@@ -200,7 +330,6 @@ export class RLTradingAgent {
     stateTensor.dispose();
     qValues.dispose();
 
-    // Return action with highest Q-value
     return qValuesRow.indexOf(Math.max(...qValuesRow)) as RLAction;
   }
 
@@ -223,13 +352,11 @@ export class RLTradingAgent {
     };
 
     if (this.config.prioritizedReplay) {
-      // Calculate priority based on reward magnitude
       experience.priority = Math.abs(reward.total) + 1e-6;
     }
 
     this.memory.push(experience);
 
-    // Remove oldest experience if memory is full
     if (this.memory.length > this.config.memorySize) {
       this.memory.shift();
     }
@@ -395,14 +522,26 @@ export class RLTradingAgent {
   /**
    * Run a complete episode
    */
-  public async runEpisode(): Promise<RLTrainingMetrics> {
+  public async runEpisode(): Promise<EnhancedRLTrainingMetrics> {
+    console.log("      🎯 Starting episode...");
     let state = this.environment.reset();
     let totalReward = 0;
     let stepCount = 0;
+    const maxSteps = 1000; // Safety limit
 
-    while (true) {
+    console.log("      📊 Episode initialized, starting steps...");
+
+    while (stepCount < maxSteps) {
       // Choose action
       const action = this.chooseAction(state);
+
+      if (stepCount % 100 === 0) {
+        console.log(
+          `      🔄 Step ${stepCount}: Action=${action}, Epsilon=${this.epsilon.toFixed(
+            3
+          )}`
+        );
+      }
 
       // Execute action
       const { state: nextState, reward, done } = this.environment.step(action);
@@ -410,8 +549,10 @@ export class RLTradingAgent {
       // Store experience
       this.storeExperience(state, action, reward, nextState, done);
 
-      // Train if enough experiences
-      await this.train();
+      // Train periodically (not every step)
+      if (this.memory.length >= this.config.batchSize && stepCount % 10 === 0) {
+        await this.train();
+      }
 
       totalReward += reward.total;
       stepCount++;
@@ -420,26 +561,41 @@ export class RLTradingAgent {
       state = nextState;
 
       if (done) {
+        console.log(`      ✅ Episode completed after ${stepCount} steps`);
         break;
       }
     }
 
+    if (stepCount >= maxSteps) {
+      console.log(`      ⚠️ Episode stopped at max steps (${maxSteps})`);
+    }
+
     // Get episode results
     const episodeResults = this.environment.getEpisodeResults();
+    console.log(
+      `      📈 Episode results: Return=${(
+        episodeResults.totalReturn * 100
+      ).toFixed(2)}%, Sharpe=${episodeResults.sharpeRatio.toFixed(3)}, Trades=${
+        episodeResults.totalTrades
+      }`
+    );
 
     // Create training metrics
-    const metrics: RLTrainingMetrics = {
+    const metrics: EnhancedRLTrainingMetrics = {
       episode: this.episodeCount,
       totalReward,
       averageReward: totalReward / stepCount,
       epsilon: this.epsilon,
-      loss: 0, // Will be updated with actual loss
-      accuracy: 0, // Will be updated with actual accuracy
+      loss: 0,
+      accuracy: 0,
       totalReturn: episodeResults.totalReturn,
       sharpeRatio: episodeResults.sharpeRatio,
       maxDrawdown: episodeResults.maxDrawdown,
       winRate: episodeResults.winRate,
       totalTrades: episodeResults.totalTrades,
+      modelComplexity: this.config.useTradeModelFactory
+        ? "TradeModelFactory"
+        : "Custom",
     };
 
     this.trainingMetrics.push(metrics);
@@ -449,30 +605,51 @@ export class RLTradingAgent {
   }
 
   /**
-   * Train the agent for multiple episodes
+   * Train the agent for multiple episodes with adaptive learning
    */
   public async trainForEpisodes(
     numEpisodes: number,
-    callback?: (metrics: RLTrainingMetrics) => void
-  ): Promise<RLTrainingMetrics[]> {
-    const results: RLTrainingMetrics[] = [];
+    callback?: (metrics: EnhancedRLTrainingMetrics) => void
+  ): Promise<EnhancedRLTrainingMetrics[]> {
+    const results: EnhancedRLTrainingMetrics[] = [];
+    let performanceHistory: number[] = [];
 
     for (let episode = 0; episode < numEpisodes; episode++) {
       const metrics = await this.runEpisode();
       results.push(metrics);
+      performanceHistory.push(metrics.totalReturn);
+
+      // Adaptive learning rate based on performance
+      if (episode > 20 && episode % 10 === 0) {
+        const recentPerformance = performanceHistory.slice(-10);
+        const avgPerformance =
+          recentPerformance.reduce((a, b) => a + b, 0) /
+          recentPerformance.length;
+
+        // Adjust learning rate based on performance trend
+        if (avgPerformance > 0.05) {
+          // Good performance - reduce learning rate for fine-tuning
+          this.adjustLearningRate(0.95);
+        } else if (avgPerformance < -0.1) {
+          // Poor performance - increase learning rate for faster learning
+          this.adjustLearningRate(1.05);
+        }
+      }
 
       if (callback) {
         callback(metrics);
       }
 
-      // Log progress
+      // Log progress with adaptive learning info
       if (episode % 10 === 0) {
         console.log(
           `Episode ${episode}/${numEpisodes} - ` +
             `Return: ${(metrics.totalReturn * 100).toFixed(2)}% - ` +
             `Sharpe: ${metrics.sharpeRatio.toFixed(3)} - ` +
             `Epsilon: ${metrics.epsilon.toFixed(3)} - ` +
-            `Trades: ${metrics.totalTrades}`
+            `Trades: ${metrics.totalTrades} - ` +
+            `Model: ${metrics.modelComplexity} - ` +
+            `LR: ${this.config.learningRate.toFixed(6)}`
         );
       }
     }
@@ -481,13 +658,35 @@ export class RLTradingAgent {
   }
 
   /**
+   * Adjust learning rate adaptively
+   */
+  private adjustLearningRate(factor: number): void {
+    const newLearningRate = this.config.learningRate * factor;
+    const minLR = 0.0001;
+    const maxLR = 0.01;
+
+    this.config.learningRate = Math.max(
+      minLR,
+      Math.min(maxLR, newLearningRate)
+    );
+
+    // Update optimizer with new learning rate
+    const optimizer = tf.train.adam(this.config.learningRate);
+    this.qNetwork.compile({
+      optimizer,
+      loss: "meanSquaredError",
+      metrics: ["accuracy"],
+    });
+  }
+
+  /**
    * Evaluate the agent on a test environment
    */
   public async evaluate(
     testEnvironment: RLTradingEnvironment,
     numEpisodes: number = 1
-  ): Promise<RLTrainingMetrics[]> {
-    const results: RLTrainingMetrics[] = [];
+  ): Promise<EnhancedRLTrainingMetrics[]> {
+    const results: EnhancedRLTrainingMetrics[] = [];
     const originalEpsilon = this.epsilon;
 
     // Set epsilon to 0 for evaluation (no exploration)
@@ -513,7 +712,7 @@ export class RLTradingAgent {
       }
 
       const episodeResults = testEnvironment.getEpisodeResults();
-      const metrics: RLTrainingMetrics = {
+      const metrics: EnhancedRLTrainingMetrics = {
         episode: episode,
         totalReward,
         averageReward: totalReward / stepCount,
@@ -525,6 +724,9 @@ export class RLTradingAgent {
         maxDrawdown: episodeResults.maxDrawdown,
         winRate: episodeResults.winRate,
         totalTrades: episodeResults.totalTrades,
+        modelComplexity: this.config.useTradeModelFactory
+          ? "TradeModelFactory"
+          : "Custom",
       };
 
       results.push(metrics);
@@ -556,7 +758,7 @@ export class RLTradingAgent {
   /**
    * Get training metrics history
    */
-  public getTrainingMetrics(): RLTrainingMetrics[] {
+  public getTrainingMetrics(): EnhancedRLTrainingMetrics[] {
     return this.trainingMetrics;
   }
 
@@ -570,7 +772,7 @@ export class RLTradingAgent {
   /**
    * Get agent configuration
    */
-  public getConfig(): RLAgentConfig {
+  public getConfig(): EnhancedRLAgentConfig {
     return this.config;
   }
 

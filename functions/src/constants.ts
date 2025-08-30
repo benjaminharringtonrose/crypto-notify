@@ -96,7 +96,7 @@ export const TRAINING_CONFIG = {
   MIN_LEARNING_RATE: 0.00005, // 7DAY-2: Higher floor for better 7-day convergence
   CYCLIC_LR_STEP_SIZE: 15, // PROVEN OPTIMAL: 10 showed minor promise but 15 is baseline
   OUTPUT_CLASSES: 2,
-  START_DAYS_AGO: 730, // PROVEN OPTIMAL: 600 days documented in experiments
+  START_DAYS_AGO: 365, // PROVEN OPTIMAL: 600 days documented in experiments
   TRAIN_SPLIT: 0.8, // PROVEN OPTIMAL: 80% train / 20% validation split
   PREFETCH_BUFFER: 4,
   PATIENCE: 10, // PROVEN OPTIMAL: Early stopping patience

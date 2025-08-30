@@ -1,6 +1,6 @@
 import FeatureCalculator from "./FeatureCalculator";
 
-// RL Environment Configuration
+// Enhanced RL Environment Configuration
 export interface RLEnvironmentConfig {
   initialCapital: number;
   commission: number;
@@ -13,9 +13,53 @@ export interface RLEnvironmentConfig {
   transactionCostPenalty: number;
   holdingPenalty: number;
   volatilityPenalty: number;
+  // New configuration parameters
+  enableMarketRegimeDetection: boolean;
+  enableSyntheticData: boolean;
+  enableHybridApproach: boolean;
+  enableDynamicPositionSizing: boolean;
+  regimeThresholds: {
+    volatilityThreshold: number;
+    trendStrengthThreshold: number;
+    momentumThreshold: number;
+  };
+  riskManagement: {
+    maxDrawdownThreshold: number;
+    positionSizeMultiplier: number;
+    volatilityScaling: boolean;
+    regimeBasedPositionSizing: boolean;
+  };
+  syntheticDataConfig: {
+    enableTrendingMarkets: boolean;
+    enableRangingMarkets: boolean;
+    enableVolatileMarkets: boolean;
+    noiseLevel: number;
+    trendStrength: number;
+  };
 }
 
-// State representation for the RL agent
+// RL Agent Configuration
+export interface RLAgentConfig {
+  learningRate: number;
+  discountFactor: number;
+  epsilon: number;
+  epsilonDecay: number;
+  epsilonMin: number;
+  batchSize: number;
+  memorySize: number;
+  targetUpdateFrequency: number;
+  hiddenLayers: number[];
+  activationFunction: string;
+  optimizer: string;
+  lossFunction: string;
+  gradientClipping: number;
+  experienceReplay: boolean;
+  prioritizedReplay: boolean;
+  doubleDQN: boolean;
+  duelingDQN: boolean;
+}
+
+// Enhanced State representation for the RL agent
 export interface RLState {
   features: number[]; // Technical indicators and market features
   position: number; // Current position (-1 to 1, where 0 = no position)
@@ -24,37 +68,79 @@ export interface RLState {
   priceHistory: number[]; // Recent price history
   volumeHistory: number[]; // Recent volume history
   timeStep: number; // Current time step
-  marketRegime: string; // Current market regime (trending, ranging, volatile)
+  marketRegime: string; // Current market regime (trending, ranging, volatile, bearish, bullish)
   volatility: number; // Current market volatility
   momentum: number; // Current price momentum
   trendStrength: number; // Current trend strength
+  // New state variables
+  regimeConfidence: number; // Confidence in regime classification (0-1)
+  riskScore: number; // Current risk score (0-1)
+  optimalPositionSize: number; // Optimal position size based on risk management
+  marketCondition: string; // Favorable, neutral, unfavorable
+  syntheticDataFlag: boolean; // Whether current data is synthetic
+  ruleBasedSignal: number; // Rule-based trading signal (-1 to 1)
+  hybridWeight: number; // Weight for hybrid approach (0-1)
 }
 
-// Action space for the RL agent
+// Enhanced Action space for the RL agent
 export enum RLAction {
   HOLD = 0,
-  BUY_SMALL = 1,
-  BUY_MEDIUM = 2,
-  BUY_LARGE = 3,
-  SELL_SMALL = 4,
-  SELL_MEDIUM = 5,
-  SELL_LARGE = 6,
+  HOLD_CASH = 1, // Explicitly hold cash (no position)
+  BUY_SMALL = 2,
+  BUY_MEDIUM = 3,
+  BUY_LARGE = 4,
+  SELL_SMALL = 5,
+  SELL_MEDIUM = 6,
+  SELL_LARGE = 7,
+  // New actions for hybrid approach
+  RULE_BASED_BUY = 8,
+  RULE_BASED_SELL = 9,
+  HYBRID_BUY = 10,
+  HYBRID_SELL = 11,
 }
 
-// Reward structure for the RL agent
+// Enhanced Reward structure for the RL agent
 export interface RLReward {
   total: number;
   components: {
     returns: number;
+    profitBonus: number;
+    trendBonus: number;
+    explorationBonus: number;
+    momentumBonus: number;
+    survivalBonus: number;
+    doNothingBonus: number;
     transactionCosts: number;
     riskPenalty: number;
     volatilityPenalty: number;
     holdingPenalty: number;
     drawdownPenalty: number;
+    // New reward components
+    regimeBonus: number; // Bonus for trading in favorable regimes
+    hybridBonus: number; // Bonus for successful hybrid decisions
+    riskManagementBonus: number; // Bonus for good risk management
+    syntheticDataBonus: number; // Bonus for learning on synthetic data
   };
 }
 
-// Episode result tracking
+// Market Regime Classification
+export interface MarketRegime {
+  type: string; // trending, ranging, volatile, bearish, bullish
+  confidence: number; // 0-1 confidence in classification
+  characteristics: {
+    volatility: number;
+    trendStrength: number;
+    momentum: number;
+    volumeProfile: string;
+  };
+  tradingConditions: {
+    isFavorable: boolean;
+    recommendedPositionSize: number;
+    riskLevel: string; // low, medium, high
+  };
+}
+
+// Enhanced Episode result tracking
 export interface RLEpisodeResult {
   totalReturn: number;
   sharpeRatio: number;
@@ -66,6 +152,12 @@ export interface RLEpisodeResult {
   actions: RLAction[];
   rewards: RLReward[];
   states: RLState[];
+  // New metrics
+  regimePerformance: { [regime: string]: number }; // Performance by regime
+  hybridPerformance: number; // Performance of hybrid decisions
+  riskManagementScore: number; // Risk management effectiveness
+  syntheticDataPerformance: number; // Performance on synthetic data
+  favorableConditionTrades: number; // Trades in favorable conditions
 }
 
 export class RLTradingEnvironment {
@@ -83,6 +175,8 @@ export class RLTradingEnvironment {
   private actionHistory!: RLAction[];
   private rewardHistory!: RLReward[];
   private stateHistory!: RLState[];
+  private regimeHistory!: MarketRegime[];
+  private syntheticDataIndices!: Set<number>;
 
   constructor(
     prices: number[],
@@ -93,7 +187,267 @@ export class RLTradingEnvironment {
     this.prices = prices;
     this.volumes = volumes;
     this.featureCalculator = new FeatureCalculator();
+
+    // Generate synthetic data if enabled
+    if (this.config.enableSyntheticData) {
+      this.generateSyntheticData();
+    }
+
     this.reset();
+  }
+
+  /**
+   * Generate synthetic data for easier learning scenarios
+   */
+  private generateSyntheticData(): void {
+    this.syntheticDataIndices = new Set();
+    const startIndex = Math.floor(this.prices.length * 0.7);
+
+    for (let i = startIndex; i < this.prices.length; i++) {
+      this.syntheticDataIndices.add(i);
+
+      if (
+        this.config.syntheticDataConfig.enableTrendingMarkets &&
+        i % 3 === 0
+      ) {
+        // Create trending market
+        const trend = this.config.syntheticDataConfig.trendStrength;
+        const noise =
+          (Math.random() - 0.5) * this.config.syntheticDataConfig.noiseLevel;
+        this.prices[i] = this.prices[i - 1] * (1 + trend + noise);
+      } else if (
+        this.config.syntheticDataConfig.enableRangingMarkets &&
+        i % 3 === 1
+      ) {
+        // Create ranging market
+        const range = 0.02; // 2% range
+        const noise =
+          (Math.random() - 0.5) * this.config.syntheticDataConfig.noiseLevel;
+        this.prices[i] =
+          this.prices[i - 1] * (1 + (Math.random() - 0.5) * range + noise);
+      } else if (
+        this.config.syntheticDataConfig.enableVolatileMarkets &&
+        i % 3 === 2
+      ) {
+        // Create volatile market
+        const volatility = 0.05; // 5% volatility
+        const noise = (Math.random() - 0.5) * volatility;
+        this.prices[i] = this.prices[i - 1] * (1 + noise);
+      }
+
+      // Ensure price doesn't go negative
+      this.prices[i] = Math.max(this.prices[i], 0.01);
+    }
+  }
+
+  /**
+   * Enhanced market regime detection
+   */
+  private detectMarketRegime(): MarketRegime {
+    const volatility = this.calculateVolatility();
+    const trendStrength = this.calculateTrendStrength();
+    const momentum = this.calculateMomentum();
+    const volumeProfile = this.analyzeVolumeProfile();
+
+    let regimeType = "ranging";
+    let confidence = 0.5;
+    let isFavorable = false;
+    let recommendedPositionSize = this.config.maxPositionSize * 0.5;
+    let riskLevel = "medium";
+
+    // Enhanced regime classification
+    if (volatility > this.config.regimeThresholds.volatilityThreshold) {
+      regimeType = "volatile";
+      confidence = Math.min(0.9, volatility / 0.1);
+      isFavorable = false;
+      recommendedPositionSize = this.config.maxPositionSize * 0.2;
+      riskLevel = "high";
+    } else if (
+      Math.abs(trendStrength) >
+      this.config.regimeThresholds.trendStrengthThreshold
+    ) {
+      if (
+        trendStrength > 0 &&
+        momentum > this.config.regimeThresholds.momentumThreshold
+      ) {
+        regimeType = "bullish";
+        confidence = Math.min(0.9, (trendStrength + momentum) / 0.1);
+        isFavorable = true;
+        recommendedPositionSize = this.config.maxPositionSize * 0.8;
+        riskLevel = "low";
+      } else if (
+        trendStrength < 0 &&
+        momentum < -this.config.regimeThresholds.momentumThreshold
+      ) {
+        regimeType = "bearish";
+        confidence = Math.min(
+          0.9,
+          (Math.abs(trendStrength) + Math.abs(momentum)) / 0.1
+        );
+        isFavorable = false;
+        recommendedPositionSize = this.config.maxPositionSize * 0.1;
+        riskLevel = "high";
+      } else {
+        regimeType = "trending";
+        confidence = Math.min(0.8, Math.abs(trendStrength) / 0.05);
+        isFavorable = Math.abs(momentum) > 0.01;
+        recommendedPositionSize = this.config.maxPositionSize * 0.6;
+        riskLevel = "medium";
+      }
+    } else {
+      regimeType = "ranging";
+      confidence = 0.7;
+      isFavorable = volatility < 0.02; // Low volatility is favorable for ranging
+      recommendedPositionSize = this.config.maxPositionSize * 0.4;
+      riskLevel = "low";
+    }
+
+    return {
+      type: regimeType,
+      confidence,
+      characteristics: {
+        volatility,
+        trendStrength,
+        momentum,
+        volumeProfile,
+      },
+      tradingConditions: {
+        isFavorable,
+        recommendedPositionSize,
+        riskLevel,
+      },
+    };
+  }
+
+  /**
+   * Analyze volume profile for regime detection
+   */
+  private analyzeVolumeProfile(): string {
+    const lookback = Math.min(20, this.currentIndex);
+    const recentVolumes = this.volumes.slice(
+      this.currentIndex - lookback,
+      this.currentIndex + 1
+    );
+    const avgVolume =
+      recentVolumes.reduce((sum, vol) => sum + vol, 0) / recentVolumes.length;
+    const currentVolume = this.volumes[this.currentIndex];
+
+    if (currentVolume > avgVolume * 1.5) return "high";
+    if (currentVolume < avgVolume * 0.5) return "low";
+    return "normal";
+  }
+
+  /**
+   * Calculate optimal position size based on risk management
+   */
+  private calculateOptimalPositionSize(): number {
+    if (!this.config.enableDynamicPositionSizing) {
+      return this.config.maxPositionSize;
+    }
+
+    const regime = this.regimeHistory[this.regimeHistory.length - 1];
+    const volatility = this.calculateVolatility();
+    const riskScore = this.calculateRiskScore();
+
+    let positionSize = this.config.maxPositionSize;
+
+    // Regime-based position sizing
+    if (this.config.riskManagement.regimeBasedPositionSizing) {
+      positionSize = regime.tradingConditions.recommendedPositionSize;
+    }
+
+    // Volatility scaling
+    if (this.config.riskManagement.volatilityScaling) {
+      const volatilityFactor = Math.max(0.1, 1 - volatility * 10);
+      positionSize *= volatilityFactor;
+    }
+
+    // Risk score adjustment
+    const riskFactor = Math.max(0.1, 1 - riskScore);
+    positionSize *= riskFactor;
+
+    // Ensure within bounds
+    return Math.max(
+      this.config.minPositionSize,
+      Math.min(this.config.maxPositionSize, positionSize)
+    );
+  }
+
+  /**
+   * Calculate comprehensive risk score
+   */
+  private calculateRiskScore(): number {
+    const volatility = this.calculateVolatility();
+    const drawdown = this.calculateCurrentDrawdown();
+    const positionRisk = Math.abs(this.currentPosition);
+    const regime = this.regimeHistory[this.regimeHistory.length - 1];
+
+    // Combine risk factors
+    const volatilityRisk = Math.min(1, volatility * 20);
+    const drawdownRisk = Math.min(1, drawdown * 2);
+    const positionRiskScore = positionRisk;
+    const regimeRisk =
+      regime.tradingConditions.riskLevel === "high"
+        ? 0.8
+        : regime.tradingConditions.riskLevel === "medium"
+        ? 0.5
+        : 0.2;
+
+    return (volatilityRisk + drawdownRisk + positionRiskScore + regimeRisk) / 4;
+  }
+
+  /**
+   * Calculate current drawdown
+   */
+  private calculateCurrentDrawdown(): number {
+    const currentValue = this.getPortfolioValue();
+    this.peakValue = Math.max(this.peakValue, currentValue);
+
+    if (this.peakValue <= 0) return 0;
+
+    return (this.peakValue - currentValue) / this.peakValue;
+  }
+
+  /**
+   * Generate rule-based trading signal
+   */
+  private generateRuleBasedSignal(): number {
+    const regime = this.regimeHistory[this.regimeHistory.length - 1];
+    const momentum = this.calculateMomentum();
+    const trendStrength = this.calculateTrendStrength();
+    const volatility = this.calculateVolatility();
+
+    let signal = 0;
+
+    // Simple rule-based strategy
+    if (regime.type === "bullish" && momentum > 0.01 && trendStrength > 0.001) {
+      signal = 0.8; // Strong buy
+    } else if (
+      regime.type === "bearish" &&
+      momentum < -0.01 &&
+      trendStrength < -0.001
+    ) {
+      signal = -0.8; // Strong sell
+    } else if (regime.type === "trending" && Math.abs(momentum) > 0.005) {
+      signal = momentum > 0 ? 0.5 : -0.5; // Moderate buy/sell
+    } else if (regime.type === "ranging" && volatility < 0.02) {
+      signal = 0.2; // Small buy for ranging markets
+    } else if (regime.type === "volatile") {
+      signal = 0; // No position in volatile markets
+    }
+
+    return signal;
+  }
+
+  /**
+   * Calculate hybrid weight based on regime confidence and performance
+   */
+  private calculateHybridWeight(): number {
+    const regime = this.regimeHistory[this.regimeHistory.length - 1];
+    const confidence = regime.confidence;
+
+    // Higher confidence in regime = higher weight for rule-based
+    return Math.min(0.8, confidence * 0.8);
   }
 
   /**
@@ -109,6 +463,7 @@ export class RLTradingEnvironment {
     this.actionHistory = [];
     this.rewardHistory = [];
     this.stateHistory = [];
+    this.regimeHistory = [];
 
     // Initialize episode results
     this.episodeResults = {
@@ -122,6 +477,11 @@ export class RLTradingEnvironment {
       actions: [],
       rewards: [],
       states: [],
+      regimePerformance: {},
+      hybridPerformance: 0,
+      riskManagementScore: 0,
+      syntheticDataPerformance: 0,
+      favorableConditionTrades: 0,
     };
 
     return this.getCurrentState();
@@ -140,13 +500,13 @@ export class RLTradingEnvironment {
     const previousPortfolioValue = this.getPortfolioValue();
     const previousPosition = this.currentPosition;
 
-    // Execute the action
+    // Execute the action with enhanced logic
     this.executeAction(action, currentPrice);
 
     // Move to next time step
     this.currentIndex++;
 
-    // Calculate reward
+    // Calculate reward with enhanced components
     const reward = this.calculateReward(
       previousPortfolioValue,
       previousPosition
@@ -154,6 +514,15 @@ export class RLTradingEnvironment {
 
     // Check if episode is done
     const done = this.currentIndex >= this.prices.length - 1;
+
+    // Enhanced stop-loss with regime consideration
+    const currentValue = this.getPortfolioValue();
+    const regime = this.regimeHistory[this.regimeHistory.length - 1];
+    const stopLossThreshold =
+      regime?.tradingConditions.riskLevel === "high" ? 0.15 : 0.2;
+    const stopLossTriggered =
+      currentValue < this.config.initialCapital * stopLossThreshold;
+    const finalDone = done || stopLossTriggered;
 
     // Get new state
     const state = this.getCurrentState();
@@ -164,45 +533,82 @@ export class RLTradingEnvironment {
     this.stateHistory.push(state);
 
     // Update episode results if done
-    if (done) {
+    if (finalDone) {
       this.calculateEpisodeResults();
+    }
+
+    // Log progress every 100 steps
+    if (this.currentIndex % 100 === 0) {
+      console.log(
+        `        📊 Step ${this.currentIndex}: Action=${action}, Regime=${
+          regime?.type
+        }, Price=${currentPrice.toFixed(
+          2
+        )}, Portfolio=${this.getPortfolioValue().toFixed(2)}, Done=${finalDone}`
+      );
     }
 
     return {
       state,
       reward,
-      done,
+      done: finalDone,
       info: {
         portfolioValue: this.getPortfolioValue(),
         position: this.currentPosition,
         currentPrice,
         timeStep: this.currentIndex,
+        stopLossTriggered,
+        regime: regime?.type,
+        riskScore: this.calculateRiskScore(),
       },
     };
   }
 
   /**
-   * Execute a trading action
+   * Enhanced action execution with hybrid approach
    */
   private executeAction(action: RLAction, currentPrice: number): void {
     const slippage = this.config.slippage;
     const commission = this.config.commission;
+    const optimalPositionSize = this.calculateOptimalPositionSize();
 
     switch (action) {
       case RLAction.HOLD:
         // No action taken
         break;
 
+      case RLAction.HOLD_CASH:
+        // Explicitly hold cash - close any existing position
+        if (this.currentPosition !== 0) {
+          this.executeSell(1.0, currentPrice, slippage, commission);
+        }
+        break;
+
       case RLAction.BUY_SMALL:
-        this.executeBuy(0.25, currentPrice, slippage, commission);
+        this.executeBuy(
+          0.25 * optimalPositionSize,
+          currentPrice,
+          slippage,
+          commission
+        );
         break;
 
       case RLAction.BUY_MEDIUM:
-        this.executeBuy(0.5, currentPrice, slippage, commission);
+        this.executeBuy(
+          0.5 * optimalPositionSize,
+          currentPrice,
+          slippage,
+          commission
+        );
         break;
 
       case RLAction.BUY_LARGE:
-        this.executeBuy(1.0, currentPrice, slippage, commission);
+        this.executeBuy(
+          optimalPositionSize,
+          currentPrice,
+          slippage,
+          commission
+        );
         break;
 
       case RLAction.SELL_SMALL:
@@ -215,6 +621,54 @@ export class RLTradingEnvironment {
 
       case RLAction.SELL_LARGE:
         this.executeSell(1.0, currentPrice, slippage, commission);
+        break;
+
+      case RLAction.RULE_BASED_BUY:
+        // Execute rule-based buy signal
+        const ruleSignal = this.generateRuleBasedSignal();
+        if (ruleSignal > 0) {
+          this.executeBuy(
+            ruleSignal * optimalPositionSize,
+            currentPrice,
+            slippage,
+            commission
+          );
+        }
+        break;
+
+      case RLAction.RULE_BASED_SELL:
+        // Execute rule-based sell signal
+        const ruleSellSignal = this.generateRuleBasedSignal();
+        if (ruleSellSignal < 0) {
+          this.executeSell(
+            Math.abs(ruleSellSignal),
+            currentPrice,
+            slippage,
+            commission
+          );
+        }
+        break;
+
+      case RLAction.HYBRID_BUY:
+        // Hybrid approach: combine RL and rule-based
+        const hybridWeight = this.calculateHybridWeight();
+        const ruleSignalHybrid = this.generateRuleBasedSignal();
+        const hybridSize =
+          (0.5 + hybridWeight * ruleSignalHybrid) * optimalPositionSize;
+        if (hybridSize > 0) {
+          this.executeBuy(hybridSize, currentPrice, slippage, commission);
+        }
+        break;
+
+      case RLAction.HYBRID_SELL:
+        // Hybrid approach: combine RL and rule-based
+        const hybridSellWeight = this.calculateHybridWeight();
+        const ruleSellSignalHybrid = this.generateRuleBasedSignal();
+        const hybridSellSize =
+          0.5 + hybridSellWeight * Math.abs(ruleSellSignalHybrid);
+        if (hybridSellSize > 0) {
+          this.executeSell(hybridSellSize, currentPrice, slippage, commission);
+        }
         break;
     }
   }
@@ -282,46 +736,93 @@ export class RLTradingEnvironment {
   }
 
   /**
-   * Calculate the reward for the current action
+   * Calculate the reward for the current action - ENHANCED VERSION
    */
   private calculateReward(
     previousPortfolioValue: number,
     previousPosition: number
   ): RLReward {
     const currentPortfolioValue = this.getPortfolioValue();
-    const returns =
-      (currentPortfolioValue - previousPortfolioValue) / previousPortfolioValue;
+
+    // Handle division by zero or negative values
+    let returns = 0;
+    if (previousPortfolioValue > 0) {
+      returns =
+        (currentPortfolioValue - previousPortfolioValue) /
+        previousPortfolioValue;
+    } else if (currentPortfolioValue > 0) {
+      returns = 1.0; // 100% return if starting from zero
+    }
 
     // Calculate risk-adjusted returns
     const riskFreeReturn = this.config.riskFreeRate / 252; // Daily risk-free rate
     const excessReturn = returns - riskFreeReturn;
 
-    // Calculate volatility penalty
+    // Calculate volatility penalty (much reduced)
     const priceChange =
       (this.prices[this.currentIndex] - this.prices[this.currentIndex - 1]) /
       this.prices[this.currentIndex - 1];
     const volatilityPenalty =
       Math.abs(priceChange) * this.config.volatilityPenalty;
 
-    // Calculate transaction cost penalty
+    // Calculate transaction cost penalty (much reduced)
     const positionChange = Math.abs(this.currentPosition - previousPosition);
     const transactionCostPenalty =
       positionChange * this.config.transactionCostPenalty;
 
-    // Calculate holding penalty (encourage active trading)
-    const holdingPenalty =
-      this.currentPosition > 0 ? this.config.holdingPenalty : 0;
+    // Calculate holding penalty (removed - allow holding profitable positions)
+    const holdingPenalty = 0; // this.config.holdingPenalty;
 
-    // Calculate drawdown penalty
-    const drawdownPenalty = this.calculateDrawdownPenalty();
+    // Calculate drawdown penalty (much reduced)
+    const drawdownPenalty = this.calculateDrawdownPenalty() * 0.1; // Reduced by 90%
 
-    // Calculate risk penalty (penalize excessive risk)
-    const riskPenalty = this.calculateRiskPenalty();
+    // Calculate risk penalty (much reduced)
+    const riskPenalty = this.calculateRiskPenalty() * 0.1; // Reduced by 90%
 
-    // Combine all components
+    // Calculate exploration bonus (increased)
+    const explorationBonus = this.calculateExplorationBonus() * 2; // Doubled
+
+    // Calculate momentum bonus (increased)
+    const momentumBonus = this.calculateMomentumBonus() * 3; // Tripled
+
+    // Calculate profit bonus (new - reward consistent profits)
+    const profitBonus = this.calculateProfitBonus();
+
+    // Calculate trend following bonus (new - reward good timing)
+    const trendBonus = this.calculateTrendBonus();
+
+    // Calculate survival bonus (new - reward staying alive)
+    const survivalBonus = this.calculateSurvivalBonus();
+
+    // Calculate "do nothing" bonus (new - reward holding cash during bad markets)
+    const doNothingBonus = this.calculateDoNothingBonus();
+
+    // NEW: Calculate regime bonus (reward for trading in favorable conditions)
+    const regimeBonus = this.calculateRegimeBonus();
+
+    // NEW: Calculate hybrid bonus (reward for successful hybrid decisions)
+    const hybridBonus = this.calculateHybridBonus();
+
+    // NEW: Calculate risk management bonus (reward for good risk management)
+    const riskManagementBonus = this.calculateRiskManagementBonus();
+
+    // NEW: Calculate synthetic data bonus (reward for learning on synthetic data)
+    const syntheticDataBonus = this.calculateSyntheticDataBonus();
+
+    // ENHANCED REWARD: Include all components
     const totalReward =
-      excessReturn * this.config.rewardScaling -
-      transactionCostPenalty -
+      excessReturn * this.config.rewardScaling +
+      survivalBonus * 10 + // Much stronger survival incentive
+      profitBonus * 5 + // Stronger profit incentive
+      doNothingBonus * 3 + // Reward for holding cash in bad markets
+      explorationBonus +
+      momentumBonus +
+      trendBonus +
+      regimeBonus * 2 + // Regime-based trading bonus
+      hybridBonus * 1.5 + // Hybrid approach bonus
+      riskManagementBonus * 2 + // Risk management bonus
+      syntheticDataBonus * 0.5 + // Synthetic data learning bonus
+      -transactionCostPenalty -
       volatilityPenalty -
       holdingPenalty -
       drawdownPenalty -
@@ -331,11 +832,21 @@ export class RLTradingEnvironment {
       total: totalReward,
       components: {
         returns: excessReturn * this.config.rewardScaling,
+        profitBonus: profitBonus,
+        trendBonus: trendBonus,
+        explorationBonus: explorationBonus,
+        momentumBonus: momentumBonus,
+        survivalBonus: survivalBonus,
+        doNothingBonus: doNothingBonus,
         transactionCosts: -transactionCostPenalty,
         riskPenalty: -riskPenalty,
         volatilityPenalty: -volatilityPenalty,
         holdingPenalty: -holdingPenalty,
         drawdownPenalty: -drawdownPenalty,
+        regimeBonus: regimeBonus,
+        hybridBonus: hybridBonus,
+        riskManagementBonus: riskManagementBonus,
+        syntheticDataBonus: syntheticDataBonus,
       },
     };
   }
@@ -346,8 +857,14 @@ export class RLTradingEnvironment {
   private calculateDrawdownPenalty(): number {
     const currentValue = this.getPortfolioValue();
     this.peakValue = Math.max(this.peakValue, currentValue);
+
+    // Handle division by zero
+    if (this.peakValue <= 0) {
+      return 0;
+    }
+
     const drawdown = (this.peakValue - currentValue) / this.peakValue;
-    return drawdown * 0.1; // Penalty for drawdowns
+    return drawdown * 0.05; // Reduced penalty for drawdowns (was 0.1)
   }
 
   /**
@@ -356,7 +873,365 @@ export class RLTradingEnvironment {
   private calculateRiskPenalty(): number {
     const volatility = this.calculateVolatility();
     const positionRisk = Math.abs(this.currentPosition) * volatility;
-    return positionRisk * 0.05; // Penalty for high risk positions
+    return positionRisk * 0.02; // Reduced penalty for high risk positions (was 0.05)
+  }
+
+  /**
+   * Calculate exploration bonus to encourage diverse actions
+   */
+  private calculateExplorationBonus(): number {
+    // Small bonus for taking actions that haven't been taken recently
+    const recentActions = this.actionHistory.slice(-10);
+    const currentAction = this.actionHistory[this.actionHistory.length - 1];
+
+    if (!currentAction) return 0;
+
+    const actionFrequency = recentActions.filter(
+      (a) => a === currentAction
+    ).length;
+    const explorationBonus = Math.max(0, (5 - actionFrequency) * 0.001);
+
+    return explorationBonus;
+  }
+
+  /**
+   * Calculate momentum bonus for trend following
+   */
+  private calculateMomentumBonus(): number {
+    const momentum = this.calculateMomentum();
+    const position = this.currentPosition;
+
+    // Reward for being on the right side of the trend
+    if (momentum > 0 && position > 0) {
+      return momentum * 0.1; // Long position in uptrend
+    } else if (momentum < 0 && position < 0) {
+      return Math.abs(momentum) * 0.1; // Short position in downtrend
+    }
+
+    return 0;
+  }
+
+  /**
+   * Calculate profit bonus for consistent positive returns
+   */
+  private calculateProfitBonus(): number {
+    const currentValue = this.getPortfolioValue();
+    const initialValue = this.config.initialCapital;
+
+    if (currentValue <= initialValue) return 0;
+
+    // Bonus for being profitable
+    const profitRatio = (currentValue - initialValue) / initialValue;
+    return profitRatio * 2.0; // 200% of profit as bonus - much more generous
+  }
+
+  /**
+   * Calculate trend following bonus for good timing
+   */
+  private calculateTrendBonus(): number {
+    const momentum = this.calculateMomentum();
+    const position = this.currentPosition;
+    const priceChange =
+      this.prices[this.currentIndex] - this.prices[this.currentIndex - 1];
+
+    // Reward for entering positions in the right direction
+    if (Math.abs(position) > 0.1) {
+      // Only if we have a meaningful position
+      if (
+        (momentum > 0 && priceChange > 0) ||
+        (momentum < 0 && priceChange < 0)
+      ) {
+        return Math.abs(momentum) * 0.2; // Bonus for good timing
+      }
+    }
+
+    return 0;
+  }
+
+  /**
+   * Calculate survival bonus for maintaining portfolio value
+   */
+  private calculateSurvivalBonus(): number {
+    const currentValue = this.getPortfolioValue();
+    const initialValue = this.config.initialCapital;
+
+    // Much more generous survival bonus
+    if (currentValue > initialValue * 0.8) {
+      return 0.1; // Strong bonus for staying above 80%
+    } else if (currentValue > initialValue * 0.5) {
+      return 0.05; // Medium bonus for staying above 50%
+    } else if (currentValue > initialValue * 0.2) {
+      return 0.02; // Small bonus for staying above 20%
+    }
+
+    return 0;
+  }
+
+  /**
+   * Calculate "do nothing" bonus for holding cash during unfavorable market conditions
+   */
+  private calculateDoNothingBonus(): number {
+    const position = this.currentPosition;
+    const momentum = this.calculateMomentum();
+    const volatility = this.calculateVolatility();
+
+    // Reward for holding cash (no position) during bad market conditions
+    if (Math.abs(position) < 0.1) {
+      // No significant position
+      if (momentum < -0.02 || volatility > 0.05) {
+        // Bad market conditions
+        return 0.05; // Bonus for staying out of bad markets
+      }
+    }
+
+    // Reward for using HOLD_CASH action specifically
+    const lastAction = this.actionHistory[this.actionHistory.length - 1];
+    if (lastAction === 1) {
+      // HOLD_CASH action
+      return 0.02; // Small bonus for explicit cash holding
+    }
+
+    return 0;
+  }
+
+  /**
+   * Calculate regime bonus for trading in favorable market conditions
+   */
+  private calculateRegimeBonus(): number {
+    const regime = this.regimeHistory[this.regimeHistory.length - 1];
+    if (!regime) return 0;
+
+    // Bonus for trading in favorable regimes
+    if (
+      regime.tradingConditions.isFavorable &&
+      Math.abs(this.currentPosition) > 0.1
+    ) {
+      return 0.1 * regime.confidence; // Bonus proportional to regime confidence
+    }
+
+    // Penalty for trading in unfavorable regimes
+    if (
+      !regime.tradingConditions.isFavorable &&
+      Math.abs(this.currentPosition) > 0.1
+    ) {
+      return -0.05 * regime.confidence; // Penalty proportional to regime confidence
+    }
+
+    return 0;
+  }
+
+  /**
+   * Calculate hybrid bonus for successful hybrid decisions
+   */
+  private calculateHybridBonus(): number {
+    const lastAction = this.actionHistory[this.actionHistory.length - 1];
+    const regime = this.regimeHistory[this.regimeHistory.length - 1];
+
+    if (!regime || !lastAction) return 0;
+
+    // Bonus for using hybrid actions in appropriate conditions
+    if (
+      (lastAction === RLAction.HYBRID_BUY ||
+        lastAction === RLAction.HYBRID_SELL) &&
+      regime.confidence > 0.7
+    ) {
+      return 0.05; // Bonus for high-confidence hybrid decisions
+    }
+
+    // Bonus for using rule-based actions when regime is clear
+    if (
+      (lastAction === RLAction.RULE_BASED_BUY ||
+        lastAction === RLAction.RULE_BASED_SELL) &&
+      regime.confidence > 0.8
+    ) {
+      return 0.03; // Bonus for high-confidence rule-based decisions
+    }
+
+    return 0;
+  }
+
+  /**
+   * Calculate risk management bonus for good risk management
+   */
+  private calculateRiskManagementBonus(): number {
+    const riskScore = this.calculateRiskScore();
+    const optimalPositionSize = this.calculateOptimalPositionSize();
+    const actualPositionSize = Math.abs(this.currentPosition);
+
+    let bonus = 0;
+
+    // Bonus for maintaining low risk score
+    if (riskScore < 0.3) {
+      bonus += 0.05;
+    } else if (riskScore < 0.5) {
+      bonus += 0.02;
+    }
+
+    // Bonus for using appropriate position sizing
+    const positionSizeRatio = actualPositionSize / optimalPositionSize;
+    if (positionSizeRatio > 0.8 && positionSizeRatio < 1.2) {
+      bonus += 0.03; // Bonus for using close to optimal position size
+    }
+
+    // Bonus for avoiding excessive drawdown
+    const drawdown = this.calculateCurrentDrawdown();
+    if (drawdown < 0.1) {
+      bonus += 0.04; // Bonus for keeping drawdown low
+    }
+
+    return bonus;
+  }
+
+  /**
+   * Calculate synthetic data bonus for learning on synthetic data
+   */
+  private calculateSyntheticDataBonus(): number {
+    if (!this.syntheticDataIndices.has(this.currentIndex)) {
+      return 0; // No bonus for real data
+    }
+
+    // Small bonus for learning on synthetic data
+    return 0.01;
+  }
+
+  /**
+   * Calculate performance by market regime
+   */
+  private calculateRegimePerformance(): void {
+    const regimePerformance: { [regime: string]: number } = {};
+    const regimeReturns: { [regime: string]: number[] } = {};
+
+    // Group returns by regime
+    for (
+      let i = 0;
+      i < this.regimeHistory.length && i < this.rewardHistory.length;
+      i++
+    ) {
+      const regime = this.regimeHistory[i];
+      const reward = this.rewardHistory[i];
+
+      if (!regimeReturns[regime.type]) {
+        regimeReturns[regime.type] = [];
+      }
+      regimeReturns[regime.type].push(reward.total);
+    }
+
+    // Calculate average return for each regime
+    for (const [regime, returns] of Object.entries(regimeReturns)) {
+      const avgReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
+      regimePerformance[regime] = avgReturn;
+    }
+
+    this.episodeResults.regimePerformance = regimePerformance;
+  }
+
+  /**
+   * Calculate hybrid approach performance
+   */
+  private calculateHybridPerformance(): void {
+    let hybridReturns = 0;
+    let hybridCount = 0;
+
+    for (
+      let i = 0;
+      i < this.actionHistory.length && i < this.rewardHistory.length;
+      i++
+    ) {
+      const action = this.actionHistory[i];
+      const reward = this.rewardHistory[i];
+
+      if (
+        action === RLAction.HYBRID_BUY ||
+        action === RLAction.HYBRID_SELL ||
+        action === RLAction.RULE_BASED_BUY ||
+        action === RLAction.RULE_BASED_SELL
+      ) {
+        hybridReturns += reward.total;
+        hybridCount++;
+      }
+    }
+
+    this.episodeResults.hybridPerformance =
+      hybridCount > 0 ? hybridReturns / hybridCount : 0;
+  }
+
+  /**
+   * Calculate risk management effectiveness score
+   */
+  private calculateRiskManagementScore(): void {
+    let totalRiskScore = 0;
+    let lowRiskCount = 0;
+    let totalDrawdown = 0;
+
+    for (const state of this.stateHistory) {
+      totalRiskScore += state.riskScore;
+      if (state.riskScore < 0.3) {
+        lowRiskCount++;
+      }
+    }
+
+    // Calculate average drawdown
+    for (let i = 1; i < this.stateHistory.length; i++) {
+      const currentValue = this.stateHistory[i].portfolioValue;
+      const previousValue = this.stateHistory[i - 1].portfolioValue;
+      if (previousValue > 0) {
+        const drawdown = (previousValue - currentValue) / previousValue;
+        totalDrawdown += Math.max(0, drawdown);
+      }
+    }
+
+    const avgRiskScore = totalRiskScore / this.stateHistory.length;
+    const riskManagementRatio = lowRiskCount / this.stateHistory.length;
+    const avgDrawdown = totalDrawdown / this.stateHistory.length;
+
+    // Combine metrics into overall score
+    this.episodeResults.riskManagementScore =
+      (1 - avgRiskScore) * 0.4 +
+      riskManagementRatio * 0.4 +
+      (1 - avgDrawdown) * 0.2;
+  }
+
+  /**
+   * Calculate performance on synthetic data
+   */
+  private calculateSyntheticDataPerformance(): void {
+    let syntheticReturns = 0;
+    let syntheticCount = 0;
+
+    for (
+      let i = 0;
+      i < this.stateHistory.length && i < this.rewardHistory.length;
+      i++
+    ) {
+      const state = this.stateHistory[i];
+      const reward = this.rewardHistory[i];
+
+      if (state.syntheticDataFlag) {
+        syntheticReturns += reward.total;
+        syntheticCount++;
+      }
+    }
+
+    this.episodeResults.syntheticDataPerformance =
+      syntheticCount > 0 ? syntheticReturns / syntheticCount : 0;
+  }
+
+  /**
+   * Calculate number of trades in favorable conditions
+   */
+  private calculateFavorableConditionTrades(): void {
+    let favorableTrades = 0;
+
+    for (const state of this.stateHistory) {
+      if (
+        state.marketCondition === "favorable" &&
+        Math.abs(state.position) > 0.1
+      ) {
+        favorableTrades++;
+      }
+    }
+
+    this.episodeResults.favorableConditionTrades = favorableTrades;
   }
 
   /**
@@ -371,7 +1246,7 @@ export class RLTradingEnvironment {
       i <= this.currentIndex;
       i++
     ) {
-      if (i > 0) {
+      if (i > 0 && this.prices[i - 1] > 0) {
         const return_val =
           (this.prices[i] - this.prices[i - 1]) / this.prices[i - 1];
         returns.push(return_val);
@@ -384,7 +1259,9 @@ export class RLTradingEnvironment {
     const variance =
       returns.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) /
       returns.length;
-    return Math.sqrt(variance);
+
+    // Ensure variance is not negative (shouldn't happen, but safety check)
+    return Math.sqrt(Math.max(variance, 0));
   }
 
   /**
@@ -392,11 +1269,20 @@ export class RLTradingEnvironment {
    */
   private getPortfolioValue(): number {
     const currentPrice = this.prices[this.currentIndex];
+
+    // Handle case where no position has been taken (entryPrice = 0)
+    if (this.entryPrice <= 0 || this.currentPosition <= 0) {
+      return this.currentCapital;
+    }
+
     const positionValue =
       this.currentCapital *
       this.currentPosition *
       (currentPrice / this.entryPrice);
-    return this.currentCapital + positionValue;
+
+    // Ensure portfolio value is never negative
+    const totalValue = this.currentCapital + positionValue;
+    return Math.max(totalValue, 0);
   }
 
   /**
@@ -413,10 +1299,29 @@ export class RLTradingEnvironment {
       currentPrice,
     });
 
+    // Detect market regime
+    const regime = this.detectMarketRegime();
+    this.regimeHistory.push(regime);
+
     // Calculate market metrics
     const volatility = this.calculateVolatility();
     const trendStrength = this.calculateTrendStrength();
-    const marketRegime = this.determineMarketRegime();
+    const riskScore = this.calculateRiskScore();
+    const optimalPositionSize = this.calculateOptimalPositionSize();
+    const ruleBasedSignal = this.generateRuleBasedSignal();
+    const hybridWeight = this.calculateHybridWeight();
+
+    // Determine market condition
+    let marketCondition = "neutral";
+    if (regime.tradingConditions.isFavorable) {
+      marketCondition = "favorable";
+    } else if (regime.tradingConditions.riskLevel === "high") {
+      marketCondition = "unfavorable";
+    }
+
+    // Check if current data is synthetic
+    const syntheticDataFlag =
+      this.syntheticDataIndices?.has(this.currentIndex) || false;
 
     // Get recent price and volume history
     const priceHistory = this.prices.slice(
@@ -436,10 +1341,17 @@ export class RLTradingEnvironment {
       priceHistory,
       volumeHistory,
       timeStep: this.currentIndex,
-      marketRegime,
+      marketRegime: regime.type,
       volatility,
       momentum: this.calculateMomentum(),
       trendStrength,
+      regimeConfidence: regime.confidence,
+      riskScore,
+      optimalPositionSize,
+      marketCondition,
+      syntheticDataFlag,
+      ruleBasedSignal,
+      hybridWeight,
     };
   }
 
@@ -452,6 +1364,10 @@ export class RLTradingEnvironment {
 
     const currentPrice = this.prices[this.currentIndex];
     const pastPrice = this.prices[this.currentIndex - lookback];
+
+    // Handle division by zero
+    if (pastPrice <= 0) return 0;
+
     return (currentPrice - pastPrice) / pastPrice;
   }
 
@@ -489,22 +1405,6 @@ export class RLTradingEnvironment {
     const intercept = (sumY - slope * sumX) / n;
 
     return { slope, intercept };
-  }
-
-  /**
-   * Determine current market regime
-   */
-  private determineMarketRegime(): string {
-    const volatility = this.calculateVolatility();
-    const trendStrength = this.calculateTrendStrength();
-
-    if (volatility > 0.05) {
-      return "volatile";
-    } else if (Math.abs(trendStrength) > 0.001) {
-      return "trending";
-    } else {
-      return "ranging";
-    }
   }
 
   /**
@@ -550,6 +1450,21 @@ export class RLTradingEnvironment {
           holdingPeriods.length
         : 0;
 
+    // NEW: Calculate regime performance
+    this.calculateRegimePerformance();
+
+    // NEW: Calculate hybrid performance
+    this.calculateHybridPerformance();
+
+    // NEW: Calculate risk management score
+    this.calculateRiskManagementScore();
+
+    // NEW: Calculate synthetic data performance
+    this.calculateSyntheticDataPerformance();
+
+    // NEW: Calculate favorable condition trades
+    this.calculateFavorableConditionTrades();
+
     // Copy arrays
     this.episodeResults.actions = [...this.actionHistory];
     this.episodeResults.rewards = [...this.rewardHistory];
@@ -593,7 +1508,7 @@ export class RLTradingEnvironment {
    * Get action space size
    */
   public getActionSpaceSize(): number {
-    return Object.keys(RLAction).length / 2; // Exclude enum reverse mappings
+    return 12; // Total number of actions including new hybrid actions
   }
 
   /**
@@ -601,7 +1516,7 @@ export class RLTradingEnvironment {
    */
   public getStateSpaceSize(): number {
     const state = this.getCurrentState();
-    return state.features.length + 10; // Features + additional state variables
+    return state.features.length + 17; // Features + additional state variables (increased for new variables)
   }
 
   /**

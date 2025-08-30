@@ -1,8 +1,8 @@
-import { CryptoCompareService } from "../api/CryptoCompareService";
-import { PERIODS } from "../constants";
-import { HistoricalData, ModelConfig } from "../types";
-import FeatureCalculator from "./FeatureCalculator";
-import { FeatureDetector } from "./FeatureDetector";
+import { CryptoCompareService } from "../../api/CryptoCompareService";
+import { PERIODS } from "../../constants";
+import { HistoricalData, ModelConfig } from "../../types";
+import FeatureCalculator from "../shared/FeatureCalculator";
+import { FeatureDetector } from "../shared/FeatureDetector";
 
 const cryptoCompare = new CryptoCompareService();
 

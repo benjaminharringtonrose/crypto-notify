@@ -1,6 +1,6 @@
 import { TradingStrategy } from "./TradingStrategy";
-import { HistoricalData, Recommendation, Trade } from "../types";
-import { TIME_CONVERSIONS } from "../constants";
+import { HistoricalData, Recommendation, Trade } from "../../types";
+import { TIME_CONVERSIONS } from "../../constants";
 
 interface BacktestTrade extends Trade {
   confidence: number;

@@ -1,4 +1,4 @@
-import { TradeModelBacktester } from "../bitcoin/TradeModelBacktester";
+import { TradeModelBacktester } from "../bitcoin/ml/TradeModelBacktester";
 import { CoinbaseService } from "../api/CoinbaseService";
 import { HistoricalData } from "../types";
 import { TIME_CONVERSIONS, STRATEGY_CONFIG } from "../constants";

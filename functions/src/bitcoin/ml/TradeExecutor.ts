@@ -12,8 +12,8 @@ import {
   Granularity,
   Recommendation,
   Trade,
-} from "../types";
-import { TIME_CONVERSIONS } from "../constants";
+} from "../../types";
+import { TIME_CONVERSIONS } from "../../constants";
 
 interface CoinbaseClientConfig {
   apiKey?: string;

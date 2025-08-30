@@ -10,7 +10,7 @@ import {
   formatPredictionExplanation,
   sendSMS,
 } from "../utils";
-import { TradeModelPredictor } from "../bitcoin/TradeModelPredictor";
+import { TradeModelPredictor } from "../bitcoin/ml/TradeModelPredictor";
 import { TIME_CONVERSIONS } from "../constants";
 import { CoinbaseService } from "../api/CoinbaseService";
 

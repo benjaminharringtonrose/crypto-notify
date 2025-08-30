@@ -2,17 +2,17 @@ import * as admin from "firebase-admin";
 import * as tf from "@tensorflow/tfjs-node";
 import dotenv from "dotenv";
 
-import { ExponentialDecayLRCallback } from "./callbacks/ExponentialDecayLRCallback";
-import { GradientClippingCallback } from "./callbacks/GradientClippingCallback";
-// import { CurriculumLearningCallback } from "./callbacks/CurriculumLearningCallback"; // RECOVERY-3: Disabled
-import { TrainingLoggerCallback } from "./callbacks/TrainingLoggerCallback";
-import { ModelConfig } from "../types";
+import { ExponentialDecayLRCallback } from "../shared/callbacks/ExponentialDecayLRCallback";
+import { GradientClippingCallback } from "../shared/callbacks/GradientClippingCallback";
+// import { CurriculumLearningCallback } from "../shared/callbacks/CurriculumLearningCallback"; // RECOVERY-3: Disabled
+import { TrainingLoggerCallback } from "../shared/callbacks/TrainingLoggerCallback";
+import { ModelConfig } from "../../types";
 import TradeModelFactory from "./TradeModelFactory";
-import { FirebaseService } from "../api/FirebaseService";
-import { FILE_NAMES, MODEL_CONFIG, TRAINING_CONFIG } from "../constants";
+import { FirebaseService } from "../../api/FirebaseService";
+import { FILE_NAMES, MODEL_CONFIG, TRAINING_CONFIG } from "../../constants";
 import { DataProcessor } from "./DataProcessor";
-import { Metrics } from "./Metrics";
-import { FeatureDetector } from "./FeatureDetector";
+import { Metrics } from "../shared/Metrics";
+import { FeatureDetector } from "../shared/FeatureDetector";
 
 dotenv.config();
 FirebaseService.getInstance();

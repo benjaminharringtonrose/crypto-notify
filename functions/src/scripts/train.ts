@@ -1,4 +1,4 @@
-import { TradeModelTrainer } from "../bitcoin/TradeModelTrainer";
+import { TradeModelTrainer } from "../bitcoin/ml/TradeModelTrainer";
 import * as tf from "@tensorflow/tfjs-node";
 
 interface TrainingResult {

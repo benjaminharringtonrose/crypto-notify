@@ -6,8 +6,8 @@
  * the FeatureRegistry to match, ensuring consistency across the system.
  */
 
-import FeatureCalculator from "../bitcoin/FeatureCalculator";
-import { FEATURE_REGISTRY } from "../bitcoin/FeatureRegistry";
+import FeatureCalculator from "../bitcoin/shared/FeatureCalculator";
+import { FEATURE_REGISTRY } from "../bitcoin/shared/FeatureRegistry";
 
 class FeatureRegistryFixer {
   private featureCalculator: FeatureCalculator;

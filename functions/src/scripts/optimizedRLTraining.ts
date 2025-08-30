@@ -1,14 +1,14 @@
 import { CryptoCompareService } from "../api/CryptoCompareService";
 import { FirebaseService } from "../api/FirebaseService";
-import { RLTradingEnvironment } from "../bitcoin/RLTradingEnvironment";
-import { EnhancedRLAgent } from "../bitcoin/EnhancedRLAgent";
+import { RLTradingEnvironment } from "../bitcoin/rl/RLTradingEnvironment";
+import { EnhancedRLAgent } from "../bitcoin/rl/EnhancedRLAgent";
 import {
   HighReturnRLEnvironmentConfig,
   MomentumFocusedConfig,
   VolatilityHarvestingConfig,
   MultiTimeframeConfig,
   ReturnOptimizationStrategies,
-} from "../bitcoin/HighReturnRLConfig";
+} from "../bitcoin/rl/HighReturnRLConfig";
 
 // Initialize Firebase
 FirebaseService.getInstance();

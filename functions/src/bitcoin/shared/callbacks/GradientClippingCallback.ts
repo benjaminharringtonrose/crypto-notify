@@ -1,5 +1,5 @@
 import * as tf from "@tensorflow/tfjs-node";
-import { TRAINING_CONFIG } from "../../constants";
+import { TRAINING_CONFIG } from "../../../constants";
 
 export class GradientClippingCallback extends tf.CustomCallback {
   private model: tf.LayersModel | null = null;
@@ -28,7 +28,9 @@ export class GradientClippingCallback extends tf.CustomCallback {
   }
 
   private calculateLoss(predictions: tf.Tensor): tf.Scalar {
-    return tf.losses.softmaxCrossEntropy(this.yVal, predictions).mean() as tf.Scalar;
+    return tf.losses
+      .softmaxCrossEntropy(this.yVal, predictions)
+      .mean() as tf.Scalar;
   }
 
   async onEpochEnd(epoch: number, logs?: tf.Logs) {
@@ -55,12 +57,12 @@ export class GradientClippingCallback extends tf.CustomCallback {
           .map((g) => tf.sum(tf.square(g)))
           .reduce((acc, curr) => acc.add(curr), tf.scalar(0))
       );
-      
+
       // Send gradient norm to training logger instead of logging directly
       if (this.trainingLogger) {
         this.trainingLogger.setGradientNorm(gradNorm.dataSync()[0]);
       }
-      
+
       const clippedGrads: { [key: string]: tf.Tensor } = {};
       trainableWeights.forEach((weight, i) => {
         const grad = grads[i];

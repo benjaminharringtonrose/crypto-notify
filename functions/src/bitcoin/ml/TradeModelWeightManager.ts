@@ -1,8 +1,8 @@
 import * as tf from "@tensorflow/tfjs-node";
-import { FirebaseService } from "../api/FirebaseService";
+import { FirebaseService } from "../../api/FirebaseService";
 import { Bucket } from "@google-cloud/storage";
-import { FILE_NAMES, MODEL_CONFIG, TRAINING_CONFIG } from "../constants";
-import { FeatureDetector } from "./FeatureDetector";
+import { FILE_NAMES, MODEL_CONFIG, TRAINING_CONFIG } from "../../constants";
+import { FeatureDetector } from "../shared/FeatureDetector";
 
 export class ModelWeightManager {
   private weights: any;

@@ -1,7 +1,7 @@
 import { TradeModelPredictor } from "./TradeModelPredictor";
-import { Trade, Recommendation, StrategyType } from "../types";
-import { PERIODS, STRATEGY_CONFIG, TIME_CONVERSIONS } from "../constants";
-import FeatureCalculator from "./FeatureCalculator";
+import { Trade, Recommendation, StrategyType } from "../../types";
+import { PERIODS, STRATEGY_CONFIG, TIME_CONVERSIONS } from "../../constants";
+import FeatureCalculator from "../shared/FeatureCalculator";
 
 interface TradingStrategyParams {
   basePositionSize?: number;

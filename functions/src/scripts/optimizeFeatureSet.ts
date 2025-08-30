@@ -9,8 +9,8 @@
 // Import types only for now, will implement locally
 // import { FeatureAnalyzer, FeatureAnalysisResult } from "./analyzeFeatures";
 import { FeatureAblationStudy, AblationResult } from "./featureAblationStudy";
-import { DataProcessor } from "../bitcoin/DataProcessor";
-import { FeatureDetector } from "../bitcoin/FeatureDetector";
+import { DataProcessor } from "../bitcoin/ml/DataProcessor";
+import { FeatureDetector } from "../bitcoin/shared/FeatureDetector";
 import { MODEL_CONFIG, TRAINING_CONFIG } from "../constants";
 import * as tf from "@tensorflow/tfjs-node";
 

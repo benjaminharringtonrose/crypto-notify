@@ -10,8 +10,8 @@ import {
 } from "../types";
 import { sendSMS, formatAnalysisResults } from "../utils";
 import { getFirestore } from "firebase-admin/firestore";
-import { TradingStrategy } from "../bitcoin/TradingStrategy";
-import { TradeExecutor } from "../bitcoin/TradeExecutor";
+import { TradingStrategy } from "../bitcoin/ml/TradingStrategy";
+import { TradeExecutor } from "../bitcoin/ml/TradeExecutor";
 import { TIME_CONVERSIONS } from "../constants";
 
 const CONFIG: ScheduleOptions = {

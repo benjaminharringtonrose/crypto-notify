@@ -1,5 +1,5 @@
 import * as tf from "@tensorflow/tfjs-node";
-import { TRAINING_CONFIG } from "../../constants";
+import { TRAINING_CONFIG } from "../../../constants";
 
 export class ExponentialDecayLRCallback extends tf.CustomCallback {
   private model: tf.LayersModel | null = null;

@@ -2,8 +2,8 @@ import { https, logger } from "firebase-functions";
 import { HttpsOptions } from "firebase-functions/https";
 import { CoinbaseProductIds, Granularity } from "../types";
 import { sendSMS } from "../utils";
-import { TradingStrategy } from "../bitcoin/TradingStrategy";
-import { TradeExecutor } from "../bitcoin/TradeExecutor";
+import { TradingStrategy } from "../bitcoin/ml/TradingStrategy";
+import { TradeExecutor } from "../bitcoin/ml/TradeExecutor";
 import { TIME_CONVERSIONS } from "../constants";
 
 const NOW_CONFIG: HttpsOptions = {

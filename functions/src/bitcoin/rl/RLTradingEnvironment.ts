@@ -1,4 +1,4 @@
-import FeatureCalculator from "./FeatureCalculator";
+import FeatureCalculator from "../shared/FeatureCalculator";
 
 // Enhanced RL Environment Configuration
 export interface RLEnvironmentConfig {

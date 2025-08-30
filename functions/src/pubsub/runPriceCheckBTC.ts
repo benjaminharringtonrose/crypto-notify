@@ -8,7 +8,7 @@ import {
   priceAlertTextMessage,
 } from "../utils";
 import { CoinbaseProductIds, Collections, Docs } from "../types";
-import { TradeExecutor } from "../bitcoin/TradeExecutor";
+import { TradeExecutor } from "../bitcoin/ml/TradeExecutor";
 
 const CONFIG: ScheduleOptions = {
   schedule: "*/10 * * * *",

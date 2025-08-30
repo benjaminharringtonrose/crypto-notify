@@ -1,6 +1,6 @@
 import * as tf from "@tensorflow/tfjs-node";
-import { TRAINING_CONFIG } from "../../constants";
-import { TradeModelTrainer } from "../TradeModelTrainer";
+import { TRAINING_CONFIG } from "../../../constants";
+import { TradeModelTrainer } from "../../ml/TradeModelTrainer";
 import { Metrics } from "../Metrics";
 
 interface EpochData {

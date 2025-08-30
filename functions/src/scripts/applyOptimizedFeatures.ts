@@ -6,8 +6,8 @@
  * the FeatureCalculator with the optimal 25-feature set.
  */
 
-import { FeatureDetector } from "../bitcoin/FeatureDetector";
-import { FEATURE_REGISTRY } from "../bitcoin/FeatureRegistry";
+import { FeatureDetector } from "../bitcoin/shared/FeatureDetector";
+import { FEATURE_REGISTRY } from "../bitcoin/shared/FeatureRegistry";
 
 // Results from gradual optimization
 const OPTIMIZATION_RESULTS = {

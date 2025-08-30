@@ -1,5 +1,5 @@
 import * as tf from "@tensorflow/tfjs-node";
-import { TradeModelTrainer } from "../TradeModelTrainer";
+import { TradeModelTrainer } from "../../ml/TradeModelTrainer";
 
 export class PredictionLoggerCallback {
   private model: tf.LayersModel | null = null;

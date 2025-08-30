@@ -1,10 +1,10 @@
 import * as tf from "@tensorflow/tfjs-node";
 import { ModelWeightManager } from "./TradeModelWeightManager";
 import TradeModelFactory from "./TradeModelFactory";
-import { FeatureSequenceGenerator } from "./FeatureSequenceGenerator";
-import { FirebaseService } from "../api/FirebaseService";
-import { MODEL_CONFIG, PERIODS } from "../constants";
-import { FeatureDetector } from "./FeatureDetector";
+import { FeatureSequenceGenerator } from "../shared/FeatureSequenceGenerator";
+import { FirebaseService } from "../../api/FirebaseService";
+import { MODEL_CONFIG, PERIODS } from "../../constants";
+import { FeatureDetector } from "../shared/FeatureDetector";
 
 export class TradeModelPredictor {
   private weightManager: ModelWeightManager;

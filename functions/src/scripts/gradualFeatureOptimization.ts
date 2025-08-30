@@ -15,11 +15,11 @@
 import * as tf from "@tensorflow/tfjs-node";
 import * as fs from "fs";
 import * as path from "path";
-import { DataProcessor } from "../bitcoin/DataProcessor";
-import { FeatureDetector } from "../bitcoin/FeatureDetector";
-import { TradeModelTrainer } from "../bitcoin/TradeModelTrainer";
+import { DataProcessor } from "../bitcoin/ml/DataProcessor";
+import { FeatureDetector } from "../bitcoin/shared/FeatureDetector";
+import { TradeModelTrainer } from "../bitcoin/ml/TradeModelTrainer";
 import { MODEL_CONFIG, TRAINING_CONFIG } from "../constants";
-import { FeatureRegistry } from "../bitcoin/FeatureRegistry";
+import { FeatureRegistry } from "../bitcoin/shared/FeatureRegistry";
 
 interface PerformanceMetrics {
   validationAccuracy: number;

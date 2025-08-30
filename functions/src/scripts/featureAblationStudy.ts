@@ -7,9 +7,9 @@
  */
 
 import * as tf from "@tensorflow/tfjs-node";
-import { DataProcessor } from "../bitcoin/DataProcessor";
-import { FEATURE_REGISTRY } from "../bitcoin/FeatureRegistry";
-import { FeatureDetector } from "../bitcoin/FeatureDetector";
+import { DataProcessor } from "../bitcoin/ml/DataProcessor";
+import { FEATURE_REGISTRY } from "../bitcoin/shared/FeatureRegistry";
+import { FeatureDetector } from "../bitcoin/shared/FeatureDetector";
 import { MODEL_CONFIG, TRAINING_CONFIG } from "../constants";
 
 interface AblationResult {

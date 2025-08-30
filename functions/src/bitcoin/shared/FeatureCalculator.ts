@@ -1,5 +1,5 @@
-import { Indicators } from "../types";
-import { PERIODS } from "../constants";
+import { Indicators } from "../../types";
+import { PERIODS } from "../../constants";
 import { FeatureDetector } from "./FeatureDetector";
 
 interface ComputeParams {

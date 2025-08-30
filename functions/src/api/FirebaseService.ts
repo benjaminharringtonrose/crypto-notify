@@ -1,5 +1,5 @@
 import * as admin from "firebase-admin";
-import dotenv from "dotenv";
+import * as dotenv from "dotenv";
 import { Bucket } from "@google-cloud/storage";
 
 dotenv.config();

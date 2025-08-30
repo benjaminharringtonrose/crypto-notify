@@ -1,0 +1,37 @@
+🚀 Testing Individual Feature Removal
+🎯 Testing removal of: "cci"
+🎯 Performance tolerance: 2%
+🎲 Using seed: 42
+================================================================================
+
+🔧 Initializing feature detection...
+
+📈 Step 1: Establishing Baseline Performance (All Features)
+✅ Baseline: 0.4810 accuracy, 0.9119 combined F1
+
+🔍 Step 2: Testing Performance Without "cci"
+
+================================================================================
+📋 FEATURE REMOVAL TEST RESULTS
+================================================================================
+
+🎯 Feature Tested: "cci"
+📊 Feature Index: 23/55
+
+📈 PERFORMANCE COMPARISON:
+   Metric              | Baseline | Modified | Change
+   --------------------|----------|----------|--------
+   Validation Accuracy | 0.4810 | 0.5311 | 10.43%
+   Buy F1 Score        | 0.3392 | 0.4838 | 42.63%
+   Sell F1 Score       | 0.5726 | 0.5705 | -0.37%
+   Combined F1 Score   | 0.9119 | 1.0543 | 15.62%
+   Balanced Accuracy   | 0.4810 | 0.5311 | 10.43%
+   Matthews Correlation| -0.0421 | 0.0634 | -250.36%
+
+🎯 DECISION: REMOVE
+✅ RECOMMENDATION: Remove "cci" - Performance improved by 15.62%
+
+📊 FEATURE COUNT:
+   Original: 55 features
+   Modified: 54 features
+   Reduction: 1 feature (1.8%)

@@ -1,0 +1,521 @@
+/**
+ * FeatureRegistry - Central registry of all features with metadata
+ * This eliminates hardcoded feature counts and enables feature analysis
+ */
+
+export interface FeatureDefinition {
+  name: string;
+  description: string;
+  category: "core" | "technical" | "ratio" | "enhanced" | "microstructure";
+  experimentAdded?: string; // e.g., "Experiment #61"
+  importance?: "high" | "medium" | "low" | "unknown";
+}
+
+/**
+ * OPTIMIZED feature registry matching FeatureCalculator.ts optimizedFeatures array
+ * Order MUST match the exact order in FeatureCalculator
+ * Optimized from 36 to 26 features based on gradual optimization results
+ */
+export const FEATURE_REGISTRY: FeatureDefinition[] = [
+  // 1-4: Core Price Action & Volatility (4 features)
+  {
+    name: "highLowRange",
+    description: "High-low price range",
+    category: "core",
+    importance: "medium",
+  },
+  {
+    name: "priceVolatility",
+    description: "Short-term price volatility",
+    category: "core",
+    importance: "high",
+  },
+  {
+    name: "pricePosition",
+    description: "Price position in recent range",
+    category: "core",
+    importance: "medium",
+  },
+  {
+    name: "relativeVolume",
+    description: "Relative volume indicator",
+    category: "core",
+    importance: "medium",
+  },
+
+  // 6-10: Technical Indicators (5 features)
+  {
+    name: "rsi",
+    description: "RSI momentum oscillator",
+    category: "technical",
+    importance: "high",
+  },
+  {
+    name: "signalLine",
+    description: "MACD signal line",
+    category: "technical",
+    importance: "high",
+  },
+  {
+    name: "vwapRatio",
+    description: "Price to VWAP ratio",
+    category: "technical",
+    importance: "high",
+  },
+  {
+    name: "atr",
+    description: "Average True Range",
+    category: "technical",
+    importance: "high",
+  },
+  {
+    name: "obv",
+    description: "On-Balance Volume",
+    category: "technical",
+    importance: "high",
+  },
+
+  // 11-15: Enhanced Indicators (5 features)
+  {
+    name: "momentum",
+    description: "Raw momentum",
+    category: "enhanced",
+    importance: "medium",
+  },
+  {
+    name: "macdHistogram",
+    description: "MACD histogram",
+    category: "enhanced",
+    importance: "medium",
+  },
+  {
+    name: "priceSMA7Ratio",
+    description: "Price to SMA7 ratio",
+    category: "ratio",
+    importance: "medium",
+  },
+  {
+    name: "priceSMA21Ratio",
+    description: "Price to SMA21 ratio",
+    category: "ratio",
+    importance: "medium",
+  },
+  {
+    name: "priceSMA50Ratio",
+    description: "Price to SMA50 ratio",
+    category: "ratio",
+    importance: "medium",
+  },
+
+  // 16-20: Market Regime Features (5 features)
+  {
+    name: "trendRegime",
+    description: "Trend regime score",
+    category: "enhanced",
+    importance: "high",
+  },
+  {
+    name: "volatilityRegime",
+    description: "Volatility regime score (normalized)",
+    category: "enhanced",
+    importance: "medium",
+  },
+  {
+    name: "ichimokuTenkanSen",
+    description: "Ichimoku Tenkan-sen (9-period)",
+    category: "microstructure",
+    experimentAdded: "Experiment #61",
+    importance: "medium",
+  },
+  {
+    name: "ichimokuKijunSen",
+    description: "Ichimoku Kijun-sen (26-period)",
+    category: "microstructure",
+    experimentAdded: "Experiment #61",
+    importance: "medium",
+  },
+  {
+    name: "ichimokuCloudPosition",
+    description: "Position relative to Ichimoku cloud",
+    category: "microstructure",
+    experimentAdded: "Experiment #61",
+    importance: "medium",
+  },
+
+  // 21-26: Advanced Microstructure Features (6 features)
+  {
+    name: "williamsR",
+    description: "Williams %R momentum oscillator",
+    category: "microstructure",
+    experimentAdded: "Experiment #61",
+    importance: "medium",
+  },
+
+  {
+    name: "volumeMA20",
+    description: "20-day volume moving average",
+    category: "technical",
+    importance: "medium",
+  },
+  {
+    name: "volumeOscillator",
+    description: "Volume oscillator",
+    category: "technical",
+    importance: "medium",
+  },
+  {
+    name: "bollingerSqueeze",
+    description: "Bollinger Band squeeze indicator",
+    category: "enhanced",
+    importance: "low",
+  },
+  {
+    name: "rsiDivergence",
+    description: "RSI divergence signal",
+    category: "enhanced",
+    importance: "low",
+  },
+  {
+    name: "cci",
+    description: "Commodity Channel Index (CCI)",
+    category: "microstructure",
+    experimentAdded: "Experiment #2 - CCI",
+    importance: "medium",
+  },
+  {
+    name: "mfi",
+    description: "Money Flow Index (MFI)",
+    category: "microstructure",
+    experimentAdded: "Experiment #3 - MFI",
+    importance: "medium",
+  },
+  {
+    name: "aroonOscillator",
+    description: "Aroon Oscillator",
+    category: "microstructure",
+    experimentAdded: "Experiment #5 - Aroon",
+    importance: "medium",
+  },
+  {
+    name: "donchianPosition",
+    description: "Donchian Channels position",
+    category: "microstructure",
+    experimentAdded: "Experiment #2 - Donchian",
+    importance: "medium",
+  },
+  {
+    name: "parabolicSAR",
+    description: "Parabolic SAR trend",
+    category: "microstructure",
+    experimentAdded: "Experiment #3 - Parabolic SAR",
+    importance: "medium",
+  },
+  {
+    name: "adx",
+    description: "Average Directional Index (ADX)",
+    category: "microstructure",
+    experimentAdded: "Experiment #1 - ADX",
+    importance: "medium",
+  },
+  {
+    name: "ichimokuPosition",
+    description: "Ichimoku Cloud position",
+    category: "microstructure",
+    experimentAdded: "Experiment #2 - Ichimoku",
+    importance: "medium",
+  },
+  {
+    name: "fibonacciPosition",
+    description: "Fibonacci Retracement position",
+    category: "microstructure",
+    experimentAdded: "Experiment #3 - Fibonacci",
+    importance: "medium",
+  },
+  {
+    name: "stochasticK",
+    description: "Stochastic K oscillator",
+    category: "microstructure",
+    experimentAdded: "Experiment #4 - Stochastic",
+    importance: "medium",
+  },
+  {
+    name: "priceAcceleration",
+    description: "Price acceleration indicator",
+    category: "microstructure",
+    experimentAdded: "Experiment #5 - Price Acceleration",
+    importance: "medium",
+  },
+  {
+    name: "proc",
+    description: "Price Rate of Change (PROC)",
+    category: "microstructure",
+    experimentAdded: "Experiment #2 - PROC",
+    importance: "medium",
+  },
+  {
+    name: "stochRsi",
+    description: "Stochastic RSI (StochRSI)",
+    category: "microstructure",
+    experimentAdded: "Experiment #4 - StochRSI",
+    importance: "medium",
+  },
+  {
+    name: "vwma",
+    description: "Volume Weighted Moving Average (VWMA)",
+    category: "microstructure",
+    experimentAdded: "Experiment #5 - VWMA",
+    importance: "medium",
+  },
+  {
+    name: "centerOfGravityOscillator",
+    description: "Center of Gravity Oscillator (COG)",
+    category: "microstructure",
+    experimentAdded: "Experiment #4 - Center of Gravity Oscillator",
+    importance: "medium",
+  },
+  {
+    name: "tsi",
+    description: "True Strength Index (TSI)",
+    category: "microstructure",
+    experimentAdded: "Experiment #7-1 - TSI",
+    importance: "medium",
+  },
+  {
+    name: "pmo",
+    description: "Price Momentum Oscillator (PMO)",
+    category: "microstructure",
+    experimentAdded: "Experiment #7-3 - PMO",
+    importance: "medium",
+  },
+  {
+    name: "bollingerBandWidth",
+    description: "Bollinger Band Width - percentage width of Bollinger Bands",
+    category: "technical",
+    experimentAdded: "Experiment #7-4",
+    importance: "medium",
+  },
+  {
+    name: "historicalVolatility",
+    description:
+      "Historical Volatility - annualized volatility based on log returns",
+    category: "technical",
+    experimentAdded: "Experiment #8-1",
+    importance: "medium",
+  },
+  {
+    name: "camarillaPivots",
+    description:
+      "Camarilla Pivots - support/resistance levels based on previous day's range",
+    category: "technical",
+    experimentAdded: "Experiment #8-4",
+    importance: "medium",
+  },
+  {
+    name: "acceleratorOscillator",
+    description:
+      "Accelerator Oscillator - momentum acceleration/deceleration indicator",
+    category: "technical",
+    experimentAdded: "Experiment #8-5",
+    importance: "medium",
+  },
+  {
+    name: "chaikinOscillator",
+    description:
+      "Chaikin Oscillator - volume-based momentum indicator using ADL EMAs",
+    category: "technical",
+    experimentAdded: "Experiment #9-1",
+    importance: "medium",
+  },
+  {
+    name: "klingerVolumeOscillator",
+    description: "Klinger Volume Oscillator - trend-following volume indicator",
+    category: "technical",
+    experimentAdded: "Experiment #9-3",
+    importance: "medium",
+  },
+  {
+    name: "massIndex",
+    description:
+      "Mass Index - volatility indicator measuring range expansion/contraction",
+    category: "technical",
+    experimentAdded: "Experiment #9-4",
+    importance: "medium",
+  },
+  {
+    name: "priceChannel",
+    description:
+      "Price Channel - support/resistance indicator measuring position within channel",
+    category: "technical",
+    experimentAdded: "Experiment #9-5",
+    importance: "medium",
+  },
+  {
+    name: "fisherTransform",
+    description:
+      "Fisher Transform - advanced oscillator that transforms price data to Gaussian distribution for better turning point identification",
+    category: "technical",
+    experimentAdded: "Experiment #10-1",
+    importance: "medium",
+  },
+  {
+    name: "hullMovingAverage",
+    description:
+      "Hull Moving Average (HMA) - advanced trend indicator using weighted moving averages to reduce lag while maintaining smoothness",
+    category: "technical",
+    experimentAdded: "Experiment #10-2",
+    importance: "medium",
+  },
+  {
+    name: "kaufmanAdaptiveMovingAverage",
+    description:
+      "Kaufman Adaptive Moving Average (KAMA) - advanced trend indicator that adapts to market volatility using efficiency ratio",
+    category: "technical",
+    experimentAdded: "Experiment #10-3",
+    importance: "medium",
+  },
+  {
+    name: "mesaSineWave",
+    description:
+      "MESA Sine Wave - advanced oscillator using Hilbert Transform to create sine wave that leads price action",
+    category: "technical",
+    experimentAdded: "Experiment #10-4",
+    importance: "medium",
+  },
+  {
+    name: "rainbowMovingAverage",
+    description:
+      "Rainbow Moving Average - advanced trend indicator using multiple EMAs to create rainbow effect for trend analysis",
+    category: "technical",
+    experimentAdded: "Experiment #10-5",
+    importance: "medium",
+  },
+  {
+    name: "supportResistanceLevel",
+    description:
+      "Support/Resistance Level (SRL) - advanced support/resistance indicator measuring price position relative to local highs and lows",
+    category: "technical",
+    experimentAdded: "Experiment #12-2",
+    importance: "medium",
+  },
+  {
+    name: "mcginleyDynamic",
+    description:
+      "McGinley Dynamic - advanced moving average that adjusts to market speed and provides better trend identification than traditional moving averages",
+    category: "technical",
+    experimentAdded: "Experiment #15-3",
+    importance: "medium",
+  },
+  {
+    name: "knowSureThing",
+    description:
+      "Know Sure Thing (KST) - long-term momentum oscillator that combines multiple rate of change measurements to identify major market trends",
+    category: "technical",
+    experimentAdded: "Experiment #15-4",
+    importance: "medium",
+  },
+  {
+    name: "trix",
+    description:
+      "Trix - advanced momentum oscillator that uses triple exponential moving average to filter out market noise",
+    category: "technical",
+    experimentAdded: "Experiment #15-5",
+    importance: "medium",
+  },
+];
+
+/**
+ * FeatureRegistry utility functions
+ */
+export class FeatureRegistry {
+  /**
+   * Get total feature count
+   */
+  public static getFeatureCount(): number {
+    return FEATURE_REGISTRY.length;
+  }
+
+  /**
+   * Get features by category
+   */
+  public static getFeaturesByCategory(
+    category: FeatureDefinition["category"]
+  ): FeatureDefinition[] {
+    return FEATURE_REGISTRY.filter((f) => f.category === category);
+  }
+
+  /**
+   * Get features added in a specific experiment
+   */
+  public static getFeaturesByExperiment(
+    experimentName: string
+  ): FeatureDefinition[] {
+    return FEATURE_REGISTRY.filter((f) => f.experimentAdded === experimentName);
+  }
+
+  /**
+   * Get features by importance level
+   */
+  public static getFeaturesByImportance(
+    importance: FeatureDefinition["importance"]
+  ): FeatureDefinition[] {
+    return FEATURE_REGISTRY.filter((f) => f.importance === importance);
+  }
+
+  /**
+   * Get feature definition by index
+   */
+  public static getFeatureByIndex(index: number): FeatureDefinition | null {
+    return FEATURE_REGISTRY[index] || null;
+  }
+
+  /**
+   * Get feature index by name
+   */
+  public static getFeatureIndex(name: string): number {
+    return FEATURE_REGISTRY.findIndex((f) => f.name === name);
+  }
+
+  /**
+   * Validate that feature count matches expected count
+   */
+  public static validateFeatureCount(actualCount: number): void {
+    const expectedCount = this.getFeatureCount();
+    if (actualCount !== expectedCount) {
+      throw new Error(
+        `Feature count mismatch! Registry defines ${expectedCount} features, got ${actualCount}. ` +
+          `Check FeatureCalculator.ts coreFeatures array matches FeatureRegistry.ts`
+      );
+    }
+  }
+
+  /**
+   * Get summary statistics
+   */
+  public static getSummary(): {
+    total: number;
+    byCategory: Record<string, number>;
+    byImportance: Record<string, number>;
+  } {
+    const byCategory: Record<string, number> = {};
+    const byImportance: Record<string, number> = {};
+
+    FEATURE_REGISTRY.forEach((feature) => {
+      byCategory[feature.category] = (byCategory[feature.category] || 0) + 1;
+      byImportance[feature.importance || "unknown"] =
+        (byImportance[feature.importance || "unknown"] || 0) + 1;
+    });
+
+    return {
+      total: FEATURE_REGISTRY.length,
+      byCategory,
+      byImportance,
+    };
+  }
+
+  /**
+   * Get feature names in order (useful for analysis)
+   */
+  public static getFeatureNames(): string[] {
+    return FEATURE_REGISTRY.map((f) => f.name);
+  }
+}

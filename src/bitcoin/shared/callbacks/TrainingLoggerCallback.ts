@@ -231,17 +231,21 @@ export class TrainingLoggerCallback extends tf.CustomCallback {
   }
 
   private getLearningRate(epoch: number): number {
-    const initialLR = TRAINING_CONFIG.INITIAL_LEARNING_RATE;
-    const decayRate = TRAINING_CONFIG.LR_DECAY_RATE;
-    const warmupEpochs = TRAINING_CONFIG.WARMUP_EPOCHS;
-    const warmupInitialLR = TRAINING_CONFIG.WARMUP_INITIAL_LR;
-
-    if (epoch < warmupEpochs) {
-      const slope = (initialLR - warmupInitialLR) / warmupEpochs;
-      return warmupInitialLR + slope * epoch;
+    // Get the actual learning rate from the model's optimizer
+    if (this.model && this.model.optimizer) {
+      const optimizer = this.model.optimizer;
+      // Try to get learning rate from the optimizer
+      if ("learningRate" in optimizer) {
+        return (optimizer as any).learningRate;
+      }
+      // Fallback: try to get from optimizer config
+      if ("getConfig" in optimizer) {
+        const config = (optimizer as any).getConfig();
+        return config.learningRate || TRAINING_CONFIG.INITIAL_LEARNING_RATE;
+      }
     }
-    const decayEpochs = epoch - warmupEpochs;
-    return initialLR * Math.pow(decayRate, decayEpochs);
+    // Fallback to initial learning rate if we can't get it from optimizer
+    return TRAINING_CONFIG.INITIAL_LEARNING_RATE;
   }
 
   private getDifficultyLevel(epoch: number): number {

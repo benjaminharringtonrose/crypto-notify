@@ -89,10 +89,10 @@ export const MODEL_CONFIG = {
 };
 
 export const TRAINING_CONFIG = {
-  EPOCHS: 35, // PROVEN OPTIMAL: 30 epochs for faster iteration, 50+ caused issues
+  EPOCHS: 100,
   BATCH_SIZE: 16, // PROVEN OPTIMAL: Best balance for gradient updates
   SHUFFLE_CHUNK_SIZE: 10,
-  INITIAL_LEARNING_RATE: 0.0005, // PROVEN OPTIMAL: 0.0008 showed promise but 0.0005 is baseline
+  INITIAL_LEARNING_RATE: 0.0008, // PROVEN OPTIMAL: 0.0008 showed promise but 0.0005 is baseline
   MIN_LEARNING_RATE: 0.00005, // 7DAY-2: Higher floor for better 7-day convergence
   CYCLIC_LR_STEP_SIZE: 15, // PROVEN OPTIMAL: 10 showed minor promise but 15 is baseline
   OUTPUT_CLASSES: 2,

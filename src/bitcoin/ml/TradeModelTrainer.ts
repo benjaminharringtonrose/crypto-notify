@@ -2,11 +2,10 @@ import * as admin from "firebase-admin";
 import * as tf from "@tensorflow/tfjs-node";
 import dotenv from "dotenv";
 
-import { ExponentialDecayLRCallback } from "../shared/callbacks/ExponentialDecayLRCallback";
-import { GradientClippingCallback } from "../shared/callbacks/GradientClippingCallback";
-// import { CurriculumLearningCallback } from "../shared/callbacks/CurriculumLearningCallback"; // RECOVERY-3: Disabled
+import { CyclicalLRCallback } from "../shared/callbacks/CyclicalLRCallback";
+// import { AdaptiveLRCallback } from "../shared/callbacks/AdaptiveLRCallback";
 import { TrainingLoggerCallback } from "../shared/callbacks/TrainingLoggerCallback";
-import { ModelConfig } from "../../types";
+import { FinalMetrics, ModelConfig } from "../../types";
 import TradeModelFactory from "./TradeModelFactory";
 import { FirebaseService } from "../../api/FirebaseService";
 import { FILE_NAMES, MODEL_CONFIG, TRAINING_CONFIG } from "../../constants";
@@ -36,18 +35,7 @@ export class TradeModelTrainer {
   private currentFeatureName?: string; // For tracking which feature is being evaluated
 
   // Final metrics for analysis
-  private finalMetrics: {
-    balancedAccuracy: number;
-    buyF1: number;
-    sellF1: number;
-    combinedF1: number;
-    matthewsCorrelation: number;
-    buyPrecision: number;
-    sellPrecision: number;
-    buyRecall: number;
-    sellRecall: number;
-    finalEpoch: number;
-  } = {
+  private finalMetrics: FinalMetrics = {
     balancedAccuracy: 0,
     buyF1: 0,
     sellF1: 0,
@@ -64,9 +52,6 @@ export class TradeModelTrainer {
     // Use provided seed or default to 42 for consistency
     this.seed = seed || 42;
     tf.randomUniform([1, 1], 0, 1, "float32", this.seed); // Seed TensorFlow random
-    console.log(
-      `🔧 RECOVERY-2: Deterministic seeding enabled with seed: ${this.seed}`
-    );
 
     this.dataProcessor = new DataProcessor(
       this.config,
@@ -207,19 +192,11 @@ export class TradeModelTrainer {
         this
       );
 
-      const lrCallback = new ExponentialDecayLRCallback();
-      const gradientClippingCallback = new GradientClippingCallback(
-        X_val,
-        y_val
-      );
-      // RECOVERY-3: Disable curriculum learning to prevent class collapse
-      // const curriculumLearningCallback = new CurriculumLearningCallback(
-      //   this.config.epochs,
-      //   this.dataProcessor
-      // );
-      console.log(
-        "🔧 RECOVERY-3: Curriculum learning disabled to stabilize class balance"
-      );
+      const lrCallback = new CyclicalLRCallback({
+        baseLr: TRAINING_CONFIG.WARMUP_INITIAL_LR,
+        maxLr: this.config.initialLearningRate,
+        stepSize: TRAINING_CONFIG.CYCLIC_LR_STEP_SIZE,
+      });
 
       if (!this.model) throw new Error("Model initialization failed");
 
@@ -246,11 +223,6 @@ export class TradeModelTrainer {
 
       trainingLoggerCallback.setModel(this.model);
       lrCallback.setModel(this.model);
-      gradientClippingCallback.setModel(this.model);
-      // curriculumLearningCallback.setModel(this.model); // DISABLED
-
-      // Connect gradient clipping callback to training logger
-      gradientClippingCallback.setTrainingLogger(trainingLoggerCallback);
 
       console.log("Model summary:");
       this.model.summary();
@@ -304,9 +276,7 @@ export class TradeModelTrainer {
 
                 // Use centralized training logger
                 await trainingLoggerCallback.onEpochEnd(epoch, logs);
-                await lrCallback.onEpochEnd(epoch, logs);
-                await gradientClippingCallback.onEpochEnd(epoch, logs);
-                // await curriculumLearningCallback.onEpochEnd(epoch, logs); // DISABLED
+                await lrCallback.onEpochEnd(epoch);
               }
             },
             onTrainEnd: async () => {

@@ -58,6 +58,61 @@ Handles learning rate scheduling with exponential decay and warmup.
 
 **Changes**: Removed console logging - learning rate is now displayed in the centralized table.
 
+### ReduceLROnPlateauCallback
+
+**File**: `ReduceLROnPlateauCallback.ts`
+
+Learning rate scheduler that monitors a validation metric and reduces LR when training plateaus.
+
+**Features**:
+
+- Monitors a chosen metric (e.g., `val_loss`)
+- Patience-based plateau detection with `minDelta`
+- Multiplies LR by a `factor`, with a floor (`MIN_LEARNING_RATE`)
+- Automatically recompiles optimizer with new LR
+
+### CyclicalLRCallback (CURRENT)
+
+**File**: `CyclicalLRCallback.ts`
+
+Implements a triangular cyclical learning rate policy that cycles LR between a base and max value over fixed step sizes. Useful for escaping shallow minima in non-stationary time series.
+
+**Features**:
+
+- Triangular policy with `baseLr`, `maxLr`, and `stepSize`
+- Epoch-based schedule; adjusts LR each epoch
+- Respects `MIN_LEARNING_RATE`
+- Automatically recompiles optimizer each epoch
+
+### AdaptiveLRCallback
+
+**File**: `AdaptiveLRCallback.ts`
+
+An intelligent learning rate scheduler that adapts LR based on validation performance. Increases LR when validation improves, decreases when it plateaus, with momentum to smooth changes.
+
+**Features**:
+
+- Performance-based LR adjustment (increases on improvement, decreases on plateau)
+- Momentum system to smooth LR changes and avoid oscillation
+- Configurable increase/decrease factors and patience
+- Monitors any validation metric (val_loss, val_accuracy, etc.)
+- Automatic optimizer recompilation
+
+**Usage**:
+
+```typescript
+const lrCallback = new AdaptiveLRCallback({
+  baseLr: TRAINING_CONFIG.WARMUP_INITIAL_LR,
+  maxLr: TRAINING_CONFIG.INITIAL_LEARNING_RATE,
+  minLr: TRAINING_CONFIG.MIN_LEARNING_RATE,
+  increaseFactor: 1.1,
+  decreaseFactor: 0.8,
+  patience: 3,
+  monitor: "val_loss",
+  mode: "min",
+});
+```
+
 ### GradientClippingCallback
 
 **File**: `GradientClippingCallback.ts`
@@ -109,23 +164,20 @@ The callbacks are automatically configured in `TradeModelTrainer.ts`:
 // Create centralized training logger
 const trainingLoggerCallback = new TrainingLoggerCallback(X_val, y_val, this);
 
-// Set up other callbacks
-const lrCallback = new ExponentialDecayLRCallback();
-const gradientClippingCallback = new GradientClippingCallback(
-  this.lossFn,
-  X_val,
-  y_val
-);
-const curriculumLearningCallback = new CurriculumLearningCallback(
-  this.config.epochs,
-  this.dataProcessor
-);
+// Set up other callbacks (current setup)
+const lrCallback = new CyclicalLRCallback({
+  baseLr: TRAINING_CONFIG.WARMUP_INITIAL_LR,
+  maxLr: TRAINING_CONFIG.INITIAL_LEARNING_RATE,
+  stepSize: TRAINING_CONFIG.CYCLIC_LR_STEP_SIZE,
+});
+const gradientClippingCallback = new GradientClippingCallback(X_val, y_val);
+// const curriculumLearningCallback = new CurriculumLearningCallback(...); // Disabled by default
 
 // Connect callbacks
 trainingLoggerCallback.setModel(this.model);
 lrCallback.setModel(this.model);
 gradientClippingCallback.setModel(this.model);
-curriculumLearningCallback.setModel(this.model);
+// curriculumLearningCallback.setModel(this.model);
 
 // Connect gradient clipping to training logger
 gradientClippingCallback.setTrainingLogger(trainingLoggerCallback);

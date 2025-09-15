@@ -215,3 +215,16 @@ export interface GetAdvTradeProductCandlesRequest {
     | "ONE_DAY";
   limit?: number;
 }
+
+export interface FinalMetrics {
+  balancedAccuracy: number;
+  buyF1: number;
+  sellF1: number;
+  combinedF1: number;
+  matthewsCorrelation: number;
+  buyPrecision: number;
+  sellPrecision: number;
+  buyRecall: number;
+  sellRecall: number;
+  finalEpoch: number;
+}

@@ -470,15 +470,16 @@ class LogisticRegressionModel extends BaseModel {
         const prediction = this.sigmoid(
           this.dotProduct(scaledX[i], this.weights) + this.bias
         );
-        
+
         // Cross-entropy loss
-        const loss = -y[i] * Math.log(Math.max(prediction, 1e-15)) - 
-                    (1 - y[i]) * Math.log(Math.max(1 - prediction, 1e-15));
+        const loss =
+          -y[i] * Math.log(Math.max(prediction, 1e-15)) -
+          (1 - y[i]) * Math.log(Math.max(1 - prediction, 1e-15));
         totalLoss += loss;
 
         // Gradient calculation
         const error = prediction - y[i];
-        
+
         for (let j = 0; j < nFeatures; j++) {
           totalGradientW[j] += error * scaledX[i][j];
         }
@@ -488,8 +489,8 @@ class LogisticRegressionModel extends BaseModel {
       // Update weights with regularization
       const batchSize = scaledX.length;
       for (let j = 0; j < nFeatures; j++) {
-        const gradient = totalGradientW[j] / batchSize + 
-                        this.regularization * this.weights[j];
+        const gradient =
+          totalGradientW[j] / batchSize + this.regularization * this.weights[j];
         this.weights[j] -= this.learningRate * gradient;
       }
       this.bias -= this.learningRate * (totalGradientB / batchSize);
@@ -500,7 +501,9 @@ class LogisticRegressionModel extends BaseModel {
       }
 
       if (iteration % 100 === 0) {
-        console.log(`Iteration ${iteration}, Loss: ${totalLoss / scaledX.length}`);
+        console.log(
+          `Iteration ${iteration}, Loss: ${totalLoss / scaledX.length}`
+        );
       }
     }
 
@@ -562,17 +565,20 @@ class LogisticRegressionModel extends BaseModel {
 
     // Calculate mean and std for each feature
     for (let j = 0; j < nFeatures; j++) {
-      const values = X.map(row => row[j]);
-      const featureMean = values.reduce((sum, val) => sum + val, 0) / values.length;
-      const variance = values.reduce((sum, val) => sum + Math.pow(val - featureMean, 2), 0) / values.length;
+      const values = X.map((row) => row[j]);
+      const featureMean =
+        values.reduce((sum, val) => sum + val, 0) / values.length;
+      const variance =
+        values.reduce((sum, val) => sum + Math.pow(val - featureMean, 2), 0) /
+        values.length;
       const featureStd = Math.sqrt(variance);
-      
+
       mean.push(featureMean);
       std.push(featureStd > 1e-8 ? featureStd : 1); // Avoid division by zero
     }
 
     // Scale features
-    const scaledX = X.map(row => 
+    const scaledX = X.map((row) =>
       row.map((val, j) => (val - mean[j]) / std[j])
     );
 
@@ -580,7 +586,9 @@ class LogisticRegressionModel extends BaseModel {
   }
 
   private scaleFeatures(sample: number[]): number[] {
-    return sample.map((val, j) => (val - this.featureMean[j]) / this.featureStd[j]);
+    return sample.map(
+      (val, j) => (val - this.featureMean[j]) / this.featureStd[j]
+    );
   }
 
   private featureMean: number[] = [];
@@ -829,7 +837,10 @@ export class BitcoinPredictor {
     return results;
   }
 
-  private async optimizeEnsembleWeights(X: number[][], y: number[]): Promise<void> {
+  private async optimizeEnsembleWeights(
+    X: number[][],
+    y: number[]
+  ): Promise<void> {
     console.log("Optimizing ensemble weights...");
 
     // Use cross-validation to get more reliable performance estimates
@@ -838,21 +849,21 @@ export class BitcoinPredictor {
 
     for (const [name, model] of Object.entries(this.bestModels)) {
       cvScores[name] = [];
-      
+
       try {
         // Simple cross-validation
         const foldSize = Math.floor(X.length / cvFolds);
         for (let fold = 0; fold < cvFolds; fold++) {
           const start = fold * foldSize;
           const end = fold === cvFolds - 1 ? X.length : (fold + 1) * foldSize;
-          
+
           const testX = X.slice(start, end);
           const testY = y.slice(start, end);
-          
+
           // Retrain model on remaining data
           const trainX = [...X.slice(0, start), ...X.slice(end)];
           const trainY = [...y.slice(0, start), ...y.slice(end)];
-          
+
           if (trainX.length > 0 && testX.length > 0) {
             const tempModel = this.createModelCopy(name, model);
             await tempModel.train(trainX, trainY);
@@ -870,17 +881,24 @@ export class BitcoinPredictor {
     // Calculate average CV scores and apply minimum performance threshold
     const minPerformance = 0.45; // Minimum acceptable performance
     for (const [name, scores] of Object.entries(cvScores)) {
-      const avgScore = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+      const avgScore =
+        scores.reduce((sum, score) => sum + score, 0) / scores.length;
       const adjustedScore = Math.max(avgScore, minPerformance);
       this.ensembleWeights[name] = adjustedScore;
-      console.log(`${name} - CV Accuracy: ${avgScore.toFixed(4)}, Adjusted: ${adjustedScore.toFixed(4)}`);
+      console.log(
+        `${name} - CV Accuracy: ${avgScore.toFixed(
+          4
+        )}, Adjusted: ${adjustedScore.toFixed(4)}`
+      );
     }
 
     // Normalize weights with softmax for better distribution
     const maxWeight = Math.max(...Object.values(this.ensembleWeights));
-    const expWeights = Object.values(this.ensembleWeights).map(w => Math.exp(w - maxWeight));
+    const expWeights = Object.values(this.ensembleWeights).map((w) =>
+      Math.exp(w - maxWeight)
+    );
     const sumExpWeights = expWeights.reduce((sum, w) => sum + w, 0);
-    
+
     let weightIndex = 0;
     for (const name in this.ensembleWeights) {
       this.ensembleWeights[name] = expWeights[weightIndex] / sumExpWeights;
